@@ -3,9 +3,70 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Assignment 01</title>
+    <title>Stellar Web</title>
+    <link rel="stylesheet" href="styles/main.css">
 </head>
 <body>
-    <h1>Hello from mynamejohn!</h1>
+    <canvas id="stellar-canvas"></canvas>
+
+    <div class="controls">
+        <h2>Stellar Web Controls</h2>
+
+        <div class="control-group">
+            <label for="connectivity">Connectivity Radius: <span id="connectivity-val">150</span></label>
+            <input type="range" id="connectivity" min="50" max="300" value="150">
+        </div>
+
+        <div class="control-group">
+            <label for="edge-length">Edge Length: <span id="edge-length-val">100</span></label>
+            <input type="range" id="edge-length" min="20" max="200" value="100">
+        </div>
+
+        <div class="control-group">
+            <label for="volatility">Volatility: <span id="volatility-val">0.2</span></label>
+            <input type="range" id="volatility" min="0.1" max="5" step="0.1" value="0.2">
+        </div>
+
+        <div class="control-group">
+            <label for="speed">Speed: <span id="speed-val">1.0</span></label>
+            <input type="range" id="speed" min="0.1" max="3" step="0.1" value="1.0">
+        </div>
+
+        <div class="control-group">
+            <label for="particle-count">Particles: <span id="particle-count-val">350</span></label>
+            <input type="range" id="particle-count" min="20" max="600" value="350">
+        </div>
+
+        <div class="control-group">
+            <label for="positive-ratio">Positive Ratio: <span id="positive-ratio-val">50</span>%</label>
+            <input type="range" id="positive-ratio" min="0" max="100" value="50">
+        </div>
+
+        <div class="control-group">
+            <label for="antiparticle-ratio">Antiparticles: <span id="antiparticle-ratio-val">0</span>%</label>
+            <input type="range" id="antiparticle-ratio" min="0" max="50" value="0">
+        </div>
+
+        <div class="control-group">
+            <label for="gravity-well">Finger Gravity: <span id="gravity-well-val">5.0</span></label>
+            <input type="range" id="gravity-well" min="0" max="10" step="0.1" value="5.0">
+        </div>
+
+        <div class="control-group">
+            <label for="discharge-threshold">Discharge Threshold: <span id="discharge-threshold-val">5.0</span></label>
+            <input type="range" id="discharge-threshold" min="0" max="15" step="0.5" value="5.0">
+        </div>
+
+        <div class="control-group toggle-group">
+            <label>
+                <input type="checkbox" id="polarity-toggle">
+                <span>Particle Polarity (attract/repel)</span>
+            </label>
+        </div>
+
+        <button id="reset-btn">Reset Particles</button>
+    </div>
+
+    <script src="scripts/stellar.js"></script>
 </body>
 </html>

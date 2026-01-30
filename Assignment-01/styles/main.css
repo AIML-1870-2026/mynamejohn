@@ -1,0 +1,144 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background: #0a0a12;
+    overflow: hidden;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+#stellar-canvas {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.controls {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(20, 20, 35, 0.9);
+    padding: 20px;
+    border-radius: 12px;
+    border: 1px solid rgba(204, 204, 255, 0.2);
+    color: #ccccff;
+    min-width: 250px;
+    backdrop-filter: blur(10px);
+    z-index: 100;
+}
+
+.controls h2 {
+    font-size: 1.1rem;
+    margin-bottom: 15px;
+    color: #ccccff;
+    text-align: center;
+    font-weight: 400;
+    letter-spacing: 1px;
+}
+
+.control-group {
+    margin-bottom: 15px;
+}
+
+.control-group label {
+    display: block;
+    font-size: 0.85rem;
+    margin-bottom: 5px;
+    color: #9999cc;
+}
+
+.control-group label span {
+    color: #ccccff;
+    font-weight: 600;
+}
+
+input[type="range"] {
+    width: 100%;
+    height: 6px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: rgba(204, 204, 255, 0.2);
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    background: #ccccff;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+    background: #ffffff;
+}
+
+input[type="range"]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    background: #ccccff;
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+}
+
+button {
+    width: 100%;
+    padding: 10px;
+    margin-top: 10px;
+    background: rgba(204, 204, 255, 0.15);
+    border: 1px solid rgba(204, 204, 255, 0.3);
+    color: #ccccff;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+button:hover {
+    background: rgba(204, 204, 255, 0.25);
+    border-color: rgba(204, 204, 255, 0.5);
+}
+
+/* Toggle checkbox styling */
+.toggle-group label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    gap: 10px;
+}
+
+.toggle-group input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: #ccccff;
+    cursor: pointer;
+}
+
+.toggle-group span {
+    font-weight: normal;
+    color: #9999cc;
+}
+
+/* Legend for particle types */
+.controls::after {
+    content: '● Positive  ○ Negative  ⊗ Anti';
+    display: block;
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(204, 204, 255, 0.2);
+    font-size: 0.75rem;
+    text-align: center;
+    color: #9999cc;
+}
