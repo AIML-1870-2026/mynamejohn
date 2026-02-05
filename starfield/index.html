@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hyperspace Starfield</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #000;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            position: fixed;
+            top: 0;
+            left: 0;
+        }
+
+        .controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(20, 20, 40, 0.9);
+            padding: 25px;
+            border-radius: 15px;
+            border: 1px solid rgba(100, 150, 255, 0.3);
+            box-shadow: 0 0 30px rgba(100, 150, 255, 0.2);
+            z-index: 100;
+            min-width: 280px;
+        }
+
+        .controls h2 {
+            color: #fff;
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 1.3rem;
+            text-shadow: 0 0 10px rgba(100, 150, 255, 0.5);
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        .control-group label {
+            display: flex;
+            justify-content: space-between;
+            color: #aac;
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+        }
+
+        .control-group label span {
+            color: #7af;
+            font-weight: bold;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            background: linear-gradient(90deg, #1a1a3a, #3a3a6a);
+            outline: none;
+            -webkit-appearance: none;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #7af, #48f);
+            box-shadow: 0 0 10px rgba(100, 150, 255, 0.6);
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #7af, #48f);
+            box-shadow: 0 0 10px rgba(100, 150, 255, 0.6);
+            cursor: pointer;
+            border: none;
+        }
+
+        .reset-btn {
+            width: 100%;
+            padding: 12px;
+            margin-top: 10px;
+            background: linear-gradient(135deg, #3a3a6a, #2a2a5a);
+            border: 1px solid rgba(100, 150, 255, 0.4);
+            border-radius: 8px;
+            color: #aac;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .reset-btn:hover {
+            background: linear-gradient(135deg, #4a4a8a, #3a3a7a);
+            color: #fff;
+            box-shadow: 0 0 15px rgba(100, 150, 255, 0.4);
+        }
+
+        .info {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            color: rgba(150, 180, 255, 0.6);
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="starfield"></canvas>
+
+    <div class="controls">
+        <h2>Hyperspace Controls</h2>
+
+        <div class="control-group">
+            <label>Star Size <span id="sizeValue">2</span></label>
+            <input type="range" id="size" min="0.5" max="5" value="2" step="0.5">
+        </div>
+
+        <div class="control-group">
+            <label>Trail Length <span id="trailValue">50</span></label>
+            <input type="range" id="trail" min="10" max="150" value="50" step="5">
+        </div>
+
+        <div class="control-group">
+            <label>Speed <span id="speedValue">15</span></label>
+            <input type="range" id="speed" min="2" max="50" value="15" step="1">
+        </div>
+
+        <div class="control-group">
+            <label>Brightness <span id="brightnessValue">100</span>%</label>
+            <input type="range" id="brightness" min="20" max="100" value="100" step="5">
+        </div>
+
+        <div class="control-group">
+            <label>Dance Chance <span id="danceValue">5</span>%</label>
+            <input type="range" id="dance" min="0" max="50" value="5" step="1">
+        </div>
+
+        <button class="reset-btn" id="resetBtn">Reset to Defaults</button>
+    </div>
+
+    <div class="info">
+        Punch it, Chewie! | Watch for dancing stick figures!
+    </div>
+
+    <script>
+        const canvas = document.getElementById('starfield');
+        const ctx = canvas.getContext('2d');
+
+        let centerX, centerY;
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            centerX = canvas.width / 2;
+            centerY = canvas.height / 2;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+
+        // Settings
+        const settings = {
+            size: 2,
+            trail: 50,
+            speed: 15,
+            brightness: 100,
+            danceChance: 5
+        };
+
+        const defaults = { ...settings };
+
+        // Stars array
+        let stars = [];
+        const maxStars = 400;
+
+        // Dancing stick figures
+        let dancers = [];
+
+        // Star colors
+        const starColors = [
+            [255, 255, 255],
+            [200, 220, 255],
+            [255, 240, 220],
+            [255, 200, 200],
+            [200, 200, 255],
+            [255, 255, 200],
+        ];
+
+        // Dancing stick figure class
+        class Dancer {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.life = 120;
+                this.maxLife = 120;
+                this.dancePhase = Math.random() * Math.PI * 2;
+                this.danceSpeed = 0.15 + Math.random() * 0.1;
+                this.size = 20;
+            }
+
+            update() {
+                this.dancePhase += this.danceSpeed;
+                this.life--;
+                return this.life > 0;
+            }
+
+            draw() {
+                const alpha = Math.min(1, this.life / 30) * (settings.brightness / 100);
+                const [r, g, b] = this.color;
+                const colorStr = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+
+                ctx.strokeStyle = colorStr;
+                ctx.lineWidth = 2;
+                ctx.lineCap = 'round';
+
+                const t = this.dancePhase;
+                const size = this.size;
+
+                // Jive bounce - up and down energy
+                const bounce = Math.abs(Math.sin(t * 2)) * size * 0.15;
+                const sway = Math.sin(t) * size * 0.1;
+
+                // Head
+                ctx.beginPath();
+                ctx.arc(this.x + sway, this.y - size - bounce, size * 0.3, 0, Math.PI * 2);
+                ctx.stroke();
+
+                // Body (bounces and sways)
+                const shoulderY = this.y - size * 0.6 - bounce;
+                const hipY = this.y + size * 0.1 - bounce * 0.5;
+                ctx.beginPath();
+                ctx.moveTo(this.x + sway, this.y - size * 0.7 - bounce);
+                ctx.lineTo(this.x + sway * 0.5, hipY);
+                ctx.stroke();
+
+                // Arms - swinging opposite to legs, bent at elbows
+                const armSwing = Math.sin(t) * 0.8;
+
+                // Left arm swings forward when right leg kicks
+                const leftElbowX = this.x + sway - size * 0.3;
+                const leftElbowY = shoulderY + size * 0.3;
+                const leftHandX = leftElbowX + Math.sin(armSwing + Math.PI) * size * 0.4;
+                const leftHandY = leftElbowY + Math.cos(armSwing) * size * 0.2;
+
+                ctx.beginPath();
+                ctx.moveTo(this.x + sway, shoulderY);
+                ctx.lineTo(leftElbowX, leftElbowY);
+                ctx.lineTo(leftHandX, leftHandY);
+                ctx.stroke();
+
+                // Right arm swings opposite
+                const rightElbowX = this.x + sway + size * 0.3;
+                const rightElbowY = shoulderY + size * 0.3;
+                const rightHandX = rightElbowX + Math.sin(armSwing) * size * 0.4;
+                const rightHandY = rightElbowY + Math.cos(armSwing + Math.PI) * size * 0.2;
+
+                ctx.beginPath();
+                ctx.moveTo(this.x + sway, shoulderY);
+                ctx.lineTo(rightElbowX, rightElbowY);
+                ctx.lineTo(rightHandX, rightHandY);
+                ctx.stroke();
+
+                // Legs - high stepping jive kicks
+                const legKick = Math.sin(t);
+                const footY = hipY + size * 0.8;
+
+                // Left leg - kicks when legKick > 0
+                const leftKneeX = this.x + sway * 0.5 - size * 0.15;
+                const leftKneeY = hipY + size * 0.4 - (legKick > 0 ? legKick * size * 0.3 : 0);
+                const leftFootX = leftKneeX - size * 0.1 - (legKick > 0 ? legKick * size * 0.3 : 0);
+                const leftFootY = legKick > 0 ? leftKneeY + size * 0.3 : footY;
+
+                ctx.beginPath();
+                ctx.moveTo(this.x + sway * 0.5, hipY);
+                ctx.lineTo(leftKneeX, leftKneeY);
+                ctx.lineTo(leftFootX, leftFootY);
+                ctx.stroke();
+
+                // Right leg - kicks when legKick < 0
+                const rightKneeX = this.x + sway * 0.5 + size * 0.15;
+                const rightKneeY = hipY + size * 0.4 - (legKick < 0 ? -legKick * size * 0.3 : 0);
+                const rightFootX = rightKneeX + size * 0.1 + (legKick < 0 ? -legKick * size * 0.3 : 0);
+                const rightFootY = legKick < 0 ? rightKneeY + size * 0.3 : footY;
+
+                ctx.beginPath();
+                ctx.moveTo(this.x + sway * 0.5, hipY);
+                ctx.lineTo(rightKneeX, rightKneeY);
+                ctx.lineTo(rightFootX, rightFootY);
+                ctx.stroke();
+            }
+        }
+
+        // Star class - 3D perspective
+        class Star {
+            constructor() {
+                this.reset();
+            }
+
+            reset() {
+                // Random position in 3D space
+                this.x = (Math.random() - 0.5) * canvas.width * 2;
+                this.y = (Math.random() - 0.5) * canvas.height * 2;
+                this.z = Math.random() * 1500 + 500; // Start far away
+
+                this.color = starColors[Math.floor(Math.random() * starColors.length)];
+                this.shouldDance = Math.random() * 100 < settings.danceChance;
+                this.hasDanced = false;
+            }
+
+            update() {
+                // Move toward viewer
+                this.z -= settings.speed;
+
+                // Check for dance transformation when star is close
+                if (this.shouldDance && !this.hasDanced && this.z < 200 && this.z > 50) {
+                    const scale = 500 / this.z;
+                    const screenX = centerX + this.x * scale;
+                    const screenY = centerY + this.y * scale;
+
+                    // Only dance if on screen
+                    if (screenX > 50 && screenX < canvas.width - 50 &&
+                        screenY > 50 && screenY < canvas.height - 50) {
+                        this.hasDanced = true;
+                        dancers.push(new Dancer(screenX, screenY, this.color));
+                        this.reset();
+                        return;
+                    }
+                }
+
+                // Reset when passed viewer
+                if (this.z < 1) {
+                    this.reset();
+                }
+            }
+
+            draw() {
+                const [r, g, b] = this.color;
+
+                // Perspective projection
+                const scale = 500 / this.z;
+                const screenX = centerX + this.x * scale;
+                const screenY = centerY + this.y * scale;
+
+                // Previous position for trail
+                const prevZ = this.z + settings.trail;
+                const prevScale = 500 / prevZ;
+                const prevScreenX = centerX + this.x * prevScale;
+                const prevScreenY = centerY + this.y * prevScale;
+
+                // Skip if off screen
+                if (screenX < -50 || screenX > canvas.width + 50 ||
+                    screenY < -50 || screenY > canvas.height + 50) {
+                    return;
+                }
+
+                // Size based on distance
+                const size = Math.max(0.5, (1 - this.z / 2000) * settings.size * 3);
+
+                // Brightness based on distance (closer = brighter)
+                const distanceFactor = 1 - this.z / 2000;
+                const alpha = distanceFactor * (settings.brightness / 100);
+
+                // Draw trail (streak effect)
+                const gradient = ctx.createLinearGradient(prevScreenX, prevScreenY, screenX, screenY);
+                gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0)`);
+                gradient.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, ${alpha * 0.5})`);
+                gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, ${alpha})`);
+
+                ctx.beginPath();
+                ctx.moveTo(prevScreenX, prevScreenY);
+                ctx.lineTo(screenX, screenY);
+                ctx.strokeStyle = gradient;
+                ctx.lineWidth = size;
+                ctx.lineCap = 'round';
+                ctx.stroke();
+
+                // Draw star head (bright point at front)
+                ctx.beginPath();
+                ctx.arc(screenX, screenY, size * 0.8, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+                ctx.fill();
+
+                // Glow effect for close stars
+                if (this.z < 300) {
+                    const glowAlpha = (1 - this.z / 300) * alpha * 0.5;
+                    ctx.beginPath();
+                    ctx.arc(screenX, screenY, size * 2, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${glowAlpha})`;
+                    ctx.fill();
+                }
+            }
+        }
+
+        // Initialize stars
+        function initStars() {
+            stars = [];
+            for (let i = 0; i < maxStars; i++) {
+                const star = new Star();
+                // Distribute initial z positions
+                star.z = Math.random() * 2000;
+                stars.push(star);
+            }
+        }
+        initStars();
+
+        // Animation loop
+        function animate() {
+            // Clear with slight fade for motion blur
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Update and draw stars
+            stars.forEach(star => {
+                star.update();
+                star.draw();
+            });
+
+            // Update and draw dancers
+            dancers = dancers.filter(d => {
+                const alive = d.update();
+                if (alive) d.draw();
+                return alive;
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        // Event listeners
+        document.getElementById('size').addEventListener('input', (e) => {
+            settings.size = parseFloat(e.target.value);
+            document.getElementById('sizeValue').textContent = e.target.value;
+        });
+
+        document.getElementById('trail').addEventListener('input', (e) => {
+            settings.trail = parseInt(e.target.value);
+            document.getElementById('trailValue').textContent = e.target.value;
+        });
+
+        document.getElementById('speed').addEventListener('input', (e) => {
+            settings.speed = parseFloat(e.target.value);
+            document.getElementById('speedValue').textContent = e.target.value;
+        });
+
+        document.getElementById('brightness').addEventListener('input', (e) => {
+            settings.brightness = parseInt(e.target.value);
+            document.getElementById('brightnessValue').textContent = e.target.value;
+        });
+
+        document.getElementById('dance').addEventListener('input', (e) => {
+            settings.danceChance = parseInt(e.target.value);
+            document.getElementById('danceValue').textContent = e.target.value;
+        });
+
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            Object.assign(settings, defaults);
+
+            document.getElementById('size').value = defaults.size;
+            document.getElementById('sizeValue').textContent = defaults.size;
+
+            document.getElementById('trail').value = defaults.trail;
+            document.getElementById('trailValue').textContent = defaults.trail;
+
+            document.getElementById('speed').value = defaults.speed;
+            document.getElementById('speedValue').textContent = defaults.speed;
+
+            document.getElementById('brightness').value = defaults.brightness;
+            document.getElementById('brightnessValue').textContent = defaults.brightness;
+
+            document.getElementById('dance').value = defaults.danceChance;
+            document.getElementById('danceValue').textContent = defaults.danceChance;
+        });
+
+        // Start animation
+        animate();
+    </script>
+</body>
+</html>
