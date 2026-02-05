@@ -34,12 +34,37 @@ Implement a control panel with the following adjustable parameters:
 | `tailLength` | 10 | 0 - 50 | Number of previous positions to draw as trail |
 | `birdCount` | 100 | 10 - 500 | Total number of boids in simulation |
 | `mouseMode` | "off" | "leader" / "predator" / "off" | Mouse interaction behavior |
+| `hawkEnabled` | false | true / false | Enable autonomous hawk predator |
+| `evasionIntensity` | 2.0 | 0 - 5 | Strength of evasive maneuvers |
+| `panicFlockMultiplier` | 3.0 | 1 - 10 | How much tighter flock forms when threatened |
 
 ## Mouse Modes
 
 - **off**: Mouse has no effect on boids
 - **leader**: Boids are attracted toward mouse position (mouse acts as flock leader)
-- **predator**: Boids flee from mouse position (mouse acts as threat)
+- **predator**: Boids flee from mouse position with evasive maneuvers
+
+## Defensive Behaviors
+
+### Hawk Predator
+- Autonomous red hawk that hunts the flock
+- Chases closest boid with predictive targeting
+- Faster than boids (1.5x max speed)
+- Visual: larger red triangle with glow effect
+
+### Evasive Maneuvers
+- When predator gets within 60px, boids execute sharp random turns
+- Perpendicular escape direction with randomness
+- Brief cooldown between maneuvers (15 frames)
+
+### Panic Flocking
+- Threat level (0-1) based on proximity to predators
+- When threatened, cohesion and alignment multiply by panic multiplier
+- Creates tight defensive clusters
+- Birds turn from blue to red based on threat level
+
+### Speed Boost
+- Panicked birds can fly up to 50% faster than normal max speed
 
 ## Visual Design
 
