@@ -268,6 +268,32 @@
             </div>
         </div>
 
+        <div class="control-group">
+            <div class="control-label">
+                <span>Hawk Predator</span>
+            </div>
+            <div class="mouse-modes">
+                <button class="mouse-mode-btn" id="hawk-on">Enable Hawk</button>
+                <button class="mouse-mode-btn active" id="hawk-off">No Hawk</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <div class="control-label">
+                <span>Evasion Intensity</span>
+                <span class="control-value" id="evasion-value">2.0</span>
+            </div>
+            <input type="range" id="evasion" min="0" max="5" step="0.1" value="2.0">
+        </div>
+
+        <div class="control-group">
+            <div class="control-label">
+                <span>Panic Flock Multiplier</span>
+                <span class="control-value" id="panic-value">3.0</span>
+            </div>
+            <input type="range" id="panic" min="1" max="10" step="0.5" value="3.0">
+        </div>
+
         <div class="button-group">
             <button class="action-btn reset-btn" id="reset">Reset</button>
             <button class="action-btn randomize-btn" id="randomize">Randomize</button>
@@ -290,12 +316,132 @@
             maxSpeed: 4,
             tailLength: 10,
             birdCount: 100,
-            mouseMode: 'off'
+            mouseMode: 'off',
+            hawkEnabled: false,
+            evasionIntensity: 2.0,
+            panicFlockMultiplier: 3.0
         };
 
         let boids = [];
+        let hawk = null;
         let mousePos = { x: 0, y: 0 };
         let mouseActive = false;
+
+        // Hawk Predator class
+        class Hawk {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.vx = (Math.random() - 0.5) * 6;
+                this.vy = (Math.random() - 0.5) * 6;
+                this.targetBoid = null;
+                this.huntCooldown = 0;
+                this.history = [];
+            }
+
+            update(boids) {
+                // Store history for trail
+                this.history.push({ x: this.x, y: this.y });
+                if (this.history.length > 20) this.history.shift();
+
+                // Find closest boid to hunt
+                if (!this.targetBoid || this.huntCooldown <= 0 || Math.random() < 0.01) {
+                    let closestDist = Infinity;
+                    for (const boid of boids) {
+                        const dx = boid.x - this.x;
+                        const dy = boid.y - this.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        if (dist < closestDist) {
+                            closestDist = dist;
+                            this.targetBoid = boid;
+                        }
+                    }
+                    this.huntCooldown = 120; // Re-evaluate target every 2 seconds
+                }
+                this.huntCooldown--;
+
+                // Chase target with some prediction
+                if (this.targetBoid) {
+                    const predictX = this.targetBoid.x + this.targetBoid.vx * 10;
+                    const predictY = this.targetBoid.y + this.targetBoid.vy * 10;
+                    const dx = predictX - this.x;
+                    const dy = predictY - this.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist > 0) {
+                        this.vx += (dx / dist) * 0.3;
+                        this.vy += (dy / dist) * 0.3;
+                    }
+                }
+
+                // Add some wandering behavior
+                this.vx += (Math.random() - 0.5) * 0.2;
+                this.vy += (Math.random() - 0.5) * 0.2;
+
+                // Limit speed (hawk is faster than boids)
+                const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+                const maxHawkSpeed = config.maxSpeed * 1.5;
+                if (speed > maxHawkSpeed) {
+                    this.vx = (this.vx / speed) * maxHawkSpeed;
+                    this.vy = (this.vy / speed) * maxHawkSpeed;
+                }
+
+                // Update position
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Wrap around edges
+                if (this.x < 0) this.x += canvas.width;
+                if (this.x > canvas.width) this.x -= canvas.width;
+                if (this.y < 0) this.y += canvas.height;
+                if (this.y > canvas.height) this.y -= canvas.height;
+            }
+
+            draw() {
+                // Draw trail
+                if (this.history.length > 1) {
+                    for (let i = 0; i < this.history.length - 1; i++) {
+                        const alpha = (i / this.history.length) * 0.6;
+                        ctx.beginPath();
+                        ctx.moveTo(this.history[i].x, this.history[i].y);
+                        ctx.lineTo(this.history[i + 1].x, this.history[i + 1].y);
+                        ctx.strokeStyle = `rgba(255, 50, 50, ${alpha})`;
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                    }
+                }
+
+                // Draw hawk as larger triangle
+                const angle = Math.atan2(this.vy, this.vx);
+                const size = 16;
+
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(angle);
+
+                // Hawk body
+                ctx.beginPath();
+                ctx.moveTo(size, 0);
+                ctx.lineTo(-size * 0.7, size * 0.6);
+                ctx.lineTo(-size * 0.3, 0);
+                ctx.lineTo(-size * 0.7, -size * 0.6);
+                ctx.closePath();
+
+                ctx.fillStyle = '#ff3333';
+                ctx.fill();
+                ctx.strokeStyle = '#ff6666';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Glow effect
+                ctx.shadowColor = '#ff0000';
+                ctx.shadowBlur = 15;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+
+                ctx.restore();
+            }
+        }
 
         // Resize canvas
         function resize() {
@@ -324,7 +470,104 @@
                 this.vx = Math.cos(angle) * speed;
                 this.vy = Math.sin(angle) * speed;
                 this.history = [];
-                this.hue = Math.random() * 60 + 180; // Blue-cyan range
+                this.baseHue = Math.random() * 60 + 180; // Blue-cyan range
+                this.hue = this.baseHue;
+                this.threatLevel = 0; // 0 = calm, 1 = maximum panic
+                this.evasionCooldown = 0;
+                this.lastEvasionAngle = 0;
+            }
+
+            detectThreat() {
+                let maxThreat = 0;
+                const threatRadius = 150;
+
+                // Check hawk threat
+                if (config.hawkEnabled && hawk) {
+                    const dx = hawk.x - this.x;
+                    const dy = hawk.y - this.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < threatRadius) {
+                        maxThreat = Math.max(maxThreat, 1 - (dist / threatRadius));
+                    }
+                }
+
+                // Check mouse predator threat
+                if (mouseActive && config.mouseMode === 'predator') {
+                    const dx = mousePos.x - this.x;
+                    const dy = mousePos.y - this.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < threatRadius) {
+                        maxThreat = Math.max(maxThreat, 1 - (dist / threatRadius));
+                    }
+                }
+
+                // Smooth threat level transition
+                this.threatLevel += (maxThreat - this.threatLevel) * 0.1;
+                return this.threatLevel;
+            }
+
+            evade() {
+                let evadeX = 0, evadeY = 0;
+                const evasionRadius = 120;
+
+                // Evade hawk
+                if (config.hawkEnabled && hawk) {
+                    const dx = hawk.x - this.x;
+                    const dy = hawk.y - this.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist < evasionRadius) {
+                        const urgency = (1 - dist / evasionRadius) * config.evasionIntensity;
+
+                        // Direct flee
+                        evadeX -= (dx / dist) * urgency * 0.5;
+                        evadeY -= (dy / dist) * urgency * 0.5;
+
+                        // Evasive maneuver - sharp random turn when very close
+                        if (dist < 60 && this.evasionCooldown <= 0) {
+                            // Pick a perpendicular direction with some randomness
+                            const perpAngle = Math.atan2(-dx, dy) + (Math.random() - 0.5) * Math.PI * 0.5;
+                            this.lastEvasionAngle = perpAngle;
+                            this.evasionCooldown = 15; // Frames before next evasion
+
+                            evadeX += Math.cos(perpAngle) * urgency * 2;
+                            evadeY += Math.sin(perpAngle) * urgency * 2;
+                        } else if (this.evasionCooldown > 0) {
+                            // Continue evasion direction briefly
+                            evadeX += Math.cos(this.lastEvasionAngle) * urgency * 0.5;
+                            evadeY += Math.sin(this.lastEvasionAngle) * urgency * 0.5;
+                        }
+                    }
+                }
+
+                // Evade mouse predator
+                if (mouseActive && config.mouseMode === 'predator') {
+                    const dx = mousePos.x - this.x;
+                    const dy = mousePos.y - this.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist < evasionRadius) {
+                        const urgency = (1 - dist / evasionRadius) * config.evasionIntensity;
+                        evadeX -= (dx / dist) * urgency * 0.5;
+                        evadeY -= (dy / dist) * urgency * 0.5;
+
+                        // Sharp evasive turn
+                        if (dist < 60 && this.evasionCooldown <= 0) {
+                            const perpAngle = Math.atan2(-dx, dy) + (Math.random() - 0.5) * Math.PI * 0.5;
+                            this.lastEvasionAngle = perpAngle;
+                            this.evasionCooldown = 15;
+
+                            evadeX += Math.cos(perpAngle) * urgency * 2;
+                            evadeY += Math.sin(perpAngle) * urgency * 2;
+                        } else if (this.evasionCooldown > 0) {
+                            evadeX += Math.cos(this.lastEvasionAngle) * urgency * 0.5;
+                            evadeY += Math.sin(this.lastEvasionAngle) * urgency * 0.5;
+                        }
+                    }
+                }
+
+                this.evasionCooldown = Math.max(0, this.evasionCooldown - 1);
+                return { x: evadeX, y: evadeY };
             }
 
             update(boids) {
@@ -334,34 +577,50 @@
                     this.history.shift();
                 }
 
+                // Detect threats and update threat level
+                this.detectThreat();
+
+                // Update color based on threat (blue -> red)
+                this.hue = this.baseHue - (this.threatLevel * 180); // Shifts toward red when threatened
+
                 // Get neighbors
                 const neighbors = this.getNeighbors(boids);
 
-                // Apply flocking rules
+                // Apply flocking rules with panic modifiers
                 const separation = this.separate(neighbors);
                 const alignment = this.align(neighbors);
                 const cohesion = this.cohere(neighbors);
 
-                // Apply weights
+                // Panic flocking: when threatened, massively increase cohesion and alignment
+                const panicMultiplier = 1 + (this.threatLevel * (config.panicFlockMultiplier - 1));
+
+                // Apply weights (separation stays same, cohesion/alignment increase under threat)
                 this.vx += separation.x * config.separationWeight;
                 this.vy += separation.y * config.separationWeight;
-                this.vx += alignment.x * config.alignmentWeight;
-                this.vy += alignment.y * config.alignmentWeight;
-                this.vx += cohesion.x * config.cohesionWeight;
-                this.vy += cohesion.y * config.cohesionWeight;
+                this.vx += alignment.x * config.alignmentWeight * panicMultiplier;
+                this.vy += alignment.y * config.alignmentWeight * panicMultiplier;
+                this.vx += cohesion.x * config.cohesionWeight * panicMultiplier;
+                this.vy += cohesion.y * config.cohesionWeight * panicMultiplier;
 
-                // Mouse interaction
-                if (mouseActive && config.mouseMode !== 'off') {
+                // Apply evasive maneuvers
+                const evasion = this.evade();
+                this.vx += evasion.x;
+                this.vy += evasion.y;
+
+                // Mouse interaction (leader mode only when not panicking)
+                if (mouseActive && config.mouseMode === 'leader' && this.threatLevel < 0.3) {
                     const mouse = this.mouseInfluence();
                     this.vx += mouse.x;
                     this.vy += mouse.y;
                 }
 
-                // Limit speed
+                // Limit speed (allow faster when panicking)
+                const panicSpeedBoost = 1 + (this.threatLevel * 0.5);
+                const currentMaxSpeed = config.maxSpeed * panicSpeedBoost;
                 const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
-                if (speed > config.maxSpeed) {
-                    this.vx = (this.vx / speed) * config.maxSpeed;
-                    this.vy = (this.vy / speed) * config.maxSpeed;
+                if (speed > currentMaxSpeed) {
+                    this.vx = (this.vx / speed) * currentMaxSpeed;
+                    this.vy = (this.vy / speed) * currentMaxSpeed;
                 }
 
                 // Update position
@@ -442,9 +701,8 @@
 
                 if (config.mouseMode === 'leader') {
                     return { x: dx * factor * 0.02, y: dy * factor * 0.02 };
-                } else if (config.mouseMode === 'predator') {
-                    return { x: -dx * factor * 0.05, y: -dy * factor * 0.05 };
                 }
+                // Predator mode now handled by evade() method
                 return { x: 0, y: 0 };
             }
 
@@ -513,6 +771,12 @@
             ctx.fillStyle = 'rgba(10, 10, 15, 0.2)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+            // Update and draw hawk
+            if (config.hawkEnabled && hawk) {
+                hawk.update(boids);
+                hawk.draw();
+            }
+
             // Update and draw boids
             for (const boid of boids) {
                 boid.update(boids);
@@ -531,8 +795,25 @@
             radius: { key: 'neighborRadius', decimals: 0 },
             speed: { key: 'maxSpeed', decimals: 1 },
             tail: { key: 'tailLength', decimals: 0 },
-            count: { key: 'birdCount', decimals: 0, onChange: updateBoidCount }
+            count: { key: 'birdCount', decimals: 0, onChange: updateBoidCount },
+            evasion: { key: 'evasionIntensity', decimals: 1 },
+            panic: { key: 'panicFlockMultiplier', decimals: 1 }
         };
+
+        // Hawk toggle
+        document.getElementById('hawk-on').addEventListener('click', () => {
+            config.hawkEnabled = true;
+            hawk = new Hawk();
+            document.getElementById('hawk-on').classList.add('active');
+            document.getElementById('hawk-off').classList.remove('active');
+        });
+
+        document.getElementById('hawk-off').addEventListener('click', () => {
+            config.hawkEnabled = false;
+            hawk = null;
+            document.getElementById('hawk-off').classList.add('active');
+            document.getElementById('hawk-on').classList.remove('active');
+        });
 
         function updateBoidCount() {
             while (boids.length < config.birdCount) {
@@ -574,6 +855,10 @@
             config.tailLength = 10;
             config.birdCount = 100;
             config.mouseMode = 'off';
+            config.hawkEnabled = false;
+            config.evasionIntensity = 2.0;
+            config.panicFlockMultiplier = 3.0;
+            hawk = null;
 
             document.getElementById('separation').value = 1.5;
             document.getElementById('alignment').value = 1.0;
@@ -582,6 +867,8 @@
             document.getElementById('speed').value = 4;
             document.getElementById('tail').value = 10;
             document.getElementById('count').value = 100;
+            document.getElementById('evasion').value = 2.0;
+            document.getElementById('panic').value = 3.0;
 
             document.getElementById('separation-value').textContent = '1.5';
             document.getElementById('alignment-value').textContent = '1.0';
@@ -590,9 +877,13 @@
             document.getElementById('speed-value').textContent = '4';
             document.getElementById('tail-value').textContent = '10';
             document.getElementById('count-value').textContent = '100';
+            document.getElementById('evasion-value').textContent = '2.0';
+            document.getElementById('panic-value').textContent = '3.0';
 
             document.querySelectorAll('.mouse-mode-btn').forEach(b => b.classList.remove('active'));
             document.querySelector('[data-mode="off"]').classList.add('active');
+            document.getElementById('hawk-off').classList.add('active');
+            document.getElementById('hawk-on').classList.remove('active');
 
             updateBoidCount();
         });
