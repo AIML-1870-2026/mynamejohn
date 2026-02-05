@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Giant Storm Simulator</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0a0806; overflow: hidden; font-family: system-ui, sans-serif; }
+        canvas { display: block; }
+
+        .controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(15, 12, 10, 0.95);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid rgba(200, 120, 80, 0.3);
+            color: #e8a060;
+            width: 240px;
+            z-index: 100;
+        }
+
+        .controls h2 {
+            font-size: 1rem;
+            margin-bottom: 15px;
+            color: #ffd0a0;
+            text-align: center;
+        }
+
+        .control-group {
+            margin-bottom: 14px;
+        }
+
+        .control-group label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            margin-bottom: 4px;
+            color: #b08060;
+        }
+
+        .control-group label span { color: #ffd0a0; font-weight: 600; }
+
+        input[type="range"] {
+            width: 100%;
+            height: 4px;
+            -webkit-appearance: none;
+            background: rgba(200, 120, 80, 0.2);
+            border-radius: 2px;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            background: #e8a060;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            margin-top: 8px;
+            background: rgba(200, 120, 80, 0.15);
+            border: 1px solid rgba(200, 120, 80, 0.3);
+            color: #e8a060;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        button:hover { background: rgba(200, 120, 80, 0.25); }
+
+        .info {
+            position: fixed;
+            bottom: 15px;
+            left: 15px;
+            color: rgba(200, 150, 100, 0.5);
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+
+    <div class="controls">
+        <h2>Giant Storm</h2>
+
+        <div class="control-group">
+            <label>Particles <span id="v-particles">4000</span></label>
+            <input type="range" id="particles" min="1000" max="10000" step="500" value="4000">
+        </div>
+
+        <div class="control-group">
+            <label>Rotation Speed <span id="v-rotation">1.0</span></label>
+            <input type="range" id="rotation" min="0.2" max="3" step="0.1" value="1.0">
+        </div>
+
+        <div class="control-group">
+            <label>Inward Pull <span id="v-inward">0.3</span></label>
+            <input type="range" id="inward" min="0" max="1" step="0.05" value="0.3">
+        </div>
+
+        <div class="control-group">
+            <label>Storm Radius <span id="v-radius">300</span></label>
+            <input type="range" id="radius" min="100" max="500" step="20" value="300">
+        </div>
+
+        <div class="control-group">
+            <label>Eye Size <span id="v-eye">0.15</span></label>
+            <input type="range" id="eye" min="0.05" max="0.4" step="0.01" value="0.15">
+        </div>
+
+        <div class="control-group">
+            <label>Turbulence <span id="v-turb">0.4</span></label>
+            <input type="range" id="turb" min="0" max="1.5" step="0.05" value="0.4">
+        </div>
+
+        <div class="control-group">
+            <label>Spiral Arms <span id="v-arms">3</span></label>
+            <input type="range" id="arms" min="0" max="8" step="1" value="3">
+        </div>
+
+        <button id="reset">Reset Storm</button>
+    </div>
+
+    <div class="info">Drag to move storm center</div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        let W, H, cx, cy;
+
+        function resize() {
+            W = canvas.width = window.innerWidth;
+            H = canvas.height = window.innerHeight;
+            cx = W / 2;
+            cy = H / 2;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+
+        // Config
+        const config = {
+            particleCount: 4000,
+            rotationSpeed: 1.0,
+            inwardPull: 0.3,
+            stormRadius: 300,
+            eyeSize: 0.15,
+            turbulence: 0.4,
+            spiralArms: 3
+        };
+
+        // Storm center (draggable)
+        let stormX, stormY;
+        stormX = cx;
+        stormY = cy;
+
+        // Color palette - warm Jupiter tones
+        const colors = [
+            [255, 220, 180],  // cream
+            [240, 190, 140],  // tan
+            [220, 160, 110],  // orange
+            [200, 130, 90],   // rust
+            [180, 100, 70],   // brown-red
+            [160, 80, 60],    // dark rust
+            [140, 70, 55],    // deep brown
+            [200, 90, 70],    // red accent
+        ];
+
+        let particles = [];
+
+        class Particle {
+            constructor() {
+                this.reset();
+            }
+
+            reset() {
+                // Distribute in disc around storm center
+                const angle = Math.random() * Math.PI * 2;
+                const dist = Math.random() * config.stormRadius * 1.5 + config.stormRadius * 0.2;
+
+                this.x = stormX + Math.cos(angle) * dist;
+                this.y = stormY + Math.sin(angle) * dist;
+                this.vx = 0;
+                this.vy = 0;
+
+                // Color based on distance from center
+                const colorIdx = Math.floor(Math.random() * colors.length);
+                const c = colors[colorIdx];
+                this.r = c[0];
+                this.g = c[1];
+                this.b = c[2];
+                this.size = 1 + Math.random() * 2;
+
+                // Trail
+                this.trail = [];
+                this.maxTrail = 12;
+            }
+
+            update() {
+                // Store trail
+                this.trail.push({ x: this.x, y: this.y });
+                if (this.trail.length > this.maxTrail) this.trail.shift();
+
+                // Vector from storm center
+                const dx = this.x - stormX;
+                const dy = this.y - stormY;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const angle = Math.atan2(dy, dx);
+
+                if (dist < 5) {
+                    this.reset();
+                    return;
+                }
+
+                // Eye of the storm - calm center
+                const eyeRadius = config.stormRadius * config.eyeSize;
+                const inEye = dist < eyeRadius;
+
+                // Rotation speed varies with distance (faster near eye wall)
+                let rotationStrength;
+                if (inEye) {
+                    // Inside eye - slow rotation
+                    rotationStrength = config.rotationSpeed * 0.3 * (dist / eyeRadius);
+                } else if (dist < config.stormRadius) {
+                    // Eye wall to outer storm - peak rotation near eye wall
+                    const normalizedDist = (dist - eyeRadius) / (config.stormRadius - eyeRadius);
+                    rotationStrength = config.rotationSpeed * (1.5 - normalizedDist * 0.8);
+                } else {
+                    // Outer bands - decreasing rotation
+                    const outerDist = dist - config.stormRadius;
+                    rotationStrength = config.rotationSpeed * Math.max(0.2, 1 - outerDist / config.stormRadius);
+                }
+
+                // Tangential velocity (counterclockwise)
+                const tangentAngle = angle - Math.PI / 2;
+                const tangentSpeed = rotationStrength * 2;
+
+                this.vx += Math.cos(tangentAngle) * tangentSpeed * 0.1;
+                this.vy += Math.sin(tangentAngle) * tangentSpeed * 0.1;
+
+                // Inward spiral (stronger outside eye)
+                if (!inEye) {
+                    const inwardStrength = config.inwardPull * (1 - eyeRadius / dist) * 0.1;
+                    this.vx -= (dx / dist) * inwardStrength;
+                    this.vy -= (dy / dist) * inwardStrength;
+                }
+
+                // Spiral arm enhancement
+                if (config.spiralArms > 0 && dist > eyeRadius) {
+                    const armAngle = angle + dist * 0.01; // Spiral offset
+                    const armPhase = (armAngle * config.spiralArms) % (Math.PI * 2);
+                    const armStrength = Math.sin(armPhase) * 0.5 + 0.5;
+
+                    // Boost velocity in arm regions
+                    const armBoost = armStrength * 0.3;
+                    this.vx *= (1 + armBoost);
+                    this.vy *= (1 + armBoost);
+                }
+
+                // Turbulence
+                this.vx += (Math.random() - 0.5) * config.turbulence * 0.4;
+                this.vy += (Math.random() - 0.5) * config.turbulence * 0.4;
+
+                // Damping
+                this.vx *= 0.96;
+                this.vy *= 0.96;
+
+                // Speed limit
+                const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+                const maxSpeed = 8;
+                if (speed > maxSpeed) {
+                    this.vx = (this.vx / speed) * maxSpeed;
+                    this.vy = (this.vy / speed) * maxSpeed;
+                }
+
+                // Update position
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Reset if too far
+                const maxDist = config.stormRadius * 2.5;
+                if (dist > maxDist || this.x < -50 || this.x > W + 50 || this.y < -50 || this.y > H + 50) {
+                    this.reset();
+                }
+            }
+
+            draw() {
+                // Draw trail
+                if (this.trail.length > 2) {
+                    ctx.beginPath();
+                    ctx.moveTo(this.trail[0].x, this.trail[0].y);
+                    for (let i = 1; i < this.trail.length; i++) {
+                        ctx.lineTo(this.trail[i].x, this.trail[i].y);
+                    }
+                    ctx.lineTo(this.x, this.y);
+
+                    const alpha = 0.3;
+                    ctx.strokeStyle = `rgba(${this.r}, ${this.g}, ${this.b}, ${alpha})`;
+                    ctx.lineWidth = this.size * 0.6;
+                    ctx.stroke();
+                }
+
+                // Draw particle
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = `rgb(${this.r}, ${this.g}, ${this.b})`;
+                ctx.fill();
+            }
+        }
+
+        function init() {
+            stormX = cx;
+            stormY = cy;
+            particles = [];
+            for (let i = 0; i < config.particleCount; i++) {
+                particles.push(new Particle());
+            }
+        }
+        init();
+
+        // Draw storm structure
+        function drawStormBackground() {
+            const eyeRadius = config.stormRadius * config.eyeSize;
+
+            // Outer glow
+            const outerGlow = ctx.createRadialGradient(stormX, stormY, config.stormRadius * 0.5, stormX, stormY, config.stormRadius * 2);
+            outerGlow.addColorStop(0, 'rgba(180, 100, 60, 0.08)');
+            outerGlow.addColorStop(0.5, 'rgba(150, 80, 50, 0.04)');
+            outerGlow.addColorStop(1, 'rgba(100, 60, 40, 0)');
+
+            ctx.fillStyle = outerGlow;
+            ctx.fillRect(0, 0, W, H);
+
+            // Eye wall glow
+            const eyeWallGlow = ctx.createRadialGradient(stormX, stormY, eyeRadius * 0.8, stormX, stormY, eyeRadius * 2);
+            eyeWallGlow.addColorStop(0, 'rgba(200, 100, 70, 0.1)');
+            eyeWallGlow.addColorStop(0.5, 'rgba(180, 90, 60, 0.06)');
+            eyeWallGlow.addColorStop(1, 'rgba(150, 80, 50, 0)');
+
+            ctx.fillStyle = eyeWallGlow;
+            ctx.beginPath();
+            ctx.arc(stormX, stormY, eyeRadius * 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Eye (darker center)
+            const eyeGrad = ctx.createRadialGradient(stormX, stormY, 0, stormX, stormY, eyeRadius);
+            eyeGrad.addColorStop(0, 'rgba(20, 15, 12, 0.6)');
+            eyeGrad.addColorStop(0.7, 'rgba(30, 20, 15, 0.3)');
+            eyeGrad.addColorStop(1, 'rgba(40, 25, 18, 0)');
+
+            ctx.fillStyle = eyeGrad;
+            ctx.beginPath();
+            ctx.arc(stormX, stormY, eyeRadius, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function animate() {
+            // Clear with trail effect
+            ctx.fillStyle = 'rgba(10, 8, 6, 0.12)';
+            ctx.fillRect(0, 0, W, H);
+
+            // Background storm structure
+            drawStormBackground();
+
+            // Update and draw particles
+            for (const p of particles) {
+                p.update();
+                p.draw();
+            }
+
+            requestAnimationFrame(animate);
+        }
+        animate();
+
+        // Drag to move storm
+        let dragging = false;
+        canvas.addEventListener('mousedown', () => dragging = true);
+        canvas.addEventListener('mouseup', () => dragging = false);
+        canvas.addEventListener('mouseleave', () => dragging = false);
+        canvas.addEventListener('mousemove', (e) => {
+            if (dragging) {
+                stormX = e.clientX;
+                stormY = e.clientY;
+            }
+        });
+
+        // Controls
+        document.getElementById('particles').addEventListener('input', (e) => {
+            config.particleCount = +e.target.value;
+            document.getElementById('v-particles').textContent = e.target.value;
+            while (particles.length < config.particleCount) particles.push(new Particle());
+            while (particles.length > config.particleCount) particles.pop();
+        });
+
+        document.getElementById('rotation').addEventListener('input', (e) => {
+            config.rotationSpeed = +e.target.value;
+            document.getElementById('v-rotation').textContent = e.target.value;
+        });
+
+        document.getElementById('inward').addEventListener('input', (e) => {
+            config.inwardPull = +e.target.value;
+            document.getElementById('v-inward').textContent = e.target.value;
+        });
+
+        document.getElementById('radius').addEventListener('input', (e) => {
+            config.stormRadius = +e.target.value;
+            document.getElementById('v-radius').textContent = e.target.value;
+        });
+
+        document.getElementById('eye').addEventListener('input', (e) => {
+            config.eyeSize = +e.target.value;
+            document.getElementById('v-eye').textContent = e.target.value;
+        });
+
+        document.getElementById('turb').addEventListener('input', (e) => {
+            config.turbulence = +e.target.value;
+            document.getElementById('v-turb').textContent = e.target.value;
+        });
+
+        document.getElementById('arms').addEventListener('input', (e) => {
+            config.spiralArms = +e.target.value;
+            document.getElementById('v-arms').textContent = e.target.value;
+        });
+
+        document.getElementById('reset').addEventListener('click', init);
+    </script>
+</body>
+</html>

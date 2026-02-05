@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Crystal Lattice</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #06060a; overflow: hidden; font-family: system-ui, sans-serif; }
+        canvas { display: block; cursor: grab; }
+        canvas:active { cursor: grabbing; }
+
+        .controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(10, 12, 20, 0.95);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid rgba(80, 140, 255, 0.2);
+            color: #70a8ff;
+            width: 240px;
+            z-index: 100;
+        }
+
+        .controls h2 {
+            font-size: 1rem;
+            margin-bottom: 15px;
+            color: #a0c8ff;
+            text-align: center;
+        }
+
+        .control-group {
+            margin-bottom: 12px;
+        }
+
+        .control-group label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            margin-bottom: 4px;
+            color: #5080b0;
+        }
+
+        .control-group label span { color: #a0c8ff; font-weight: 600; }
+
+        input[type="range"] {
+            width: 100%;
+            height: 4px;
+            -webkit-appearance: none;
+            background: rgba(80, 140, 255, 0.2);
+            border-radius: 2px;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            background: #70a8ff;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .lattice-btns {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 15px;
+        }
+
+        .lattice-btns button {
+            flex: 1;
+            padding: 8px 4px;
+            font-size: 0.7rem;
+        }
+
+        .lattice-btns button.active {
+            background: rgba(80, 140, 255, 0.3);
+            border-color: #70a8ff;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            margin-top: 8px;
+            background: rgba(80, 140, 255, 0.1);
+            border: 1px solid rgba(80, 140, 255, 0.3);
+            color: #70a8ff;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+
+        button:hover { background: rgba(80, 140, 255, 0.2); }
+
+        .temp-display {
+            text-align: center;
+            font-size: 1.4rem;
+            color: #ffb060;
+            margin: 12px 0;
+            padding: 8px;
+            background: rgba(255, 180, 100, 0.05);
+            border-radius: 6px;
+            border: 1px solid rgba(255, 180, 100, 0.1);
+        }
+
+        .temp-display small {
+            font-size: 0.65rem;
+            color: #907050;
+            display: block;
+            margin-top: 2px;
+        }
+
+        .heat-cool {
+            display: flex;
+            gap: 8px;
+        }
+
+        .heat-cool button { flex: 1; margin-top: 0; }
+        .heat-cool .heat { color: #ff9070; border-color: rgba(255, 100, 80, 0.3); }
+        .heat-cool .cool { color: #70c0ff; border-color: rgba(100, 180, 255, 0.3); }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 10px 0;
+            font-size: 0.8rem;
+            color: #5080b0;
+        }
+
+        .checkbox-group input {
+            width: 16px;
+            height: 16px;
+            accent-color: #70a8ff;
+        }
+
+        .info {
+            position: fixed;
+            bottom: 15px;
+            left: 15px;
+            color: rgba(100, 140, 180, 0.5);
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+
+    <div class="controls">
+        <h2>3D Crystal Lattice</h2>
+
+        <div class="lattice-btns">
+            <button id="btn-sc" class="active">Simple</button>
+            <button id="btn-bcc">BCC</button>
+            <button id="btn-fcc">FCC</button>
+            <button id="btn-diamond">Diamond</button>
+        </div>
+
+        <div class="temp-display">
+            <span id="temp-val">300</span>K
+            <small>Temperature</small>
+        </div>
+
+        <div class="heat-cool">
+            <button class="heat" id="heat">+ Heat</button>
+            <button class="cool" id="cool">- Cool</button>
+        </div>
+
+        <div class="control-group">
+            <label>Grid Size <span id="v-grid">5</span></label>
+            <input type="range" id="grid" min="2" max="8" value="5">
+        </div>
+
+        <div class="control-group">
+            <label>Bond Strength <span id="v-bond">1.0</span></label>
+            <input type="range" id="bond" min="0.2" max="2" step="0.1" value="1.0">
+        </div>
+
+        <div class="control-group">
+            <label>Zoom <span id="v-zoom">1.0</span></label>
+            <input type="range" id="zoom" min="0.5" max="2" step="0.1" value="1.0">
+        </div>
+
+        <div class="control-group">
+            <label>Rotation Speed <span id="v-rot">0.3</span></label>
+            <input type="range" id="rot" min="0" max="1" step="0.05" value="0.3">
+        </div>
+
+        <div class="checkbox-group">
+            <input type="checkbox" id="showBonds" checked>
+            <label for="showBonds">Show Bonds</label>
+        </div>
+
+        <div class="checkbox-group">
+            <input type="checkbox" id="autoRotate" checked>
+            <label for="autoRotate">Auto Rotate</label>
+        </div>
+
+        <button id="disturb">Disturb Lattice</button>
+        <button id="reset">Reset Crystal</button>
+    </div>
+
+    <div class="info">Drag to rotate • Scroll to zoom • Click atoms to excite</div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        let W, H;
+        function resize() {
+            W = canvas.width = window.innerWidth;
+            H = canvas.height = window.innerHeight;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+
+        // Config
+        const config = {
+            gridSize: 5,
+            bondStrength: 1.0,
+            temperature: 300,
+            zoom: 1.0,
+            rotationSpeed: 0.3,
+            latticeType: 'sc',
+            showBonds: true,
+            autoRotate: true
+        };
+
+        // Camera
+        let rotX = 0.4;
+        let rotY = 0.3;
+        const focalLength = 400;
+
+        // Lattice data
+        let atoms = [];
+        let bonds = [];
+        const spacing = 60;
+
+        class Atom {
+            constructor(x, y, z) {
+                this.homeX = x;
+                this.homeY = y;
+                this.homeZ = z;
+                this.x = x;
+                this.y = y;
+                this.z = z;
+                this.vx = 0;
+                this.vy = 0;
+                this.vz = 0;
+                this.neighbors = [];
+            }
+
+            applyThermalVibration() {
+                const intensity = config.temperature * 0.00002;
+                this.vx += (Math.random() - 0.5) * intensity;
+                this.vy += (Math.random() - 0.5) * intensity;
+                this.vz += (Math.random() - 0.5) * intensity;
+            }
+
+            update() {
+                // Spring force toward home
+                const homeForce = 0.008 * config.bondStrength;
+                this.vx += (this.homeX - this.x) * homeForce;
+                this.vy += (this.homeY - this.y) * homeForce;
+                this.vz += (this.homeZ - this.z) * homeForce;
+
+                // Spring forces from neighbors
+                for (const neighbor of this.neighbors) {
+                    const dx = neighbor.x - this.x;
+                    const dy = neighbor.y - this.y;
+                    const dz = neighbor.z - this.z;
+                    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+                    const restDx = neighbor.homeX - this.homeX;
+                    const restDy = neighbor.homeY - this.homeY;
+                    const restDz = neighbor.homeZ - this.homeZ;
+                    const restLength = Math.sqrt(restDx * restDx + restDy * restDy + restDz * restDz);
+
+                    const stretch = dist - restLength;
+                    const force = stretch * 0.015 * config.bondStrength;
+
+                    if (dist > 0) {
+                        this.vx += (dx / dist) * force;
+                        this.vy += (dy / dist) * force;
+                        this.vz += (dz / dist) * force;
+                    }
+                }
+
+                this.applyThermalVibration();
+
+                // Damping
+                this.vx *= 0.97;
+                this.vy *= 0.97;
+                this.vz *= 0.97;
+
+                this.x += this.vx;
+                this.y += this.vy;
+                this.z += this.vz;
+            }
+        }
+
+        // 3D rotation
+        function rotateX(point, angle) {
+            const cos = Math.cos(angle);
+            const sin = Math.sin(angle);
+            return {
+                x: point.x,
+                y: point.y * cos - point.z * sin,
+                z: point.y * sin + point.z * cos
+            };
+        }
+
+        function rotateY(point, angle) {
+            const cos = Math.cos(angle);
+            const sin = Math.sin(angle);
+            return {
+                x: point.x * cos + point.z * sin,
+                y: point.y,
+                z: -point.x * sin + point.z * cos
+            };
+        }
+
+        function project(point) {
+            let p = { x: point.x, y: point.y, z: point.z };
+            p = rotateX(p, rotX);
+            p = rotateY(p, rotY);
+
+            const scale = focalLength / (focalLength + p.z) * config.zoom;
+            return {
+                x: W / 2 + p.x * scale,
+                y: H / 2 + p.y * scale,
+                z: p.z,
+                scale: scale
+            };
+        }
+
+        // Lattice generators
+        function createSimpleCubic() {
+            atoms = [];
+            bonds = [];
+            const n = config.gridSize;
+            const offset = (n - 1) * spacing / 2;
+
+            const grid = {};
+
+            for (let i = 0; i < n; i++) {
+                for (let j = 0; j < n; j++) {
+                    for (let k = 0; k < n; k++) {
+                        const atom = new Atom(
+                            i * spacing - offset,
+                            j * spacing - offset,
+                            k * spacing - offset
+                        );
+                        atoms.push(atom);
+                        grid[`${i},${j},${k}`] = atom;
+                    }
+                }
+            }
+
+            // Connect neighbors
+            for (let i = 0; i < n; i++) {
+                for (let j = 0; j < n; j++) {
+                    for (let k = 0; k < n; k++) {
+                        const atom = grid[`${i},${j},${k}`];
+                        const neighbors = [
+                            [i+1, j, k], [i, j+1, k], [i, j, k+1]
+                        ];
+                        for (const [ni, nj, nk] of neighbors) {
+                            const neighbor = grid[`${ni},${nj},${nk}`];
+                            if (neighbor) {
+                                atom.neighbors.push(neighbor);
+                                neighbor.neighbors.push(atom);
+                                bonds.push([atom, neighbor]);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        function createBCC() {
+            atoms = [];
+            bonds = [];
+            const n = config.gridSize;
+            const offset = (n - 1) * spacing / 2;
+
+            const corners = {};
+            const centers = {};
+
+            // Corner atoms
+            for (let i = 0; i < n; i++) {
+                for (let j = 0; j < n; j++) {
+                    for (let k = 0; k < n; k++) {
+                        const atom = new Atom(
+                            i * spacing - offset,
+                            j * spacing - offset,
+                            k * spacing - offset
+                        );
+                        atoms.push(atom);
+                        corners[`${i},${j},${k}`] = atom;
+                    }
+                }
+            }
+
+            // Center atoms
+            for (let i = 0; i < n - 1; i++) {
+                for (let j = 0; j < n - 1; j++) {
+                    for (let k = 0; k < n - 1; k++) {
+                        const atom = new Atom(
+                            (i + 0.5) * spacing - offset,
+                            (j + 0.5) * spacing - offset,
+                            (k + 0.5) * spacing - offset
+                        );
+                        atoms.push(atom);
+                        centers[`${i},${j},${k}`] = atom;
+                    }
+                }
+            }
+
+            // Connect centers to corners
+            for (let i = 0; i < n - 1; i++) {
+                for (let j = 0; j < n - 1; j++) {
+                    for (let k = 0; k < n - 1; k++) {
+                        const center = centers[`${i},${j},${k}`];
+                        const cornerCoords = [
+                            [i, j, k], [i+1, j, k], [i, j+1, k], [i, j, k+1],
+                            [i+1, j+1, k], [i+1, j, k+1], [i, j+1, k+1], [i+1, j+1, k+1]
+                        ];
+                        for (const [ci, cj, ck] of cornerCoords) {
+                            const corner = corners[`${ci},${cj},${ck}`];
+                            if (corner) {
+                                center.neighbors.push(corner);
+                                corner.neighbors.push(center);
+                                bonds.push([center, corner]);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        function createFCC() {
+            atoms = [];
+            bonds = [];
+            const n = config.gridSize;
+            const offset = (n - 1) * spacing / 2;
+
+            const allAtoms = {};
+
+            // Corner and face-center atoms
+            for (let i = 0; i < n; i++) {
+                for (let j = 0; j < n; j++) {
+                    for (let k = 0; k < n; k++) {
+                        // Corner
+                        const corner = new Atom(
+                            i * spacing - offset,
+                            j * spacing - offset,
+                            k * spacing - offset
+                        );
+                        atoms.push(corner);
+                        allAtoms[`c${i},${j},${k}`] = corner;
+
+                        // Face centers (only add once per face)
+                        if (i < n - 1) {
+                            const faceXY = new Atom(
+                                (i + 0.5) * spacing - offset,
+                                (j + 0.5) * spacing - offset,
+                                k * spacing - offset
+                            );
+                            atoms.push(faceXY);
+                            allAtoms[`fxy${i},${j},${k}`] = faceXY;
+                        }
+                        if (j < n - 1) {
+                            const faceXZ = new Atom(
+                                (i + 0.5) * spacing - offset,
+                                j * spacing - offset,
+                                (k + 0.5) * spacing - offset
+                            );
+                            atoms.push(faceXZ);
+                            allAtoms[`fxz${i},${j},${k}`] = faceXZ;
+                        }
+                        if (k < n - 1) {
+                            const faceYZ = new Atom(
+                                i * spacing - offset,
+                                (j + 0.5) * spacing - offset,
+                                (k + 0.5) * spacing - offset
+                            );
+                            atoms.push(faceYZ);
+                            allAtoms[`fyz${i},${j},${k}`] = faceYZ;
+                        }
+                    }
+                }
+            }
+
+            // Connect nearest neighbors
+            const threshold = spacing * 0.75;
+            for (let i = 0; i < atoms.length; i++) {
+                for (let j = i + 1; j < atoms.length; j++) {
+                    const a = atoms[i];
+                    const b = atoms[j];
+                    const dx = a.homeX - b.homeX;
+                    const dy = a.homeY - b.homeY;
+                    const dz = a.homeZ - b.homeZ;
+                    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+                    if (dist < threshold) {
+                        a.neighbors.push(b);
+                        b.neighbors.push(a);
+                        bonds.push([a, b]);
+                    }
+                }
+            }
+        }
+
+        function createDiamond() {
+            atoms = [];
+            bonds = [];
+            const n = config.gridSize;
+            const offset = (n - 1) * spacing / 2;
+
+            const allAtoms = {};
+
+            for (let i = 0; i < n; i++) {
+                for (let j = 0; j < n; j++) {
+                    for (let k = 0; k < n; k++) {
+                        // FCC positions
+                        const positions = [
+                            [0, 0, 0],
+                            [0.5, 0.5, 0],
+                            [0.5, 0, 0.5],
+                            [0, 0.5, 0.5],
+                            // Tetrahedral interstitials
+                            [0.25, 0.25, 0.25],
+                            [0.75, 0.75, 0.25],
+                            [0.75, 0.25, 0.75],
+                            [0.25, 0.75, 0.75]
+                        ];
+
+                        for (let p = 0; p < positions.length; p++) {
+                            const [px, py, pz] = positions[p];
+                            const x = (i + px) * spacing - offset;
+                            const y = (j + py) * spacing - offset;
+                            const z = (k + pz) * spacing - offset;
+
+                            // Check bounds
+                            if (x < -offset - spacing/2 || x > offset + spacing/2) continue;
+                            if (y < -offset - spacing/2 || y > offset + spacing/2) continue;
+                            if (z < -offset - spacing/2 || z > offset + spacing/2) continue;
+
+                            const key = `${x.toFixed(1)},${y.toFixed(1)},${z.toFixed(1)}`;
+                            if (!allAtoms[key]) {
+                                const atom = new Atom(x, y, z);
+                                atoms.push(atom);
+                                allAtoms[key] = atom;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Connect tetrahedral neighbors
+            const threshold = spacing * 0.45;
+            for (let i = 0; i < atoms.length; i++) {
+                for (let j = i + 1; j < atoms.length; j++) {
+                    const a = atoms[i];
+                    const b = atoms[j];
+                    const dx = a.homeX - b.homeX;
+                    const dy = a.homeY - b.homeY;
+                    const dz = a.homeZ - b.homeZ;
+                    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+                    if (dist < threshold) {
+                        a.neighbors.push(b);
+                        b.neighbors.push(a);
+                        bonds.push([a, b]);
+                    }
+                }
+            }
+        }
+
+        function init() {
+            switch (config.latticeType) {
+                case 'bcc': createBCC(); break;
+                case 'fcc': createFCC(); break;
+                case 'diamond': createDiamond(); break;
+                default: createSimpleCubic();
+            }
+        }
+        init();
+
+        function calculateTemperature() {
+            let totalKE = 0;
+            for (const atom of atoms) {
+                totalKE += atom.vx * atom.vx + atom.vy * atom.vy + atom.vz * atom.vz;
+            }
+            return Math.floor(100 + totalKE * 300);
+        }
+
+        function drawBond(a, b) {
+            const p1 = project(a);
+            const p2 = project(b);
+
+            // Bond stress color
+            const dx = b.x - a.x;
+            const dy = b.y - a.y;
+            const dz = b.z - a.z;
+            const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+            const restDx = b.homeX - a.homeX;
+            const restDy = b.homeY - a.homeY;
+            const restDz = b.homeZ - a.homeZ;
+            const restLength = Math.sqrt(restDx * restDx + restDy * restDy + restDz * restDz);
+
+            const stretch = Math.abs(dist - restLength) / restLength;
+            const stress = Math.min(1, stretch * 8);
+
+            const avgZ = (p1.z + p2.z) / 2;
+            const depthAlpha = Math.max(0.1, Math.min(0.6, 0.4 - avgZ / 500));
+
+            const r = Math.floor(50 + stress * 200);
+            const g = Math.floor(100 + (1 - stress) * 50);
+            const b2 = Math.floor(180 - stress * 130);
+
+            ctx.beginPath();
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.strokeStyle = `rgba(${r}, ${g}, ${b2}, ${depthAlpha})`;
+            ctx.lineWidth = (0.5 + stress) * Math.min(p1.scale, p2.scale);
+            ctx.stroke();
+        }
+
+        function drawAtom(atom) {
+            const p = project(atom);
+
+            const speed = Math.sqrt(atom.vx * atom.vx + atom.vy * atom.vy + atom.vz * atom.vz);
+            const energy = Math.min(1, speed * 8);
+
+            // Color: blue (cold) to red (hot)
+            const r = Math.floor(70 + energy * 185);
+            const g = Math.floor(130 - energy * 60);
+            const b = Math.floor(255 - energy * 155);
+
+            const baseSize = 5 * p.scale;
+            const glowSize = baseSize * (1.5 + energy);
+
+            // Depth-based alpha
+            const depthAlpha = Math.max(0.3, Math.min(1, 0.8 - p.z / 600));
+
+            // Glow
+            const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, glowSize);
+            gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${depthAlpha * 0.9})`);
+            gradient.addColorStop(0.4, `rgba(${r}, ${g}, ${b}, ${depthAlpha * 0.4})`);
+            gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, glowSize, 0, Math.PI * 2);
+            ctx.fillStyle = gradient;
+            ctx.fill();
+
+            // Core
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, baseSize * 0.5, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(${Math.min(255, r + 50)}, ${Math.min(255, g + 50)}, ${Math.min(255, b + 50)}, ${depthAlpha})`;
+            ctx.fill();
+
+            return { p, atom };
+        }
+
+        function animate() {
+            ctx.fillStyle = 'rgba(6, 6, 10, 0.25)';
+            ctx.fillRect(0, 0, W, H);
+
+            // Auto rotate
+            if (config.autoRotate) {
+                rotY += 0.003 * config.rotationSpeed;
+            }
+
+            // Update atoms
+            for (const atom of atoms) {
+                atom.update();
+            }
+
+            // Sort by depth for proper rendering
+            const projected = atoms.map(a => ({ atom: a, z: project(a).z }));
+            projected.sort((a, b) => b.z - a.z);
+
+            // Draw bonds first (back to front would be complex, so draw all with transparency)
+            if (config.showBonds) {
+                for (const [a, b] of bonds) {
+                    drawBond(a, b);
+                }
+            }
+
+            // Draw atoms back to front
+            for (const { atom } of projected) {
+                drawAtom(atom);
+            }
+
+            // Update temperature display
+            document.getElementById('temp-val').textContent = calculateTemperature();
+
+            requestAnimationFrame(animate);
+        }
+        animate();
+
+        // Mouse rotation
+        let isDragging = false;
+        let lastX, lastY;
+
+        canvas.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            lastX = e.clientX;
+            lastY = e.clientY;
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                const dx = e.clientX - lastX;
+                const dy = e.clientY - lastY;
+                rotY += dx * 0.005;
+                rotX += dy * 0.005;
+                lastX = e.clientX;
+                lastY = e.clientY;
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => isDragging = false);
+        canvas.addEventListener('mouseleave', () => isDragging = false);
+
+        // Scroll to zoom
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            config.zoom = Math.max(0.3, Math.min(3, config.zoom - e.deltaY * 0.001));
+            document.getElementById('zoom').value = config.zoom;
+            document.getElementById('v-zoom').textContent = config.zoom.toFixed(1);
+        });
+
+        // Click to excite atom
+        canvas.addEventListener('click', (e) => {
+            if (isDragging) return;
+
+            for (const atom of atoms) {
+                const p = project(atom);
+                const dx = p.x - e.clientX;
+                const dy = p.y - e.clientY;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist < 20 * p.scale) {
+                    atom.vx += (Math.random() - 0.5) * 3;
+                    atom.vy += (Math.random() - 0.5) * 3;
+                    atom.vz += (Math.random() - 0.5) * 3;
+                    break;
+                }
+            }
+        });
+
+        // Controls
+        document.getElementById('grid').addEventListener('input', (e) => {
+            config.gridSize = +e.target.value;
+            document.getElementById('v-grid').textContent = e.target.value;
+            init();
+        });
+
+        document.getElementById('bond').addEventListener('input', (e) => {
+            config.bondStrength = +e.target.value;
+            document.getElementById('v-bond').textContent = e.target.value;
+        });
+
+        document.getElementById('zoom').addEventListener('input', (e) => {
+            config.zoom = +e.target.value;
+            document.getElementById('v-zoom').textContent = e.target.value;
+        });
+
+        document.getElementById('rot').addEventListener('input', (e) => {
+            config.rotationSpeed = +e.target.value;
+            document.getElementById('v-rot').textContent = e.target.value;
+        });
+
+        document.getElementById('showBonds').addEventListener('change', (e) => {
+            config.showBonds = e.target.checked;
+        });
+
+        document.getElementById('autoRotate').addEventListener('change', (e) => {
+            config.autoRotate = e.target.checked;
+        });
+
+        document.getElementById('heat').addEventListener('click', () => {
+            config.temperature = Math.min(2000, config.temperature + 150);
+            for (const atom of atoms) {
+                atom.vx += (Math.random() - 0.5) * 1.5;
+                atom.vy += (Math.random() - 0.5) * 1.5;
+                atom.vz += (Math.random() - 0.5) * 1.5;
+            }
+        });
+
+        document.getElementById('cool').addEventListener('click', () => {
+            config.temperature = Math.max(50, config.temperature - 150);
+            for (const atom of atoms) {
+                atom.vx *= 0.4;
+                atom.vy *= 0.4;
+                atom.vz *= 0.4;
+            }
+        });
+
+        document.getElementById('disturb').addEventListener('click', () => {
+            for (const atom of atoms) {
+                atom.vx += (Math.random() - 0.5) * 2;
+                atom.vy += (Math.random() - 0.5) * 2;
+                atom.vz += (Math.random() - 0.5) * 2;
+            }
+        });
+
+        document.getElementById('reset').addEventListener('click', init);
+
+        // Lattice buttons
+        ['sc', 'bcc', 'fcc', 'diamond'].forEach(type => {
+            document.getElementById(`btn-${type}`).addEventListener('click', () => {
+                config.latticeType = type;
+                document.querySelectorAll('.lattice-btns button').forEach(b => b.classList.remove('active'));
+                document.getElementById(`btn-${type}`).classList.add('active');
+                init();
+            });
+        });
+    </script>
+</body>
+</html>

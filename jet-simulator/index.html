@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hypersonic Jet Simulator</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #000; overflow: hidden; font-family: system-ui, sans-serif; }
+        canvas { display: block; }
+
+        .controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(10, 15, 25, 0.95);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid rgba(100, 150, 255, 0.3);
+            color: #8af;
+            width: 280px;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+            z-index: 100;
+        }
+
+        .controls h2 {
+            font-size: 1rem;
+            margin-bottom: 15px;
+            color: #adf;
+            text-align: center;
+            border-bottom: 1px solid rgba(100, 150, 255, 0.2);
+            padding-bottom: 10px;
+        }
+
+        .section-title {
+            font-size: 0.75rem;
+            color: #6af;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 15px 0 10px 0;
+            padding-top: 10px;
+            border-top: 1px solid rgba(100, 150, 255, 0.15);
+        }
+
+        .control-group { margin-bottom: 12px; }
+
+        .control-group label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            margin-bottom: 4px;
+            color: #6af;
+        }
+
+        .control-group label span { color: #adf; font-weight: 600; }
+
+        input[type="range"] {
+            width: 100%;
+            height: 4px;
+            -webkit-appearance: none;
+            background: rgba(100, 150, 255, 0.2);
+            border-radius: 2px;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            background: #6af;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        input[type="range"]:disabled {
+            opacity: 0.4;
+        }
+
+        select {
+            width: 100%;
+            padding: 6px;
+            background: rgba(100, 150, 255, 0.1);
+            border: 1px solid rgba(100, 150, 255, 0.3);
+            color: #adf;
+            border-radius: 4px;
+            font-size: 0.85rem;
+        }
+
+        .toggle-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .toggle-row input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: #6af;
+        }
+
+        .toggle-row label {
+            font-size: 0.8rem;
+            color: #8af;
+            flex: 1;
+        }
+
+        .boost-indicator {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+
+        .boost-super { background: #f80; color: #000; }
+        .boost-turbo { background: #0af; color: #000; }
+        .boost-both { background: #f0f; color: #000; }
+
+        .readout {
+            margin-top: 15px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(100, 150, 255, 0.2);
+            font-size: 0.75rem;
+            color: #6af;
+        }
+
+        .readout div {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+
+        .readout span { color: #adf; }
+
+        .mach-display {
+            font-size: 1.5rem;
+            text-align: center;
+            color: #adf;
+            margin: 10px 0;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(100, 150, 255, 0.5);
+        }
+
+        .warning {
+            color: #f84;
+            font-weight: bold;
+            text-align: center;
+            margin-top: 10px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .warning.active { opacity: 1; }
+
+        .plasma-indicator {
+            color: #f4f;
+            text-shadow: 0 0 10px #f4f;
+        }
+
+        .turbo-spool {
+            height: 4px;
+            background: rgba(0, 170, 255, 0.2);
+            border-radius: 2px;
+            margin-top: 4px;
+            overflow: hidden;
+        }
+
+        .turbo-spool-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #0af, #0ff);
+            width: 0%;
+            transition: width 0.1s;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+
+    <div class="controls">
+        <h2>Hypersonic Flight Sim</h2>
+
+        <div class="mach-display">Mach <span id="mach-value">0.0</span></div>
+
+        <div class="section-title">Engine</div>
+
+        <div class="control-group">
+            <label>Fuel Flow <span id="v-fuel">5.0</span> kg/s</label>
+            <input type="range" id="fuel-flow" min="0" max="50" step="0.5" value="5">
+        </div>
+
+        <div class="control-group">
+            <label>Fuel Type</label>
+            <select id="fuel">
+                <option value="kerosene">JP-8 Kerosene</option>
+                <option value="hydrogen">Liquid Hydrogen</option>
+                <option value="scramjet">Scramjet (Air-breathing)</option>
+                <option value="plasma">Plasma Drive</option>
+            </select>
+        </div>
+
+        <div class="section-title">Forced Induction</div>
+
+        <div class="toggle-row">
+            <input type="checkbox" id="supercharger-on">
+            <label for="supercharger-on">Supercharger <span class="boost-indicator boost-super" id="super-status">OFF</span></label>
+        </div>
+
+        <div class="control-group">
+            <label>Supercharger Boost <span id="v-super">1.5</span>x</label>
+            <input type="range" id="supercharger" min="1" max="3" step="0.1" value="1.5" disabled>
+        </div>
+
+        <div class="toggle-row">
+            <input type="checkbox" id="turbo-on">
+            <label for="turbo-on">Turbocharger <span class="boost-indicator boost-turbo" id="turbo-status">OFF</span></label>
+        </div>
+
+        <div class="control-group">
+            <label>Turbo Boost <span id="v-turbo">2.0</span>x</label>
+            <input type="range" id="turbo" min="1" max="4" step="0.1" value="2" disabled>
+        </div>
+
+        <div class="turbo-spool" id="turbo-spool-container" style="display: none;">
+            <div class="turbo-spool-fill" id="turbo-spool"></div>
+        </div>
+
+        <div class="section-title">Environment</div>
+
+        <div class="control-group">
+            <label>Air Density <span id="v-density">1.0</span> kg/m³</label>
+            <input type="range" id="density" min="0.01" max="2" step="0.01" value="1.0">
+        </div>
+
+        <div class="control-group">
+            <label>Plasma Magnet <span id="v-em">0.0</span> T</label>
+            <input type="range" id="em" min="0" max="10" step="0.1" value="0">
+        </div>
+
+        <div class="em-info" id="em-info" style="display: none; font-size: 0.7rem; color: #a6f; margin-top: 5px;">
+            Ionization threshold: <span id="ion-threshold">3000</span> K
+        </div>
+
+        <div class="readout">
+            <div>Thrust <span id="r-thrust">0 kN</span></div>
+            <div>Drag <span id="r-drag">0 kN</span></div>
+            <div>Velocity <span id="r-velocity">0 m/s</span></div>
+            <div>Temperature <span id="r-temp">288 K</span></div>
+            <div>Boost <span id="r-boost">1.0x</span></div>
+            <div>Regime <span id="r-regime">Subsonic</span></div>
+            <div>Plasma State <span id="r-plasma">None</span></div>
+        </div>
+
+        <div class="warning" id="warning">⚠ PLASMA SHEATH ACTIVE</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        let W, H;
+        function resize() {
+            W = canvas.width = window.innerWidth;
+            H = canvas.height = window.innerHeight;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+
+        // Config
+        const config = {
+            fuelFlow: 5.0,          // kg/s
+            fuelType: 'kerosene',
+            superchargerOn: false,
+            superchargerBoost: 1.5,
+            turboOn: false,
+            turboBoost: 2.0,
+            airDensity: 1.0,        // kg/m³
+            emField: 0              // Tesla
+        };
+
+        // Dynamic state
+        let currentMach = 0;
+        let currentVelocity = 0;
+        let turboSpool = 0;         // 0-1, represents turbo spin-up
+
+        // Physics constants
+        const GAMMA = 1.4;
+        const T_AMBIENT = 288;
+        const SPEED_OF_SOUND = 343;
+        const BASE_IONIZATION_TEMP = 3000;
+
+        // EM field lowers ionization threshold (magnetic confinement aids plasma formation)
+        function getIonizationTemp() {
+            // Each Tesla reduces threshold by ~200K (strong magnets help ionize air)
+            return Math.max(1200, BASE_IONIZATION_TEMP - config.emField * 200);
+        }
+        const DRAG_COEFFICIENT = 0.02;
+        const AIRCRAFT_AREA = 25;   // m² reference area
+
+        // Fuel properties - thrust per kg/s
+        const fuels = {
+            kerosene: { color: [255, 150, 50], intensity: 1.0, thrustPerKg: 30, efficiency: 1.0 },
+            hydrogen: { color: [100, 150, 255], intensity: 1.2, thrustPerKg: 45, efficiency: 1.3 },
+            scramjet: { color: [255, 200, 100], intensity: 0.8, thrustPerKg: 25, efficiency: 0.9 },
+            plasma: { color: [200, 100, 255], intensity: 1.5, thrustPerKg: 80, efficiency: 2.0 }
+        };
+
+        // Particle systems
+        let airParticles = [];
+        let exhaustParticles = [];
+        let shockwaveParticles = [];
+        let plasmaParticles = [];
+
+        // Calculate total boost multiplier
+        function getBoostMultiplier() {
+            let boost = 1.0;
+
+            if (config.superchargerOn) {
+                // Supercharger: instant boost, but costs some efficiency
+                boost *= config.superchargerBoost * 0.95;
+            }
+
+            if (config.turboOn) {
+                // Turbocharger: boost scales with spool
+                boost *= 1 + (config.turboBoost - 1) * turboSpool;
+            }
+
+            return boost;
+        }
+
+        // Calculate thrust (kN)
+        function getThrust() {
+            const fuel = fuels[config.fuelType];
+            const baseThrust = config.fuelFlow * fuel.thrustPerKg * fuel.efficiency;
+
+            // Scramjet efficiency increases with speed
+            let speedBonus = 1;
+            if (config.fuelType === 'scramjet' && currentMach > 2) {
+                speedBonus = 1 + (currentMach - 2) * 0.15;
+            }
+
+            return baseThrust * getBoostMultiplier() * speedBonus;
+        }
+
+        // Calculate drag (kN)
+        function getDrag() {
+            // Drag = 0.5 * rho * v² * Cd * A
+            const drag = 0.5 * config.airDensity * currentVelocity * currentVelocity * DRAG_COEFFICIENT * AIRCRAFT_AREA;
+            return drag / 1000; // Convert to kN
+        }
+
+        // Update velocity based on thrust vs drag
+        function updateVelocity() {
+            const thrust = getThrust();
+            const drag = getDrag();
+            const netForce = thrust - drag;
+
+            // Simplified mass model
+            const mass = 15000; // kg
+
+            // Acceleration in m/s²
+            const acceleration = (netForce * 1000) / mass;
+
+            // Update velocity with damping for stability
+            currentVelocity += acceleration * 0.016; // ~60fps timestep
+            currentVelocity = Math.max(0, currentVelocity);
+
+            // Calculate Mach
+            currentMach = currentVelocity / SPEED_OF_SOUND;
+        }
+
+        // Update turbo spool
+        function updateTurboSpool() {
+            if (config.turboOn) {
+                // Spool up based on exhaust energy (fuel flow)
+                const targetSpool = Math.min(config.fuelFlow / 20, 1);
+                const spoolRate = config.fuelFlow > 5 ? 0.02 : 0.005;
+                turboSpool += (targetSpool - turboSpool) * spoolRate;
+
+                // Faster spool down when fuel is cut
+                if (config.fuelFlow < 1) {
+                    turboSpool *= 0.98;
+                }
+            } else {
+                turboSpool *= 0.95; // Spool down when off
+            }
+
+            turboSpool = Math.max(0, Math.min(1, turboSpool));
+
+            // Update spool indicator
+            document.getElementById('turbo-spool').style.width = (turboSpool * 100) + '%';
+        }
+
+        // Calculate stagnation temperature
+        function getStagnationTemp() {
+            return T_AMBIENT * (1 + ((GAMMA - 1) / 2) * currentMach * currentMach);
+        }
+
+        function getRegime() {
+            if (currentMach < 0.8) return 'Subsonic';
+            if (currentMach < 1.2) return 'Transonic';
+            if (currentMach < 5) return 'Supersonic';
+            if (currentMach < 10) return 'Hypersonic';
+            return 'High Hypersonic';
+        }
+
+        function hasPlasma() {
+            return getStagnationTemp() > getIonizationTemp();
+        }
+
+        function getMachAngle() {
+            if (currentMach <= 1) return Math.PI / 2;
+            return Math.asin(1 / currentMach);
+        }
+
+        // Jet shape
+        const jetScale = 60;
+        function getJetPoints() {
+            const cx = W * 0.35;
+            const cy = H / 2;
+            return {
+                nose: { x: cx + jetScale * 2, y: cy },
+                cockpit: { x: cx + jetScale * 1.2, y: cy },
+                wingFront: { x: cx + jetScale * 0.5, y: cy },
+                wingTipL: { x: cx - jetScale * 0.8, y: cy - jetScale * 1.5 },
+                wingTipR: { x: cx - jetScale * 0.8, y: cy + jetScale * 1.5 },
+                tail: { x: cx - jetScale * 1.5, y: cy },
+                finTop: { x: cx - jetScale * 1.3, y: cy - jetScale * 0.6 },
+                exhaust: { x: cx - jetScale * 1.5, y: cy }
+            };
+        }
+
+        // Air particle
+        class AirParticle {
+            constructor() { this.reset(); }
+
+            reset() {
+                this.x = W + Math.random() * 100;
+                this.y = Math.random() * H;
+                this.speed = 3 + Math.random() * 2;
+                this.size = 1 + Math.random() * 2;
+                this.alpha = 0.3 + Math.random() * 0.4;
+            }
+
+            update() {
+                const speedMult = Math.min(currentMach * 2, 30);
+                this.x -= this.speed * speedMult;
+                if (this.x < -10) this.reset();
+            }
+
+            draw() {
+                const temp = getStagnationTemp();
+                const plasma = hasPlasma();
+
+                let r, g, b;
+                if (plasma) {
+                    const intensity = Math.min((temp - getIonizationTemp()) / 5000, 1);
+                    r = 180 + intensity * 75;
+                    g = 100 + intensity * 100;
+                    b = 255;
+                } else if (temp > 1500) {
+                    const heat = (temp - 1500) / 1500;
+                    r = 255; g = 150 - heat * 100; b = 50;
+                } else {
+                    r = 200; g = 220; b = 255;
+                }
+
+                const alpha = this.alpha * config.airDensity;
+                ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+                const stretch = Math.min(currentMach * 3, 40);
+                ctx.fillRect(this.x, this.y, stretch, this.size);
+            }
+        }
+
+        // Exhaust particle
+        class ExhaustParticle {
+            constructor() { this.reset(); }
+
+            reset() {
+                const jet = getJetPoints();
+                this.x = jet.exhaust.x;
+                this.y = jet.exhaust.y + (Math.random() - 0.5) * 20;
+
+                // Exhaust velocity scales with fuel flow and boost
+                const exhaustSpeed = 5 + config.fuelFlow * 0.5 + getBoostMultiplier() * 3;
+                this.vx = -exhaustSpeed - Math.random() * 5;
+                this.vy = (Math.random() - 0.5) * 2;
+                this.life = 40 + Math.random() * 30;
+                this.maxLife = this.life;
+                this.size = 2 + Math.random() * 4 + config.fuelFlow * 0.2;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vy += (Math.random() - 0.5) * 0.3;
+                this.life--;
+                if (this.life <= 0 || this.x < -50) this.reset();
+            }
+
+            draw() {
+                const fuel = fuels[config.fuelType];
+                const lifeRatio = this.life / this.maxLife;
+                let [r, g, b] = fuel.color;
+
+                // Boost changes exhaust color
+                if (config.superchargerOn) {
+                    r = Math.min(255, r + 50);
+                    g = Math.max(0, g - 30);
+                }
+                if (config.turboOn && turboSpool > 0.5) {
+                    b = Math.min(255, b + 80 * turboSpool);
+                }
+
+                const alpha = lifeRatio * 0.8 * fuel.intensity * Math.min(config.fuelFlow / 5, 1.5);
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * lifeRatio, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+                ctx.fill();
+
+                // Glow
+                const grad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.size * 2 * lifeRatio);
+                grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${alpha * 0.5})`);
+                grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+                ctx.fillStyle = grad;
+                ctx.fillRect(this.x - this.size * 2, this.y - this.size * 2, this.size * 4, this.size * 4);
+            }
+        }
+
+        // Plasma particle
+        class PlasmaParticle {
+            constructor() { this.reset(); }
+
+            reset() {
+                const jet = getJetPoints();
+                const angle = Math.random() * Math.PI * 2;
+                const dist = 20 + Math.random() * 40;
+
+                if (Math.random() < 0.6) {
+                    this.x = jet.nose.x + Math.cos(angle) * dist * 0.5;
+                    this.y = jet.nose.y + Math.sin(angle) * dist * 0.5;
+                } else {
+                    const t = Math.random();
+                    this.x = jet.nose.x - t * jetScale * 3;
+                    this.y = jet.nose.y + (Math.random() - 0.5) * (40 + t * 60);
+                }
+
+                this.vx = -2 - Math.random() * 4;
+                this.vy = (Math.random() - 0.5) * 3;
+                this.life = 20 + Math.random() * 30;
+                this.maxLife = this.life;
+                this.size = 2 + Math.random() * 4;
+                this.hue = 260 + Math.random() * 40;
+            }
+
+            update() {
+                const emEffect = config.emField * 0.5;
+                this.vy += emEffect * (Math.random() - 0.5);
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life--;
+                if (this.life <= 0) this.reset();
+            }
+
+            draw() {
+                const lifeRatio = this.life / this.maxLife;
+                const temp = getStagnationTemp();
+                const intensity = Math.min((temp - getIonizationTemp()) / 8000, 1);
+                const hueShift = config.emField * 20;
+                const hue = (this.hue + hueShift) % 360;
+
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * lifeRatio, 0, Math.PI * 2);
+                ctx.fillStyle = `hsla(${hue}, 100%, ${60 + intensity * 30}%, ${lifeRatio * 0.7})`;
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 2 * lifeRatio, 0, Math.PI * 2);
+                ctx.fillStyle = `hsla(${hue}, 100%, 70%, ${lifeRatio * 0.2})`;
+                ctx.fill();
+            }
+        }
+
+        // Shockwave particle
+        class ShockwaveParticle {
+            constructor() { this.reset(); }
+
+            reset() {
+                const jet = getJetPoints();
+                this.originX = jet.nose.x;
+                this.originY = jet.nose.y;
+                this.angle = getMachAngle();
+                this.progress = 0;
+                this.side = Math.random() > 0.5 ? 1 : -1;
+            }
+
+            update() {
+                this.progress += 0.02 * currentMach;
+                if (this.progress > 1) this.reset();
+            }
+
+            draw() {
+                if (currentMach <= 1) return;
+                const dist = this.progress * 400;
+                const angle = this.angle * this.side;
+                const x = this.originX - Math.cos(angle) * dist;
+                const y = this.originY + Math.sin(angle) * dist;
+                const alpha = (1 - this.progress) * 0.3 * Math.min(currentMach - 1, 1);
+                ctx.beginPath();
+                ctx.arc(x, y, 2, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(200, 220, 255, ${alpha})`;
+                ctx.fill();
+            }
+        }
+
+        // Initialize
+        function init() {
+            airParticles = [];
+            exhaustParticles = [];
+            shockwaveParticles = [];
+            plasmaParticles = [];
+
+            for (let i = 0; i < 200; i++) {
+                const p = new AirParticle();
+                p.x = Math.random() * W;
+                airParticles.push(p);
+            }
+            for (let i = 0; i < 60; i++) exhaustParticles.push(new ExhaustParticle());
+            for (let i = 0; i < 100; i++) shockwaveParticles.push(new ShockwaveParticle());
+            for (let i = 0; i < 150; i++) plasmaParticles.push(new PlasmaParticle());
+        }
+        init();
+
+        // Draw jet
+        function drawJet() {
+            const jet = getJetPoints();
+            const temp = getStagnationTemp();
+            const plasma = hasPlasma();
+
+            ctx.save();
+
+            // Fuselage
+            ctx.beginPath();
+            ctx.moveTo(jet.nose.x, jet.nose.y);
+            ctx.lineTo(jet.cockpit.x, jet.cockpit.y - 12);
+            ctx.lineTo(jet.wingFront.x, jet.wingFront.y - 15);
+            ctx.lineTo(jet.tail.x, jet.tail.y - 10);
+            ctx.lineTo(jet.tail.x, jet.tail.y + 10);
+            ctx.lineTo(jet.wingFront.x, jet.wingFront.y + 15);
+            ctx.lineTo(jet.cockpit.x, jet.cockpit.y + 12);
+            ctx.closePath();
+
+            const bodyGrad = ctx.createLinearGradient(jet.nose.x, jet.nose.y, jet.tail.x, jet.tail.y);
+            if (plasma) {
+                bodyGrad.addColorStop(0, '#ff88ff');
+                bodyGrad.addColorStop(0.3, '#aa66aa');
+                bodyGrad.addColorStop(1, '#334');
+            } else if (temp > 1500) {
+                const heat = Math.min((temp - 1500) / 2000, 1);
+                bodyGrad.addColorStop(0, `rgb(${200 + heat * 55}, ${100 - heat * 50}, 50)`);
+                bodyGrad.addColorStop(0.4, '#445');
+                bodyGrad.addColorStop(1, '#334');
+            } else {
+                bodyGrad.addColorStop(0, '#556');
+                bodyGrad.addColorStop(1, '#334');
+            }
+            ctx.fillStyle = bodyGrad;
+            ctx.fill();
+            ctx.strokeStyle = '#667';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Wings
+            ctx.beginPath();
+            ctx.moveTo(jet.wingFront.x, jet.wingFront.y);
+            ctx.lineTo(jet.wingTipL.x, jet.wingTipL.y);
+            ctx.lineTo(jet.tail.x - 10, jet.tail.y - 8);
+            ctx.closePath();
+            ctx.fillStyle = '#445';
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(jet.wingFront.x, jet.wingFront.y);
+            ctx.lineTo(jet.wingTipR.x, jet.wingTipR.y);
+            ctx.lineTo(jet.tail.x - 10, jet.tail.y + 8);
+            ctx.closePath();
+            ctx.fill();
+
+            // Vertical stabilizer
+            ctx.beginPath();
+            ctx.moveTo(jet.tail.x + 20, jet.tail.y);
+            ctx.lineTo(jet.finTop.x, jet.finTop.y - 25);
+            ctx.lineTo(jet.tail.x - 10, jet.tail.y);
+            ctx.closePath();
+            ctx.fillStyle = '#556';
+            ctx.fill();
+
+            // Cockpit
+            ctx.beginPath();
+            ctx.ellipse(jet.cockpit.x, jet.cockpit.y, 15, 8, 0, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(100, 150, 200, 0.6)';
+            ctx.fill();
+
+            // Supercharger intake glow
+            if (config.superchargerOn) {
+                const intakeGlow = ctx.createRadialGradient(
+                    jet.wingFront.x - 20, jet.cockpit.y, 0,
+                    jet.wingFront.x - 20, jet.cockpit.y, 30
+                );
+                intakeGlow.addColorStop(0, 'rgba(255, 150, 50, 0.4)');
+                intakeGlow.addColorStop(1, 'rgba(255, 100, 0, 0)');
+                ctx.fillStyle = intakeGlow;
+                ctx.fillRect(jet.wingFront.x - 50, jet.cockpit.y - 30, 60, 60);
+            }
+
+            // Turbo glow (exhaust side)
+            if (config.turboOn && turboSpool > 0.3) {
+                const turboGlow = ctx.createRadialGradient(
+                    jet.exhaust.x + 10, jet.exhaust.y, 0,
+                    jet.exhaust.x + 10, jet.exhaust.y, 25 + turboSpool * 15
+                );
+                turboGlow.addColorStop(0, `rgba(0, 200, 255, ${turboSpool * 0.5})`);
+                turboGlow.addColorStop(1, 'rgba(0, 150, 255, 0)');
+                ctx.fillStyle = turboGlow;
+                ctx.beginPath();
+                ctx.arc(jet.exhaust.x + 10, jet.exhaust.y, 25 + turboSpool * 15, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Nose heating glow
+            if (temp > 800) {
+                const glowIntensity = Math.min((temp - 800) / 3000, 1);
+                const noseGlow = ctx.createRadialGradient(
+                    jet.nose.x, jet.nose.y, 0,
+                    jet.nose.x, jet.nose.y, 50 + glowIntensity * 50
+                );
+
+                if (plasma) {
+                    noseGlow.addColorStop(0, `rgba(255, 150, 255, ${glowIntensity * 0.8})`);
+                    noseGlow.addColorStop(0.5, `rgba(200, 100, 255, ${glowIntensity * 0.4})`);
+                    noseGlow.addColorStop(1, 'rgba(150, 50, 200, 0)');
+                } else {
+                    noseGlow.addColorStop(0, `rgba(255, ${200 - glowIntensity * 150}, 50, ${glowIntensity * 0.6})`);
+                    noseGlow.addColorStop(0.5, `rgba(255, 100, 50, ${glowIntensity * 0.3})`);
+                    noseGlow.addColorStop(1, 'rgba(255, 50, 0, 0)');
+                }
+
+                ctx.fillStyle = noseGlow;
+                ctx.beginPath();
+                ctx.arc(jet.nose.x, jet.nose.y, 50 + glowIntensity * 50, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            ctx.restore();
+        }
+
+        // Draw shock cone
+        function drawShockCone() {
+            if (currentMach <= 1) return;
+            const jet = getJetPoints();
+            const angle = getMachAngle();
+            const length = 800;
+
+            ctx.save();
+            ctx.globalAlpha = Math.min((currentMach - 1) * 0.3, 0.4);
+            ctx.beginPath();
+            ctx.moveTo(jet.nose.x, jet.nose.y);
+            ctx.lineTo(jet.nose.x - Math.cos(angle) * length, jet.nose.y - Math.sin(angle) * length);
+            ctx.moveTo(jet.nose.x, jet.nose.y);
+            ctx.lineTo(jet.nose.x - Math.cos(angle) * length, jet.nose.y + Math.sin(angle) * length);
+            ctx.strokeStyle = hasPlasma() ? '#a6f' : '#8af';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // Draw plasma sheath
+        function drawPlasmaSheath() {
+            if (!hasPlasma()) return;
+            const jet = getJetPoints();
+            const temp = getStagnationTemp();
+            const intensity = Math.min((temp - getIonizationTemp()) / 10000, 1);
+
+            ctx.save();
+            const sheathGrad = ctx.createRadialGradient(
+                jet.nose.x - 30, jet.nose.y, 0,
+                jet.nose.x - 30, jet.nose.y, 150 + intensity * 100
+            );
+            const hueShift = config.emField * 15;
+            sheathGrad.addColorStop(0, `hsla(${280 + hueShift}, 100%, 70%, ${0.3 + intensity * 0.3})`);
+            sheathGrad.addColorStop(0.4, `hsla(${260 + hueShift}, 100%, 50%, ${0.15 + intensity * 0.15})`);
+            sheathGrad.addColorStop(1, 'rgba(100, 0, 150, 0)');
+
+            ctx.fillStyle = sheathGrad;
+            ctx.beginPath();
+            ctx.ellipse(jet.nose.x - 30, jet.nose.y, 150 + intensity * 100, 80 + intensity * 50, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            if (Math.random() < 0.3) {
+                ctx.beginPath();
+                const arcX = jet.nose.x - Math.random() * 100;
+                const arcY = jet.nose.y + (Math.random() - 0.5) * 60;
+                ctx.moveTo(arcX, arcY);
+                for (let i = 0; i < 5; i++) {
+                    ctx.lineTo(arcX - 10 - i * 15 + (Math.random() - 0.5) * 20, arcY + (Math.random() - 0.5) * 30);
+                }
+                ctx.strokeStyle = `hsla(${280 + hueShift}, 100%, 80%, 0.6)`;
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        // Update readouts
+        function updateReadouts() {
+            const temp = getStagnationTemp();
+            const thrust = getThrust();
+            const drag = getDrag();
+            const boost = getBoostMultiplier();
+            const plasma = hasPlasma();
+
+            document.getElementById('mach-value').textContent = currentMach.toFixed(2);
+            document.getElementById('r-thrust').textContent = thrust.toFixed(1) + ' kN';
+            document.getElementById('r-drag').textContent = drag.toFixed(1) + ' kN';
+            document.getElementById('r-velocity').textContent = Math.round(currentVelocity) + ' m/s';
+            document.getElementById('r-temp').textContent = Math.round(temp) + ' K';
+            document.getElementById('r-boost').textContent = boost.toFixed(2) + 'x';
+            document.getElementById('r-regime').textContent = getRegime();
+
+            const plasmaEl = document.getElementById('r-plasma');
+            if (plasma) {
+                const ionization = Math.min((temp - getIonizationTemp()) / 5000 * 100, 100);
+                plasmaEl.textContent = ionization.toFixed(0) + '% ionized';
+                plasmaEl.className = 'plasma-indicator';
+            } else {
+                plasmaEl.textContent = 'None';
+                plasmaEl.className = '';
+            }
+
+            document.getElementById('warning').classList.toggle('active', plasma);
+
+            // Show ionization threshold when EM field is active
+            const emInfo = document.getElementById('em-info');
+            if (config.emField > 0) {
+                emInfo.style.display = 'block';
+                document.getElementById('ion-threshold').textContent = Math.round(getIonizationTemp());
+            } else {
+                emInfo.style.display = 'none';
+            }
+
+            // Update boost status indicators
+            const superStatus = document.getElementById('super-status');
+            const turboStatus = document.getElementById('turbo-status');
+
+            superStatus.textContent = config.superchargerOn ? config.superchargerBoost.toFixed(1) + 'x' : 'OFF';
+            turboStatus.textContent = config.turboOn ? (turboSpool * 100).toFixed(0) + '%' : 'OFF';
+        }
+
+        // Animation loop
+        function animate() {
+            // Update physics
+            updateTurboSpool();
+            updateVelocity();
+
+            // Background
+            const brightness = Math.max(5, 15 - currentMach * 0.5);
+            ctx.fillStyle = `rgb(${brightness}, ${brightness + 5}, ${brightness + 15})`;
+            ctx.fillRect(0, 0, W, H);
+
+            // Particles
+            airParticles.forEach(p => { p.update(); p.draw(); });
+
+            if (currentMach > 1) {
+                shockwaveParticles.forEach(p => { p.update(); p.draw(); });
+            }
+
+            drawShockCone();
+            drawPlasmaSheath();
+
+            if (hasPlasma()) {
+                plasmaParticles.forEach(p => { p.update(); p.draw(); });
+            }
+
+            drawJet();
+
+            if (config.fuelFlow > 0.5) {
+                exhaustParticles.forEach(p => { p.update(); p.draw(); });
+            }
+
+            updateReadouts();
+            requestAnimationFrame(animate);
+        }
+        animate();
+
+        // Controls
+        document.getElementById('fuel-flow').addEventListener('input', (e) => {
+            config.fuelFlow = parseFloat(e.target.value);
+            document.getElementById('v-fuel').textContent = config.fuelFlow.toFixed(1);
+        });
+
+        document.getElementById('fuel').addEventListener('change', (e) => {
+            config.fuelType = e.target.value;
+        });
+
+        document.getElementById('supercharger-on').addEventListener('change', (e) => {
+            config.superchargerOn = e.target.checked;
+            document.getElementById('supercharger').disabled = !e.target.checked;
+        });
+
+        document.getElementById('supercharger').addEventListener('input', (e) => {
+            config.superchargerBoost = parseFloat(e.target.value);
+            document.getElementById('v-super').textContent = config.superchargerBoost.toFixed(1);
+        });
+
+        document.getElementById('turbo-on').addEventListener('change', (e) => {
+            config.turboOn = e.target.checked;
+            document.getElementById('turbo').disabled = !e.target.checked;
+            document.getElementById('turbo-spool-container').style.display = e.target.checked ? 'block' : 'none';
+        });
+
+        document.getElementById('turbo').addEventListener('input', (e) => {
+            config.turboBoost = parseFloat(e.target.value);
+            document.getElementById('v-turbo').textContent = config.turboBoost.toFixed(1);
+        });
+
+        document.getElementById('density').addEventListener('input', (e) => {
+            config.airDensity = parseFloat(e.target.value);
+            document.getElementById('v-density').textContent = config.airDensity.toFixed(2);
+        });
+
+        document.getElementById('em').addEventListener('input', (e) => {
+            config.emField = parseFloat(e.target.value);
+            document.getElementById('v-em').textContent = config.emField.toFixed(1);
+        });
+    </script>
+</body>
+</html>

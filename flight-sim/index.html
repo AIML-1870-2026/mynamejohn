@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parallax Flight Simulator</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #000; overflow: hidden; font-family: 'Courier New', monospace; }
+        canvas { display: block; }
+
+        .hud {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            color: #0f0;
+            font-size: 14px;
+            text-shadow: 0 0 5px #0f0;
+            pointer-events: none;
+        }
+
+        .hud div { margin-bottom: 5px; }
+
+        .controls-info {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            color: rgba(0, 255, 0, 0.6);
+            font-size: 12px;
+        }
+
+        .targeting-info {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            color: #f80;
+            font-size: 14px;
+            text-shadow: 0 0 5px #f80;
+            text-align: right;
+            pointer-events: none;
+        }
+
+        .lock-warning {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #f00;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 0 0 10px #f00;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.1s;
+        }
+
+        .lock-warning.active {
+            opacity: 1;
+            animation: blink 0.3s infinite;
+        }
+
+        @keyframes blink {
+            50% { opacity: 0.5; }
+        }
+
+        .settings {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 30, 0, 0.8);
+            padding: 15px;
+            border: 1px solid #0f0;
+            border-radius: 5px;
+            color: #0f0;
+            font-size: 12px;
+            width: 200px;
+        }
+
+        .settings h3 {
+            margin-bottom: 10px;
+            font-size: 13px;
+            border-bottom: 1px solid #0f0;
+            padding-bottom: 5px;
+        }
+
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .settings input[type="range"] {
+            width: 80px;
+            accent-color: #0f0;
+        }
+
+        .settings span {
+            min-width: 40px;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+
+    <div class="hud">
+        <div>ALT: <span id="hud-alt">10000</span> ft</div>
+        <div>SPD: <span id="hud-spd">450</span> kts</div>
+        <div>HDG: <span id="hud-hdg">000</span>°</div>
+        <div>PITCH: <span id="hud-pitch">0</span>°</div>
+        <div>ROLL: <span id="hud-roll">0</span>°</div>
+    </div>
+
+    <div class="targeting-info">
+        <div>TGT RANGE: <span id="tgt-range">---</span> m</div>
+        <div>TGT BEARING: <span id="tgt-bearing">---</span>°</div>
+        <div>CLOSURE: <span id="tgt-closure">---</span> m/s</div>
+        <div>LEAD ANGLE: <span id="tgt-lead">---</span>°</div>
+        <div style="margin-top: 10px;">PROJECTILE: <span id="proj-vel">800</span> m/s</div>
+    </div>
+
+    <div class="lock-warning" id="lock-warning">◎ TARGET LOCK ◎</div>
+
+    <div class="controls-info">
+        WASD: Pitch/Roll | Q/E: Yaw | SHIFT/CTRL: Throttle | SPACE: Fire | R: Reset Target
+    </div>
+
+    <div class="settings">
+        <h3>TARGETING COMPUTER</h3>
+        <div class="setting-row">
+            <label>Projectile Vel</label>
+            <input type="range" id="proj-velocity" min="200" max="2000" value="800">
+            <span id="v-proj">800</span>
+        </div>
+        <div class="setting-row">
+            <label>Wind Speed</label>
+            <input type="range" id="wind-speed" min="0" max="50" value="10">
+            <span id="v-wind">10</span>
+        </div>
+        <div class="setting-row">
+            <label>Wind Dir</label>
+            <input type="range" id="wind-dir" min="0" max="360" value="90">
+            <span id="v-winddir">90</span>°
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        let W, H, cx, cy;
+        function resize() {
+            W = canvas.width = window.innerWidth;
+            H = canvas.height = window.innerHeight;
+            cx = W / 2;
+            cy = H / 2;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+
+        // Aircraft state
+        const aircraft = {
+            x: 0,
+            y: 0,
+            z: 0,
+            altitude: 10000,    // feet
+            speed: 450,         // knots
+            heading: 0,         // degrees
+            pitch: 0,           // degrees
+            roll: 0,            // degrees
+            yaw: 0
+        };
+
+        // Target aircraft
+        let target = {
+            x: 2000,
+            y: 500,
+            z: 5000,
+            vx: -50,
+            vy: 10,
+            vz: -20,
+            size: 15
+        };
+
+        // Targeting settings
+        const targeting = {
+            projectileVelocity: 800,  // m/s
+            windSpeed: 10,            // m/s
+            windDirection: 90         // degrees
+        };
+
+        // Input state
+        const keys = {};
+        document.addEventListener('keydown', (e) => {
+            keys[e.key.toLowerCase()] = true;
+            if (e.key === ' ') fireProjectile();
+            if (e.key.toLowerCase() === 'r') resetTarget();
+        });
+        document.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
+
+        // Parallax layers
+        const clouds = [];
+        const mountains = [];
+        const groundFeatures = [];
+
+        // Initialize parallax elements
+        function initParallax() {
+            // Clouds (far layer)
+            for (let i = 0; i < 30; i++) {
+                clouds.push({
+                    x: Math.random() * 4000 - 2000,
+                    y: Math.random() * 1000 + 500,
+                    z: Math.random() * 3000 + 2000,
+                    size: 50 + Math.random() * 100,
+                    opacity: 0.3 + Math.random() * 0.4
+                });
+            }
+
+            // Mountains (mid layer)
+            for (let i = 0; i < 20; i++) {
+                mountains.push({
+                    x: Math.random() * 6000 - 3000,
+                    y: -200,
+                    z: Math.random() * 2000 + 1000,
+                    width: 200 + Math.random() * 400,
+                    height: 100 + Math.random() * 200
+                });
+            }
+
+            // Ground features (near layer)
+            for (let i = 0; i < 50; i++) {
+                groundFeatures.push({
+                    x: Math.random() * 4000 - 2000,
+                    y: -500,
+                    z: Math.random() * 1500 + 200,
+                    size: 10 + Math.random() * 30,
+                    type: Math.random() > 0.5 ? 'tree' : 'building'
+                });
+            }
+        }
+        initParallax();
+
+        // Projectiles
+        let projectiles = [];
+
+        function fireProjectile() {
+            const lead = calculateLead();
+            projectiles.push({
+                x: 0,
+                y: 0,
+                z: 50,
+                vx: lead.leadX * 2,
+                vy: lead.leadY * 2,
+                vz: targeting.projectileVelocity,
+                life: 300
+            });
+        }
+
+        function resetTarget() {
+            target = {
+                x: 1500 + Math.random() * 1500,
+                y: -200 + Math.random() * 800,
+                z: 3000 + Math.random() * 3000,
+                vx: -30 - Math.random() * 40,
+                vy: -20 + Math.random() * 40,
+                vz: -10 - Math.random() * 30,
+                size: 15
+            };
+        }
+
+        // Calculate parallax lead for targeting
+        function calculateLead() {
+            const range = Math.sqrt(target.x * target.x + target.y * target.y + target.z * target.z);
+            const timeToTarget = range / targeting.projectileVelocity;
+
+            // Predict target position
+            const predictedX = target.x + target.vx * timeToTarget;
+            const predictedY = target.y + target.vy * timeToTarget;
+            const predictedZ = target.z + target.vz * timeToTarget;
+
+            // Wind compensation
+            const windRad = targeting.windDirection * Math.PI / 180;
+            const windCompX = Math.cos(windRad) * targeting.windSpeed * timeToTarget;
+            const windCompY = Math.sin(windRad) * targeting.windSpeed * timeToTarget * 0.2;
+
+            // Lead point
+            const leadX = predictedX - windCompX;
+            const leadY = predictedY - windCompY;
+            const leadZ = predictedZ;
+
+            // Calculate angles
+            const currentAngle = Math.atan2(target.x, target.z) * 180 / Math.PI;
+            const leadAngle = Math.atan2(leadX, leadZ) * 180 / Math.PI;
+            const angleDiff = leadAngle - currentAngle;
+
+            // Closure rate
+            const closureRate = -target.vz - (target.vx * target.x + target.vy * target.y) / range;
+
+            return {
+                range,
+                timeToTarget,
+                leadX,
+                leadY,
+                leadZ,
+                angleDiff,
+                closureRate,
+                bearing: (Math.atan2(target.x, target.z) * 180 / Math.PI + 360) % 360
+            };
+        }
+
+        // Project 3D point to screen with parallax
+        function project(x, y, z, parallaxFactor = 1) {
+            // Apply aircraft rotation
+            const pitchRad = aircraft.pitch * Math.PI / 180;
+            const rollRad = aircraft.roll * Math.PI / 180;
+            const yawRad = aircraft.yaw * Math.PI / 180;
+
+            // Rotate around yaw
+            let rx = x * Math.cos(yawRad) - z * Math.sin(yawRad);
+            let rz = x * Math.sin(yawRad) + z * Math.cos(yawRad);
+            let ry = y;
+
+            // Rotate around pitch
+            let ry2 = ry * Math.cos(pitchRad) - rz * Math.sin(pitchRad);
+            let rz2 = ry * Math.sin(pitchRad) + rz * Math.cos(pitchRad);
+            ry = ry2;
+            rz = rz2;
+
+            // Rotate around roll
+            let rx2 = rx * Math.cos(rollRad) - ry * Math.sin(rollRad);
+            ry2 = rx * Math.sin(rollRad) + ry * Math.cos(rollRad);
+            rx = rx2;
+            ry = ry2;
+
+            // Perspective projection
+            if (rz <= 10) return null;
+
+            const fov = 500;
+            const scale = fov / (rz * parallaxFactor);
+            const screenX = cx + rx * scale;
+            const screenY = cy - ry * scale;
+
+            return { x: screenX, y: screenY, z: rz, scale };
+        }
+
+        // Handle input
+        function handleInput() {
+            const pitchRate = 1.5;
+            const rollRate = 2;
+            const yawRate = 0.5;
+
+            if (keys['w']) aircraft.pitch = Math.min(aircraft.pitch + pitchRate, 45);
+            if (keys['s']) aircraft.pitch = Math.max(aircraft.pitch - pitchRate, -45);
+            if (keys['a']) aircraft.roll = Math.max(aircraft.roll - rollRate, -60);
+            if (keys['d']) aircraft.roll = Math.min(aircraft.roll + rollRate, 60);
+            if (keys['q']) aircraft.yaw -= yawRate;
+            if (keys['e']) aircraft.yaw += yawRate;
+            if (keys['shift']) aircraft.speed = Math.min(aircraft.speed + 2, 800);
+            if (keys['control']) aircraft.speed = Math.max(aircraft.speed - 2, 100);
+
+            // Auto-center
+            if (!keys['w'] && !keys['s']) aircraft.pitch *= 0.95;
+            if (!keys['a'] && !keys['d']) aircraft.roll *= 0.95;
+
+            // Heading changes from roll
+            aircraft.heading += aircraft.roll * 0.02;
+            aircraft.heading = (aircraft.heading + 360) % 360;
+
+            // Altitude changes from pitch
+            aircraft.altitude += aircraft.pitch * 0.5;
+            aircraft.altitude = Math.max(100, Math.min(40000, aircraft.altitude));
+        }
+
+        // Update target
+        function updateTarget() {
+            target.x += target.vx * 0.016;
+            target.y += target.vy * 0.016;
+            target.z += target.vz * 0.016;
+
+            // Reset if too close or too far
+            if (target.z < 100 || target.z > 10000 || Math.abs(target.x) > 5000) {
+                resetTarget();
+            }
+        }
+
+        // Update projectiles
+        function updateProjectiles() {
+            projectiles = projectiles.filter(p => {
+                p.x += p.vx * 0.016;
+                p.y += p.vy * 0.016;
+                p.z += p.vz * 0.016;
+                p.life--;
+
+                // Check hit
+                const dx = p.x - target.x;
+                const dy = p.y - target.y;
+                const dz = p.z - target.z;
+                const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+                if (dist < target.size * 3) {
+                    // Hit!
+                    createExplosion(target.x, target.y, target.z);
+                    resetTarget();
+                    return false;
+                }
+
+                return p.life > 0 && p.z < 8000;
+            });
+        }
+
+        // Explosions
+        let explosions = [];
+        function createExplosion(x, y, z) {
+            for (let i = 0; i < 20; i++) {
+                explosions.push({
+                    x, y, z,
+                    vx: (Math.random() - 0.5) * 100,
+                    vy: (Math.random() - 0.5) * 100,
+                    vz: (Math.random() - 0.5) * 100,
+                    life: 60,
+                    maxLife: 60,
+                    size: 5 + Math.random() * 10
+                });
+            }
+        }
+
+        // Draw sky gradient
+        function drawSky() {
+            const pitchOffset = aircraft.pitch * 3;
+            const gradient = ctx.createLinearGradient(0, -pitchOffset, 0, H - pitchOffset);
+            gradient.addColorStop(0, '#001030');
+            gradient.addColorStop(0.3, '#1a4070');
+            gradient.addColorStop(0.5, '#4080b0');
+            gradient.addColorStop(0.7, '#80b0d0');
+            gradient.addColorStop(1, '#b0d0e0');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, W, H);
+        }
+
+        // Draw horizon line
+        function drawHorizon() {
+            const pitchOffset = aircraft.pitch * 5;
+            const rollRad = aircraft.roll * Math.PI / 180;
+
+            ctx.save();
+            ctx.translate(cx, cy + pitchOffset);
+            ctx.rotate(rollRad);
+
+            // Horizon line
+            ctx.strokeStyle = '#0f0';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(-W, 0);
+            ctx.lineTo(W, 0);
+            ctx.stroke();
+
+            // Pitch ladder
+            ctx.strokeStyle = 'rgba(0, 255, 0, 0.5)';
+            ctx.lineWidth = 1;
+            for (let i = -4; i <= 4; i++) {
+                if (i === 0) continue;
+                const y = i * 50;
+                ctx.beginPath();
+                ctx.moveTo(-100, y);
+                ctx.lineTo(-30, y);
+                ctx.moveTo(30, y);
+                ctx.lineTo(100, y);
+                ctx.stroke();
+
+                ctx.fillStyle = '#0f0';
+                ctx.font = '10px monospace';
+                ctx.fillText((i * 10) + '°', 105, y + 4);
+            }
+
+            ctx.restore();
+        }
+
+        // Draw clouds
+        function drawClouds() {
+            clouds.forEach(cloud => {
+                const projected = project(cloud.x, cloud.y, cloud.z, 1.5);
+                if (!projected || projected.z < 100) return;
+
+                const size = cloud.size * projected.scale;
+                if (size < 2) return;
+
+                ctx.fillStyle = `rgba(255, 255, 255, ${cloud.opacity * Math.min(1, 500 / projected.z)})`;
+                ctx.beginPath();
+                ctx.ellipse(projected.x, projected.y, size, size * 0.4, 0, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        // Draw mountains
+        function drawMountains() {
+            mountains.forEach(mtn => {
+                const projected = project(mtn.x, mtn.y, mtn.z, 1.2);
+                if (!projected || projected.z < 50) return;
+
+                const w = mtn.width * projected.scale;
+                const h = mtn.height * projected.scale;
+                if (w < 5) return;
+
+                ctx.fillStyle = `rgba(60, 80, 60, ${Math.min(1, 300 / projected.z)})`;
+                ctx.beginPath();
+                ctx.moveTo(projected.x - w / 2, projected.y);
+                ctx.lineTo(projected.x, projected.y - h);
+                ctx.lineTo(projected.x + w / 2, projected.y);
+                ctx.closePath();
+                ctx.fill();
+            });
+        }
+
+        // Draw ground features
+        function drawGround() {
+            groundFeatures.forEach(feat => {
+                const projected = project(feat.x, feat.y, feat.z, 1);
+                if (!projected || projected.z < 20) return;
+
+                const size = feat.size * projected.scale;
+                if (size < 2) return;
+
+                if (feat.type === 'tree') {
+                    ctx.fillStyle = `rgba(30, 100, 30, ${Math.min(1, 200 / projected.z)})`;
+                    ctx.beginPath();
+                    ctx.arc(projected.x, projected.y, size, 0, Math.PI * 2);
+                    ctx.fill();
+                } else {
+                    ctx.fillStyle = `rgba(100, 100, 100, ${Math.min(1, 200 / projected.z)})`;
+                    ctx.fillRect(projected.x - size / 2, projected.y - size, size, size);
+                }
+            });
+        }
+
+        // Draw target
+        function drawTarget() {
+            const projected = project(target.x, target.y, target.z);
+            if (!projected) return;
+
+            const size = target.size * projected.scale;
+
+            // Target aircraft shape
+            ctx.fillStyle = '#f00';
+            ctx.beginPath();
+            ctx.moveTo(projected.x, projected.y - size);
+            ctx.lineTo(projected.x - size * 1.5, projected.y + size);
+            ctx.lineTo(projected.x, projected.y + size * 0.5);
+            ctx.lineTo(projected.x + size * 1.5, projected.y + size);
+            ctx.closePath();
+            ctx.fill();
+
+            // Target box
+            ctx.strokeStyle = '#f80';
+            ctx.lineWidth = 1;
+            const boxSize = Math.max(20, size * 3);
+            ctx.strokeRect(projected.x - boxSize, projected.y - boxSize, boxSize * 2, boxSize * 2);
+
+            // Draw lead indicator
+            const lead = calculateLead();
+            const leadProjected = project(lead.leadX, lead.leadY, lead.leadZ);
+            if (leadProjected) {
+                ctx.strokeStyle = '#0f0';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(leadProjected.x, leadProjected.y, 15, 0, Math.PI * 2);
+                ctx.stroke();
+
+                // Cross
+                ctx.beginPath();
+                ctx.moveTo(leadProjected.x - 20, leadProjected.y);
+                ctx.lineTo(leadProjected.x + 20, leadProjected.y);
+                ctx.moveTo(leadProjected.x, leadProjected.y - 20);
+                ctx.lineTo(leadProjected.x, leadProjected.y + 20);
+                ctx.stroke();
+
+                // Line from target to lead
+                ctx.strokeStyle = 'rgba(0, 255, 0, 0.3)';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(projected.x, projected.y);
+                ctx.lineTo(leadProjected.x, leadProjected.y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        }
+
+        // Draw projectiles
+        function drawProjectiles() {
+            projectiles.forEach(p => {
+                const projected = project(p.x, p.y, p.z);
+                if (!projected) return;
+
+                ctx.fillStyle = '#ff0';
+                ctx.beginPath();
+                ctx.arc(projected.x, projected.y, 3, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Tracer
+                const trailProjected = project(p.x - p.vx * 0.05, p.y - p.vy * 0.05, p.z - p.vz * 0.05);
+                if (trailProjected) {
+                    ctx.strokeStyle = 'rgba(255, 255, 0, 0.5)';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(trailProjected.x, trailProjected.y);
+                    ctx.lineTo(projected.x, projected.y);
+                    ctx.stroke();
+                }
+            });
+        }
+
+        // Draw explosions
+        function drawExplosions() {
+            explosions = explosions.filter(e => {
+                e.x += e.vx * 0.016;
+                e.y += e.vy * 0.016;
+                e.z += e.vz * 0.016;
+                e.life--;
+
+                const projected = project(e.x, e.y, e.z);
+                if (!projected) return e.life > 0;
+
+                const lifeRatio = e.life / e.maxLife;
+                const size = e.size * projected.scale * (1 + (1 - lifeRatio) * 2);
+
+                ctx.fillStyle = `rgba(255, ${150 * lifeRatio}, 0, ${lifeRatio})`;
+                ctx.beginPath();
+                ctx.arc(projected.x, projected.y, size, 0, Math.PI * 2);
+                ctx.fill();
+
+                return e.life > 0;
+            });
+        }
+
+        // Draw HUD crosshair
+        function drawCrosshair() {
+            ctx.strokeStyle = '#0f0';
+            ctx.lineWidth = 1;
+
+            // Center crosshair
+            ctx.beginPath();
+            ctx.arc(cx, cy, 30, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(cx - 50, cy);
+            ctx.lineTo(cx - 35, cy);
+            ctx.moveTo(cx + 35, cy);
+            ctx.lineTo(cx + 50, cy);
+            ctx.moveTo(cx, cy - 50);
+            ctx.lineTo(cx, cy - 35);
+            ctx.moveTo(cx, cy + 35);
+            ctx.lineTo(cx, cy + 50);
+            ctx.stroke();
+
+            // Velocity vector
+            const velX = aircraft.roll * 0.5;
+            const velY = -aircraft.pitch * 0.5;
+            ctx.beginPath();
+            ctx.arc(cx + velX * 3, cy + velY * 3, 5, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+
+        // Update HUD displays
+        function updateHUD() {
+            document.getElementById('hud-alt').textContent = Math.round(aircraft.altitude);
+            document.getElementById('hud-spd').textContent = Math.round(aircraft.speed);
+            document.getElementById('hud-hdg').textContent = Math.round(aircraft.heading).toString().padStart(3, '0');
+            document.getElementById('hud-pitch').textContent = Math.round(aircraft.pitch);
+            document.getElementById('hud-roll').textContent = Math.round(aircraft.roll);
+
+            const lead = calculateLead();
+            document.getElementById('tgt-range').textContent = Math.round(lead.range);
+            document.getElementById('tgt-bearing').textContent = Math.round(lead.bearing).toString().padStart(3, '0');
+            document.getElementById('tgt-closure').textContent = Math.round(lead.closureRate);
+            document.getElementById('tgt-lead').textContent = lead.angleDiff.toFixed(1);
+
+            // Lock warning
+            const lockWarning = document.getElementById('lock-warning');
+            const inReticle = Math.abs(lead.angleDiff) < 2 && lead.range < 3000;
+            lockWarning.classList.toggle('active', inReticle);
+        }
+
+        // Move parallax elements
+        function updateParallax() {
+            const speedFactor = aircraft.speed * 0.05;
+            const headingRad = aircraft.heading * Math.PI / 180;
+
+            // Move all elements based on aircraft motion
+            [...clouds, ...mountains, ...groundFeatures].forEach(elem => {
+                elem.x -= Math.sin(headingRad) * speedFactor * (2000 / (elem.z + 500));
+                elem.z -= Math.cos(headingRad) * speedFactor * 0.5;
+
+                // Wrap around
+                if (elem.z < 100) elem.z = 3000 + Math.random() * 2000;
+                if (elem.z > 5000) elem.z = 200 + Math.random() * 500;
+                if (elem.x < -3000) elem.x = 3000;
+                if (elem.x > 3000) elem.x = -3000;
+            });
+        }
+
+        // Animation loop
+        function animate() {
+            handleInput();
+            updateTarget();
+            updateProjectiles();
+            updateParallax();
+
+            drawSky();
+            drawClouds();
+            drawMountains();
+            drawGround();
+            drawHorizon();
+            drawTarget();
+            drawProjectiles();
+            drawExplosions();
+            drawCrosshair();
+            updateHUD();
+
+            requestAnimationFrame(animate);
+        }
+        animate();
+
+        // Settings controls
+        document.getElementById('proj-velocity').addEventListener('input', (e) => {
+            targeting.projectileVelocity = parseInt(e.target.value);
+            document.getElementById('v-proj').textContent = e.target.value;
+            document.getElementById('proj-vel').textContent = e.target.value;
+        });
+
+        document.getElementById('wind-speed').addEventListener('input', (e) => {
+            targeting.windSpeed = parseInt(e.target.value);
+            document.getElementById('v-wind').textContent = e.target.value;
+        });
+
+        document.getElementById('wind-dir').addEventListener('input', (e) => {
+            targeting.windDirection = parseInt(e.target.value);
+            document.getElementById('v-winddir').textContent = e.target.value;
+        });
+    </script>
+</body>
+</html>

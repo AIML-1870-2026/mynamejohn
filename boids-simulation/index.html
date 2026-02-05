@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Boids Flocking Simulation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            overflow: hidden;
+            background: #0a0a0a;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(20, 20, 30, 0.9);
+            border: 1px solid rgba(100, 100, 150, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            color: #e0e0e0;
+            width: 280px;
+            backdrop-filter: blur(10px);
+            transition: transform 0.3s ease;
+            z-index: 100;
+        }
+
+        #controls.collapsed {
+            transform: translateX(calc(100% + 10px));
+        }
+
+        #toggle-btn {
+            position: fixed;
+            top: 20px;
+            right: 310px;
+            background: rgba(20, 20, 30, 0.9);
+            border: 1px solid rgba(100, 100, 150, 0.3);
+            border-radius: 8px;
+            color: #e0e0e0;
+            padding: 10px 15px;
+            cursor: pointer;
+            font-size: 14px;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            z-index: 101;
+        }
+
+        #toggle-btn:hover {
+            background: rgba(40, 40, 60, 0.9);
+        }
+
+        #toggle-btn.collapsed {
+            right: 20px;
+        }
+
+        h2 {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: #fff;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 13px;
+            color: #a0a0a0;
+        }
+
+        .control-value {
+            color: #70b0ff;
+            font-weight: 500;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(100, 100, 150, 0.3);
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #70b0ff;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        .mouse-modes {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .mouse-mode-btn {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid rgba(100, 100, 150, 0.3);
+            background: rgba(40, 40, 60, 0.5);
+            color: #a0a0a0;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .mouse-mode-btn:hover {
+            background: rgba(60, 60, 90, 0.5);
+        }
+
+        .mouse-mode-btn.active {
+            background: rgba(70, 130, 220, 0.4);
+            border-color: #70b0ff;
+            color: #fff;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .action-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .reset-btn {
+            background: rgba(100, 100, 150, 0.3);
+            color: #e0e0e0;
+        }
+
+        .reset-btn:hover {
+            background: rgba(100, 100, 150, 0.5);
+        }
+
+        .randomize-btn {
+            background: rgba(70, 130, 220, 0.4);
+            color: #fff;
+        }
+
+        .randomize-btn:hover {
+            background: rgba(70, 130, 220, 0.6);
+        }
+
+        #fps {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            color: rgba(150, 150, 150, 0.6);
+            font-size: 12px;
+            font-family: monospace;
+        }
+
+        #info {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            color: rgba(150, 150, 150, 0.6);
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+
+    <button id="toggle-btn">Hide</button>
+
+    <div id="controls">
+        <h2>Boids Simulation</h2>
+
+        <div class="control-group">
+            <div class="control-label">
+                <span>Separation</span>
+                <span class="control-value" id="separation-value">1.5</span>
+            </div>
+            <input type="range" id="separation" min="0" max="5" step="0.1" value="1.5">
+        </div>
+
+        <div class="control-group">
+            <div class="control-label">
+                <span>Alignment</span>
+                <span class="control-value" id="alignment-value">1.0</span>
+            </div>
+            <input type="range" id="alignment" min="0" max="5" step="0.1" value="1.0">
+        </div>
+
+        <div class="control-group">
+            <div class="control-label">
+                <span>Cohesion</span>
+                <span class="control-value" id="cohesion-value">1.0</span>
+            </div>
+            <input type="range" id="cohesion" min="0" max="5" step="0.1" value="1.0">
+        </div>
+
+        <div class="control-group">
+            <div class="control-label">
+                <span>Neighbor Radius</span>
+                <span class="control-value" id="radius-value">50</span>
+            </div>
+            <input type="range" id="radius" min="10" max="200" step="5" value="50">
+        </div>
+
+        <div class="control-group">
+            <div class="control-label">
+                <span>Max Speed</span>
+                <span class="control-value" id="speed-value">4</span>
+            </div>
+            <input type="range" id="speed" min="1" max="15" step="0.5" value="4">
+        </div>
+
+        <div class="control-group">
+            <div class="control-label">
+                <span>Tail Length</span>
+                <span class="control-value" id="tail-value">10</span>
+            </div>
+            <input type="range" id="tail" min="0" max="50" step="1" value="10">
+        </div>
+
+        <div class="control-group">
+            <div class="control-label">
+                <span>Bird Count</span>
+                <span class="control-value" id="count-value">100</span>
+            </div>
+            <input type="range" id="count" min="10" max="500" step="10" value="100">
+        </div>
+
+        <div class="control-group">
+            <div class="control-label">
+                <span>Mouse Mode</span>
+            </div>
+            <div class="mouse-modes">
+                <button class="mouse-mode-btn" data-mode="leader">Leader</button>
+                <button class="mouse-mode-btn" data-mode="predator">Predator</button>
+                <button class="mouse-mode-btn active" data-mode="off">Off</button>
+            </div>
+        </div>
+
+        <div class="button-group">
+            <button class="action-btn reset-btn" id="reset">Reset</button>
+            <button class="action-btn randomize-btn" id="randomize">Randomize</button>
+        </div>
+    </div>
+
+    <div id="fps">FPS: 60</div>
+    <div id="info">Click and drag to interact</div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Configuration
+        const config = {
+            separationWeight: 1.5,
+            alignmentWeight: 1.0,
+            cohesionWeight: 1.0,
+            neighborRadius: 50,
+            maxSpeed: 4,
+            tailLength: 10,
+            birdCount: 100,
+            mouseMode: 'off'
+        };
+
+        let boids = [];
+        let mousePos = { x: 0, y: 0 };
+        let mouseActive = false;
+
+        // Resize canvas
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+
+        // Mouse tracking
+        canvas.addEventListener('mousemove', (e) => {
+            mousePos.x = e.clientX;
+            mousePos.y = e.clientY;
+        });
+
+        canvas.addEventListener('mouseenter', () => mouseActive = true);
+        canvas.addEventListener('mouseleave', () => mouseActive = false);
+
+        // Boid class
+        class Boid {
+            constructor(x, y) {
+                this.x = x || Math.random() * canvas.width;
+                this.y = y || Math.random() * canvas.height;
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 2 + 1;
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+                this.history = [];
+                this.hue = Math.random() * 60 + 180; // Blue-cyan range
+            }
+
+            update(boids) {
+                // Store position history for tail
+                this.history.push({ x: this.x, y: this.y });
+                if (this.history.length > config.tailLength) {
+                    this.history.shift();
+                }
+
+                // Get neighbors
+                const neighbors = this.getNeighbors(boids);
+
+                // Apply flocking rules
+                const separation = this.separate(neighbors);
+                const alignment = this.align(neighbors);
+                const cohesion = this.cohere(neighbors);
+
+                // Apply weights
+                this.vx += separation.x * config.separationWeight;
+                this.vy += separation.y * config.separationWeight;
+                this.vx += alignment.x * config.alignmentWeight;
+                this.vy += alignment.y * config.alignmentWeight;
+                this.vx += cohesion.x * config.cohesionWeight;
+                this.vy += cohesion.y * config.cohesionWeight;
+
+                // Mouse interaction
+                if (mouseActive && config.mouseMode !== 'off') {
+                    const mouse = this.mouseInfluence();
+                    this.vx += mouse.x;
+                    this.vy += mouse.y;
+                }
+
+                // Limit speed
+                const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+                if (speed > config.maxSpeed) {
+                    this.vx = (this.vx / speed) * config.maxSpeed;
+                    this.vy = (this.vy / speed) * config.maxSpeed;
+                }
+
+                // Update position
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Wrap around edges
+                if (this.x < 0) this.x += canvas.width;
+                if (this.x > canvas.width) this.x -= canvas.width;
+                if (this.y < 0) this.y += canvas.height;
+                if (this.y > canvas.height) this.y -= canvas.height;
+            }
+
+            getNeighbors(boids) {
+                const neighbors = [];
+                for (const other of boids) {
+                    if (other === this) continue;
+                    const dx = other.x - this.x;
+                    const dy = other.y - this.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < config.neighborRadius) {
+                        neighbors.push({ boid: other, dist });
+                    }
+                }
+                return neighbors;
+            }
+
+            separate(neighbors) {
+                let steerX = 0, steerY = 0;
+                for (const { boid, dist } of neighbors) {
+                    if (dist < config.neighborRadius * 0.5) {
+                        const factor = 1 - (dist / (config.neighborRadius * 0.5));
+                        steerX -= (boid.x - this.x) * factor * 0.05;
+                        steerY -= (boid.y - this.y) * factor * 0.05;
+                    }
+                }
+                return { x: steerX, y: steerY };
+            }
+
+            align(neighbors) {
+                if (neighbors.length === 0) return { x: 0, y: 0 };
+                let avgVx = 0, avgVy = 0;
+                for (const { boid } of neighbors) {
+                    avgVx += boid.vx;
+                    avgVy += boid.vy;
+                }
+                avgVx /= neighbors.length;
+                avgVy /= neighbors.length;
+                return {
+                    x: (avgVx - this.vx) * 0.05,
+                    y: (avgVy - this.vy) * 0.05
+                };
+            }
+
+            cohere(neighbors) {
+                if (neighbors.length === 0) return { x: 0, y: 0 };
+                let centerX = 0, centerY = 0;
+                for (const { boid } of neighbors) {
+                    centerX += boid.x;
+                    centerY += boid.y;
+                }
+                centerX /= neighbors.length;
+                centerY /= neighbors.length;
+                return {
+                    x: (centerX - this.x) * 0.005,
+                    y: (centerY - this.y) * 0.005
+                };
+            }
+
+            mouseInfluence() {
+                const dx = mousePos.x - this.x;
+                const dy = mousePos.y - this.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist > 200) return { x: 0, y: 0 };
+
+                const factor = (1 - dist / 200) * 0.5;
+
+                if (config.mouseMode === 'leader') {
+                    return { x: dx * factor * 0.02, y: dy * factor * 0.02 };
+                } else if (config.mouseMode === 'predator') {
+                    return { x: -dx * factor * 0.05, y: -dy * factor * 0.05 };
+                }
+                return { x: 0, y: 0 };
+            }
+
+            draw() {
+                // Draw tail
+                if (this.history.length > 1) {
+                    for (let i = 0; i < this.history.length - 1; i++) {
+                        const alpha = (i / this.history.length) * 0.5;
+                        ctx.beginPath();
+                        ctx.moveTo(this.history[i].x, this.history[i].y);
+                        ctx.lineTo(this.history[i + 1].x, this.history[i + 1].y);
+                        ctx.strokeStyle = `hsla(${this.hue}, 70%, 60%, ${alpha})`;
+                        ctx.lineWidth = 1;
+                        ctx.stroke();
+                    }
+                }
+
+                // Draw boid as triangle
+                const angle = Math.atan2(this.vy, this.vx);
+                const size = 8;
+
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(angle);
+
+                ctx.beginPath();
+                ctx.moveTo(size, 0);
+                ctx.lineTo(-size * 0.6, size * 0.4);
+                ctx.lineTo(-size * 0.6, -size * 0.4);
+                ctx.closePath();
+
+                ctx.fillStyle = `hsl(${this.hue}, 70%, 60%)`;
+                ctx.fill();
+
+                ctx.restore();
+            }
+        }
+
+        // Initialize boids
+        function initBoids() {
+            boids = [];
+            for (let i = 0; i < config.birdCount; i++) {
+                boids.push(new Boid());
+            }
+        }
+        initBoids();
+
+        // FPS tracking
+        let lastTime = performance.now();
+        let frameCount = 0;
+        let fps = 60;
+
+        // Animation loop
+        function animate() {
+            // Calculate FPS
+            frameCount++;
+            const now = performance.now();
+            if (now - lastTime >= 1000) {
+                fps = frameCount;
+                frameCount = 0;
+                lastTime = now;
+                document.getElementById('fps').textContent = `FPS: ${fps}`;
+            }
+
+            // Clear canvas
+            ctx.fillStyle = 'rgba(10, 10, 15, 0.2)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Update and draw boids
+            for (const boid of boids) {
+                boid.update(boids);
+                boid.draw();
+            }
+
+            requestAnimationFrame(animate);
+        }
+        animate();
+
+        // Control panel bindings
+        const controls = {
+            separation: { key: 'separationWeight', decimals: 1 },
+            alignment: { key: 'alignmentWeight', decimals: 1 },
+            cohesion: { key: 'cohesionWeight', decimals: 1 },
+            radius: { key: 'neighborRadius', decimals: 0 },
+            speed: { key: 'maxSpeed', decimals: 1 },
+            tail: { key: 'tailLength', decimals: 0 },
+            count: { key: 'birdCount', decimals: 0, onChange: updateBoidCount }
+        };
+
+        function updateBoidCount() {
+            while (boids.length < config.birdCount) {
+                boids.push(new Boid());
+            }
+            while (boids.length > config.birdCount) {
+                boids.pop();
+            }
+        }
+
+        for (const [id, ctrl] of Object.entries(controls)) {
+            const input = document.getElementById(id);
+            const valueDisplay = document.getElementById(`${id}-value`);
+
+            input.addEventListener('input', () => {
+                const value = parseFloat(input.value);
+                config[ctrl.key] = value;
+                valueDisplay.textContent = value.toFixed(ctrl.decimals);
+                if (ctrl.onChange) ctrl.onChange();
+            });
+        }
+
+        // Mouse mode buttons
+        document.querySelectorAll('.mouse-mode-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.mouse-mode-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                config.mouseMode = btn.dataset.mode;
+            });
+        });
+
+        // Reset button
+        document.getElementById('reset').addEventListener('click', () => {
+            config.separationWeight = 1.5;
+            config.alignmentWeight = 1.0;
+            config.cohesionWeight = 1.0;
+            config.neighborRadius = 50;
+            config.maxSpeed = 4;
+            config.tailLength = 10;
+            config.birdCount = 100;
+            config.mouseMode = 'off';
+
+            document.getElementById('separation').value = 1.5;
+            document.getElementById('alignment').value = 1.0;
+            document.getElementById('cohesion').value = 1.0;
+            document.getElementById('radius').value = 50;
+            document.getElementById('speed').value = 4;
+            document.getElementById('tail').value = 10;
+            document.getElementById('count').value = 100;
+
+            document.getElementById('separation-value').textContent = '1.5';
+            document.getElementById('alignment-value').textContent = '1.0';
+            document.getElementById('cohesion-value').textContent = '1.0';
+            document.getElementById('radius-value').textContent = '50';
+            document.getElementById('speed-value').textContent = '4';
+            document.getElementById('tail-value').textContent = '10';
+            document.getElementById('count-value').textContent = '100';
+
+            document.querySelectorAll('.mouse-mode-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector('[data-mode="off"]').classList.add('active');
+
+            updateBoidCount();
+        });
+
+        // Randomize button
+        document.getElementById('randomize').addEventListener('click', () => {
+            for (const boid of boids) {
+                boid.x = Math.random() * canvas.width;
+                boid.y = Math.random() * canvas.height;
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * config.maxSpeed;
+                boid.vx = Math.cos(angle) * speed;
+                boid.vy = Math.sin(angle) * speed;
+                boid.history = [];
+            }
+        });
+
+        // Toggle panel
+        const toggleBtn = document.getElementById('toggle-btn');
+        const controlPanel = document.getElementById('controls');
+
+        toggleBtn.addEventListener('click', () => {
+            controlPanel.classList.toggle('collapsed');
+            toggleBtn.classList.toggle('collapsed');
+            toggleBtn.textContent = controlPanel.classList.contains('collapsed') ? 'Show' : 'Hide';
+        });
+    </script>
+</body>
+</html>

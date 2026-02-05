@@ -15,7 +15,7 @@ let config = {
     antiparticleCharge: 2.5,
     darkMatterRatio: 0.08,
     darkMatterMass: 4.0,
-    dischargeThreshold: 5,
+    dischargeThreshold: 3,
     polarityEnabled: true
 };
 
@@ -262,49 +262,51 @@ function applyForces() {
                 // Check if both are antiparticles (colony formation)
                 const bothAntiparticles = p1.isAntiparticle && p2.isAntiparticle;
 
-                // Force calculation with connectivity strength (stronger forces for better bunching)
-                let forceMagnitude = (config.edgeLength - distance) * 0.001 *
-                                     config.connectivityStrength * config.volatility;
+                // Coulomb's law: F = k * q1 * q2 / r²
+                // Positive result = repulsion, negative = attraction
+                const minDist = 15; // Prevent extreme forces at close range
+                const effectiveDist = Math.max(distance, minDist);
+                const coulombK = config.connectivityStrength * config.volatility * 25;
 
-                // Antiparticle charge multiplier
-                if (p1.isAntiparticle || p2.isAntiparticle) {
-                    forceMagnitude *= config.antiparticleCharge;
-                }
+                // Get charge values (regular particles: ±1, antiparticles: ±antiparticleCharge)
+                const q1 = p1.charge;
+                const q2 = p2.charge;
 
-                if (canAnnihilate) {
-                    forceMagnitude *= 2; // Extra attraction for annihilation
-                }
+                // Inverse square law: force magnitude
+                let forceMagnitude = coulombK * Math.abs(q1 * q2) / (effectiveDist * effectiveDist);
 
-                const sameCharge = p1.isPositive === p2.isPositive;
+                // Determine direction: same sign charges repel, opposite attract
+                const sameCharge = (q1 * q2) > 0;
                 let fx, fy;
 
                 if (bothAntiparticles) {
-                    // Antiparticles form colonies - strong attraction to cluster together
-                    const colonyAttraction = 0.8; // Strong colony attraction
+                    // Antiparticles form colonies - add cohesion on top of electromagnetic forces
+                    const colonyAttraction = 0.5 * config.connectivityStrength;
+
                     if (sameCharge) {
-                        // Same charge antiparticles: very weak repulsion (cluster tightly)
-                        fx = -(dx / distance) * forceMagnitude * 0.15;
-                        fy = -(dy / distance) * forceMagnitude * 0.15;
+                        // Same charge: repel (but weaker for colony formation)
+                        fx = -(dx / distance) * forceMagnitude * 0.3;
+                        fy = -(dy / distance) * forceMagnitude * 0.3;
                     } else {
-                        // Opposite charge antiparticles: strong attraction (builds charge differential in colony)
-                        fx = (dx / distance) * forceMagnitude * 1.5;
-                        fy = (dy / distance) * forceMagnitude * 1.5;
+                        // Opposite charge: attract
+                        fx = (dx / distance) * forceMagnitude;
+                        fy = (dy / distance) * forceMagnitude;
                     }
-                    // Add strong colony cohesion force
-                    fx += (dx / distance) * colonyAttraction * config.connectivityStrength;
-                    fy += (dy / distance) * colonyAttraction * config.connectivityStrength;
+                    // Add colony cohesion
+                    fx += (dx / distance) * colonyAttraction;
+                    fy += (dy / distance) * colonyAttraction;
                 } else if (canAnnihilate) {
-                    // Attract for annihilation
-                    fx = (dx / distance) * forceMagnitude;
-                    fy = (dy / distance) * forceMagnitude;
-                } else if (!sameCharge) {
-                    // Regular opposite charges attract
-                    fx = (dx / distance) * forceMagnitude;
-                    fy = (dy / distance) * forceMagnitude;
-                } else {
-                    // Regular same charges repel
+                    // Strong attraction for annihilation
+                    fx = (dx / distance) * forceMagnitude * 2;
+                    fy = (dy / distance) * forceMagnitude * 2;
+                } else if (sameCharge) {
+                    // Same charges repel (force points away from other particle)
                     fx = -(dx / distance) * forceMagnitude;
                     fy = -(dy / distance) * forceMagnitude;
+                } else {
+                    // Opposite charges attract (force points toward other particle)
+                    fx = (dx / distance) * forceMagnitude;
+                    fy = (dy / distance) * forceMagnitude;
                 }
 
                 // Apply forces
@@ -487,7 +489,7 @@ function checkForDischarge() {
             const combinedCharge = Math.abs(posRegion.netCharge) + Math.abs(negRegion.netCharge);
             const dischargeProbability = (combinedCharge / 25) * (250 / Math.max(dist, 80));
 
-            if (Math.random() < dischargeProbability * 0.015) {
+            if (Math.random() < dischargeProbability * 0.04) {
                 createLightningBolt(posRegion.x, posRegion.y, negRegion.x, negRegion.y, false);
 
                 // Reduce charge
@@ -542,25 +544,30 @@ function checkForDischarge() {
     });
 }
 
-// Lightning bolt creation
+// Lightning bolt creation - realistic style
 function createLightningBolt(x1, y1, x2, y2, isAntiparticle = false) {
     const bolt = {
         segments: [],
         branches: [],
         alpha: 1,
-        life: isAntiparticle ? 15 : 12, // Antimatter lightning lasts slightly longer
-        isAntiparticle: isAntiparticle
+        life: isAntiparticle ? 5 : 4, // Quick flash
+        maxLife: isAntiparticle ? 5 : 4,
+        isAntiparticle: isAntiparticle,
+        flicker: Math.random() // For flickering effect
     };
 
     const dx = x2 - x1;
     const dy = y2 - y1;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    const segmentCount = Math.max(4, Math.floor(dist / 35));
+
+    // More segments for jaggedness
+    const segmentCount = Math.max(8, Math.floor(dist / 15));
 
     let currentX = x1;
     let currentY = y1;
     bolt.segments.push({ x: currentX, y: currentY });
 
+    // Main channel with irregular jagged path
     for (let i = 1; i < segmentCount; i++) {
         const progress = i / segmentCount;
         const targetX = x1 + dx * progress;
@@ -568,17 +575,24 @@ function createLightningBolt(x1, y1, x2, y2, isAntiparticle = false) {
 
         const perpX = -dy / dist;
         const perpY = dx / dist;
-        const displacement = (Math.random() - 0.5) * 50 * (1 - Math.abs(progress - 0.5) * 2);
+
+        // Variable displacement - sharp but controlled
+        const jitter = (Math.random() - 0.5) * 2;
+        const maxDisp = 35 * (1 - Math.pow(Math.abs(progress - 0.5) * 2, 0.5));
+        const displacement = jitter * maxDisp * (0.4 + Math.random() * 0.4);
 
         currentX = targetX + perpX * displacement;
         currentY = targetY + perpY * displacement;
         bolt.segments.push({ x: currentX, y: currentY });
 
-        // Branch chance
-        if (Math.random() < 0.25 && i > 1 && i < segmentCount - 1) {
-            const branchAngle = Math.atan2(dy, dx) + (Math.random() - 0.5) * Math.PI * 0.7;
-            const branchLength = 25 + Math.random() * 40;
-            createBranch(bolt, currentX, currentY, branchAngle, branchLength, 2);
+        // More frequent branching
+        if (Math.random() < 0.4 && i > 1 && i < segmentCount - 1) {
+            // Branches tend to go outward from main direction
+            const mainAngle = Math.atan2(dy, dx);
+            const branchSide = Math.random() > 0.5 ? 1 : -1;
+            const branchAngle = mainAngle + branchSide * (0.3 + Math.random() * 0.8);
+            const branchLength = 20 + Math.random() * 60;
+            createBranch(bolt, currentX, currentY, branchAngle, branchLength, 3);
         }
     }
 
@@ -588,27 +602,35 @@ function createLightningBolt(x1, y1, x2, y2, isAntiparticle = false) {
 }
 
 function createBranch(bolt, startX, startY, angle, length, depth) {
-    if (depth <= 0) return;
+    if (depth <= 0 || length < 8) return;
 
-    const branch = [];
-    const segments = Math.max(2, Math.floor(length / 18));
+    const branch = {
+        segments: [],
+        depth: depth
+    };
+
+    const segments = Math.max(3, Math.floor(length / 10));
 
     let x = startX;
     let y = startY;
-    branch.push({ x, y });
+    let currentAngle = angle;
+    branch.segments.push({ x, y });
 
     for (let i = 1; i <= segments; i++) {
-        const segmentLength = length / segments;
-        const wiggle = (Math.random() - 0.5) * 0.4;
-        const currentAngle = angle + wiggle;
+        const segmentLength = (length / segments) * (0.7 + Math.random() * 0.6);
+        // Sharper angle changes
+        const wiggle = (Math.random() - 0.5) * 0.7;
+        currentAngle = angle + wiggle;
 
         x += Math.cos(currentAngle) * segmentLength;
         y += Math.sin(currentAngle) * segmentLength;
-        branch.push({ x, y });
+        branch.segments.push({ x, y });
 
-        if (Math.random() < 0.15 && depth > 1) {
-            const subAngle = currentAngle + (Math.random() - 0.5) * Math.PI * 0.5;
-            createBranch(bolt, x, y, subAngle, length * 0.4, depth - 1);
+        // Sub-branches
+        if (Math.random() < 0.3 && depth > 1) {
+            const subSide = Math.random() > 0.5 ? 1 : -1;
+            const subAngle = currentAngle + subSide * (0.4 + Math.random() * 0.6);
+            createBranch(bolt, x, y, subAngle, length * 0.5, depth - 1);
         }
     }
 
@@ -636,65 +658,100 @@ function scatterParticlesNearBolt(bolt) {
     });
 }
 
-// Draw lightning
+// Draw lightning - realistic multi-layer rendering
 function drawLightning() {
     lightningBolts = lightningBolts.filter(bolt => {
         bolt.life--;
-        const maxLife = bolt.isAntiparticle ? 15 : 12;
-        bolt.alpha = bolt.life / maxLife;
+        bolt.alpha = bolt.life / bolt.maxLife;
 
         if (bolt.alpha <= 0) return false;
 
+        // Flicker effect - intensity varies
+        const flicker = 0.7 + Math.random() * 0.3;
+        const intensity = bolt.alpha * flicker;
+
         ctx.save();
         ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
+        ctx.lineJoin = 'bevel'; // Sharper joins
 
-        // Color scheme based on type
-        let glowColor, coreColor, secondaryColor, branchColor;
+        // Color palettes
+        let outerGlow, midGlow, innerGlow, core, branchOuter, branchCore;
+
         if (bolt.isAntiparticle) {
-            // Antimatter lightning: magenta/pink
-            glowColor = `rgba(255, 100, 255, ${bolt.alpha})`;
-            coreColor = `rgba(255, 200, 255, ${bolt.alpha})`;
-            secondaryColor = `rgba(255, 100, 200, ${bolt.alpha * 0.8})`;
-            branchColor = `rgba(255, 150, 255, ${bolt.alpha * 0.6})`;
+            // Antimatter: magenta/violet
+            outerGlow = `rgba(180, 50, 200, ${intensity * 0.15})`;
+            midGlow = `rgba(220, 100, 255, ${intensity * 0.4})`;
+            innerGlow = `rgba(255, 150, 255, ${intensity * 0.7})`;
+            core = `rgba(255, 220, 255, ${intensity})`;
+            branchOuter = `rgba(200, 80, 220, ${intensity * 0.3})`;
+            branchCore = `rgba(255, 180, 255, ${intensity * 0.6})`;
         } else {
-            // Regular lightning: white/blue
-            glowColor = `rgba(200, 220, 255, ${bolt.alpha})`;
-            coreColor = `rgba(255, 255, 255, ${bolt.alpha})`;
-            secondaryColor = `rgba(180, 200, 255, ${bolt.alpha * 0.7})`;
-            branchColor = `rgba(200, 220, 255, ${bolt.alpha * 0.6})`;
+            // Regular: white/cyan/blue
+            outerGlow = `rgba(100, 150, 255, ${intensity * 0.12})`;
+            midGlow = `rgba(150, 200, 255, ${intensity * 0.35})`;
+            innerGlow = `rgba(200, 230, 255, ${intensity * 0.7})`;
+            core = `rgba(255, 255, 255, ${intensity})`;
+            branchOuter = `rgba(120, 170, 255, ${intensity * 0.25})`;
+            branchCore = `rgba(220, 240, 255, ${intensity * 0.5})`;
         }
 
-        // Glow
-        ctx.shadowColor = glowColor;
-        ctx.shadowBlur = bolt.isAntiparticle ? 20 : 15;
+        // === MAIN BOLT ===
 
-        // Main bolt
+        // Layer 1: Subtle outer glow
         ctx.beginPath();
         ctx.moveTo(bolt.segments[0].x, bolt.segments[0].y);
         for (let i = 1; i < bolt.segments.length; i++) {
             ctx.lineTo(bolt.segments[i].x, bolt.segments[i].y);
         }
-        ctx.strokeStyle = coreColor;
-        ctx.lineWidth = bolt.isAntiparticle ? 3 : 2.5;
+        ctx.strokeStyle = outerGlow;
+        ctx.lineWidth = 6;
+        ctx.shadowColor = outerGlow;
+        ctx.shadowBlur = 12;
         ctx.stroke();
 
-        // Secondary glow
-        ctx.strokeStyle = secondaryColor;
-        ctx.lineWidth = bolt.isAntiparticle ? 6 : 5;
+        // Layer 2: Inner glow
+        ctx.shadowBlur = 6;
+        ctx.strokeStyle = innerGlow;
+        ctx.lineWidth = 2;
         ctx.stroke();
 
-        // Branches
+        // Layer 3: Bright core
+        ctx.shadowBlur = 2;
+        ctx.shadowColor = core;
+        ctx.strokeStyle = core;
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+
+        // === BRANCHES ===
         bolt.branches.forEach(branch => {
+            if (!branch.segments || branch.segments.length < 2) return;
+
+            const depthFade = branch.depth / 3;
+
             ctx.beginPath();
-            ctx.moveTo(branch[0].x, branch[0].y);
-            for (let i = 1; i < branch.length; i++) {
-                ctx.lineTo(branch[i].x, branch[i].y);
+            ctx.moveTo(branch.segments[0].x, branch.segments[0].y);
+            for (let i = 1; i < branch.segments.length; i++) {
+                ctx.lineTo(branch.segments[i].x, branch.segments[i].y);
             }
-            ctx.strokeStyle = branchColor;
-            ctx.lineWidth = bolt.isAntiparticle ? 1.5 : 1.2;
+
+            ctx.shadowBlur = 4 * depthFade;
+            ctx.shadowColor = branchOuter;
+            ctx.strokeStyle = branchCore;
+            ctx.lineWidth = 0.8 * depthFade;
             ctx.stroke();
         });
+
+        // === FLASH EFFECT on first frame ===
+        if (bolt.life === bolt.maxLife - 1) {
+            const flashGrad = ctx.createRadialGradient(
+                bolt.segments[0].x, bolt.segments[0].y, 0,
+                bolt.segments[0].x, bolt.segments[0].y, 25
+            );
+            flashGrad.addColorStop(0, bolt.isAntiparticle ? 'rgba(255, 200, 255, 0.4)' : 'rgba(255, 255, 255, 0.4)');
+            flashGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            ctx.fillStyle = flashGrad;
+            ctx.fillRect(bolt.segments[0].x - 25, bolt.segments[0].y - 25, 50, 50);
+        }
 
         ctx.restore();
         return true;
