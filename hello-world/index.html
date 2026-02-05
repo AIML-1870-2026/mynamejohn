@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hello World</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Georgia', serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(180deg,
+                #0a0a1a 0%,
+                #1a1a3a 20%,
+                #2a1a4a 40%,
+                #3a2a5a 60%,
+                #1a1a3a 80%,
+                #0a0a1a 100%);
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Milky Way Band */
+        .milky-way {
+            position: absolute;
+            width: 200%;
+            height: 300px;
+            top: 30%;
+            left: -50%;
+            background: linear-gradient(90deg,
+                transparent 0%,
+                rgba(255, 255, 255, 0.03) 20%,
+                rgba(200, 180, 255, 0.08) 40%,
+                rgba(255, 220, 255, 0.12) 50%,
+                rgba(200, 180, 255, 0.08) 60%,
+                rgba(255, 255, 255, 0.03) 80%,
+                transparent 100%);
+            transform: rotate(-20deg);
+            filter: blur(30px);
+        }
+
+        /* Stars layers */
+        .stars {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .stars-small, .stars-medium, .stars-large {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+        }
+
+        .stars-small {
+            background-image:
+                radial-gradient(1px 1px at 10% 20%, rgba(255,255,255,0.8), transparent),
+                radial-gradient(1px 1px at 20% 50%, rgba(255,255,255,0.6), transparent),
+                radial-gradient(1px 1px at 30% 30%, rgba(255,255,255,0.7), transparent),
+                radial-gradient(1px 1px at 40% 70%, rgba(255,255,255,0.5), transparent),
+                radial-gradient(1px 1px at 50% 10%, rgba(255,255,255,0.8), transparent),
+                radial-gradient(1px 1px at 60% 40%, rgba(255,255,255,0.6), transparent),
+                radial-gradient(1px 1px at 70% 80%, rgba(255,255,255,0.7), transparent),
+                radial-gradient(1px 1px at 80% 25%, rgba(255,255,255,0.5), transparent),
+                radial-gradient(1px 1px at 90% 55%, rgba(255,255,255,0.8), transparent),
+                radial-gradient(1px 1px at 15% 85%, rgba(255,255,255,0.6), transparent),
+                radial-gradient(1px 1px at 25% 15%, rgba(255,255,255,0.7), transparent),
+                radial-gradient(1px 1px at 35% 95%, rgba(255,255,255,0.5), transparent),
+                radial-gradient(1px 1px at 45% 35%, rgba(255,255,255,0.8), transparent),
+                radial-gradient(1px 1px at 55% 65%, rgba(255,255,255,0.6), transparent),
+                radial-gradient(1px 1px at 65% 5%, rgba(255,255,255,0.7), transparent),
+                radial-gradient(1px 1px at 75% 45%, rgba(255,255,255,0.5), transparent),
+                radial-gradient(1px 1px at 85% 75%, rgba(255,255,255,0.8), transparent),
+                radial-gradient(1px 1px at 95% 90%, rgba(255,255,255,0.6), transparent),
+                radial-gradient(1px 1px at 5% 60%, rgba(255,255,255,0.7), transparent),
+                radial-gradient(1px 1px at 12% 42%, rgba(255,255,255,0.5), transparent);
+            animation: twinkle1 3s ease-in-out infinite;
+        }
+
+        .stars-medium {
+            background-image:
+                radial-gradient(2px 2px at 15% 25%, rgba(255,255,255,0.9), transparent),
+                radial-gradient(2px 2px at 35% 65%, rgba(255,255,255,0.7), transparent),
+                radial-gradient(2px 2px at 55% 15%, rgba(255,255,255,0.8), transparent),
+                radial-gradient(2px 2px at 75% 85%, rgba(255,255,255,0.6), transparent),
+                radial-gradient(2px 2px at 95% 35%, rgba(255,255,255,0.9), transparent),
+                radial-gradient(2px 2px at 5% 75%, rgba(255,255,255,0.7), transparent),
+                radial-gradient(2px 2px at 45% 45%, rgba(200,200,255,0.8), transparent),
+                radial-gradient(2px 2px at 85% 55%, rgba(255,220,200,0.6), transparent),
+                radial-gradient(2px 2px at 25% 5%, rgba(255,255,200,0.9), transparent),
+                radial-gradient(2px 2px at 65% 95%, rgba(200,255,255,0.7), transparent);
+            animation: twinkle2 4s ease-in-out infinite;
+        }
+
+        .stars-large {
+            background-image:
+                radial-gradient(3px 3px at 20% 40%, rgba(255,255,255,1), transparent),
+                radial-gradient(3px 3px at 80% 20%, rgba(255,255,255,0.9), transparent),
+                radial-gradient(3px 3px at 40% 80%, rgba(200,200,255,1), transparent),
+                radial-gradient(3px 3px at 60% 60%, rgba(255,220,200,0.9), transparent),
+                radial-gradient(4px 4px at 10% 10%, rgba(255,255,200,1), transparent),
+                radial-gradient(3px 3px at 90% 70%, rgba(200,255,255,0.9), transparent);
+            animation: twinkle3 5s ease-in-out infinite;
+        }
+
+        @keyframes twinkle1 {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        @keyframes twinkle2 {
+            0%, 100% { opacity: 0.8; }
+            50% { opacity: 0.3; }
+        }
+
+        @keyframes twinkle3 {
+            0%, 100% { opacity: 1; }
+            33% { opacity: 0.4; }
+            66% { opacity: 0.9; }
+        }
+
+        /* Moon */
+        .moon {
+            position: absolute;
+            top: 10%;
+            right: 15%;
+            width: 120px;
+            height: 120px;
+            background: radial-gradient(circle at 30% 30%,
+                #ffffd0 0%,
+                #f0e68c 40%,
+                #daa520 100%);
+            border-radius: 50%;
+            box-shadow:
+                0 0 20px rgba(255, 255, 200, 0.5),
+                0 0 40px rgba(255, 255, 150, 0.3),
+                0 0 60px rgba(255, 255, 100, 0.2),
+                inset -15px -10px 20px rgba(0, 0, 0, 0.15);
+            z-index: 5;
+        }
+
+        .moon::before {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            top: 25%;
+            left: 30%;
+        }
+
+        .moon::after {
+            content: '';
+            position: absolute;
+            width: 30px;
+            height: 25px;
+            background: rgba(0, 0, 0, 0.08);
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+        }
+
+        /* Message */
+        .message {
+            font-size: 3.5rem;
+            font-weight: 700;
+            color: #ffffff;
+            text-align: center;
+            text-shadow:
+                0 0 10px rgba(255, 255, 255, 0.8),
+                0 0 20px rgba(200, 180, 255, 0.6),
+                0 0 30px rgba(150, 100, 255, 0.4);
+            position: relative;
+            z-index: 20;
+            animation: textGlow 3s ease-in-out infinite;
+            margin-bottom: 100px;
+        }
+
+        @keyframes textGlow {
+            0%, 100% {
+                text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 0 20px rgba(200, 180, 255, 0.6), 0 0 30px rgba(150, 100, 255, 0.4);
+            }
+            50% {
+                text-shadow: 0 0 20px rgba(255, 255, 255, 1), 0 0 40px rgba(200, 180, 255, 0.8), 0 0 60px rgba(150, 100, 255, 0.6);
+            }
+        }
+
+        /* Wolf Container */
+        .wolf-container {
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+        }
+
+        /* Wolf Image */
+        .wolf-image {
+            width: 400px;
+            height: auto;
+            max-height: 70vh;
+            object-fit: contain;
+            filter: drop-shadow(0 0 20px rgba(100, 150, 255, 0.4));
+            animation: wolfPulse 4s ease-in-out infinite;
+        }
+
+        @keyframes wolfPulse {
+            0%, 100% {
+                filter: drop-shadow(0 0 20px rgba(100, 150, 255, 0.4));
+                transform: scale(1);
+            }
+            50% {
+                filter: drop-shadow(0 0 40px rgba(150, 180, 255, 0.6));
+                transform: scale(1.02);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .message {
+                font-size: 2rem;
+                padding: 0 1rem;
+                margin-bottom: 150px;
+            }
+            .moon {
+                width: 80px;
+                height: 80px;
+                top: 5%;
+                right: 10%;
+            }
+            .wolf {
+                width: 150px;
+                height: 150px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Starry background -->
+    <div class="stars">
+        <div class="stars-small"></div>
+        <div class="stars-medium"></div>
+        <div class="stars-large"></div>
+    </div>
+
+    <!-- Milky Way band -->
+    <div class="milky-way"></div>
+
+    <!-- Main message -->
+    <div class="message">
+        Hello World, I'm ready to rock!
+    </div>
+
+    <!-- Wolf -->
+    <div class="wolf-container">
+        <img src="wolf.jpg" alt="Werewolf howling at the moon" class="wolf-image">
+    </div>
+</body>
+</html>
