@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Turing Pattern Simulator</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0a0a0f;
+            color: #e0e0e0;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+        }
+        #canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+            image-rendering: pixelated;
+        }
+        #paramSpace {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            border: 1px solid rgba(100, 150, 255, 0.3);
+            border-radius: 8px;
+            cursor: crosshair;
+            background: rgba(0,0,0,0.8);
+        }
+        .controls {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(10, 10, 20, 0.95);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid rgba(100, 150, 255, 0.3);
+            backdrop-filter: blur(10px);
+            min-width: 300px;
+            z-index: 100;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+        }
+        .controls::-webkit-scrollbar { width: 6px; }
+        .controls::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+        .controls::-webkit-scrollbar-thumb { background: rgba(100, 150, 255, 0.3); border-radius: 3px; }
+        .controls h1 { font-size: 1.3em; margin-bottom: 5px; color: #7aa2ff; }
+        .controls p { font-size: 0.75em; color: #888; margin-bottom: 15px; }
+        .control-group { margin-bottom: 12px; }
+        .control-group label { display: block; font-size: 0.8em; margin-bottom: 4px; color: #aaa; }
+        .control-group input[type="range"] {
+            width: 100%; height: 6px; -webkit-appearance: none;
+            background: rgba(100, 150, 255, 0.2); border-radius: 3px; outline: none;
+        }
+        .control-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 14px; height: 14px;
+            background: #7aa2ff; border-radius: 50%; cursor: pointer;
+        }
+        .control-group select {
+            width: 100%; padding: 8px; background: rgba(20, 20, 40, 0.9);
+            border: 1px solid rgba(100, 150, 255, 0.3); color: #c0d0ff;
+            border-radius: 6px; font-size: 0.85em; cursor: pointer;
+        }
+        .value-display { font-size: 0.75em; color: #7aa2ff; float: right; }
+        .presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 12px; }
+        .preset-btn {
+            padding: 6px 8px; background: rgba(100, 150, 255, 0.15);
+            border: 1px solid rgba(100, 150, 255, 0.3); color: #c0d0ff;
+            border-radius: 5px; cursor: pointer; font-size: 0.7em; transition: all 0.2s;
+        }
+        .preset-btn:hover { background: rgba(100, 150, 255, 0.3); }
+        .preset-btn.active { background: rgba(100, 150, 255, 0.4); border-color: #7aa2ff; }
+        .action-btns { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 12px; }
+        .action-btn {
+            padding: 8px; background: rgba(100, 150, 255, 0.2);
+            border: 1px solid rgba(100, 150, 255, 0.4); color: #c0d0ff;
+            border-radius: 6px; cursor: pointer; font-size: 0.8em; transition: all 0.2s;
+        }
+        .action-btn:hover { background: rgba(100, 150, 255, 0.35); }
+        .color-schemes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-bottom: 12px; }
+        .color-btn {
+            padding: 8px; border: 1px solid rgba(100, 150, 255, 0.3);
+            border-radius: 5px; cursor: pointer; font-size: 0.7em; transition: all 0.2s;
+            display: flex; align-items: center; gap: 6px; background: rgba(20,20,40,0.5);
+        }
+        .color-btn:hover { border-color: #7aa2ff; }
+        .color-btn.active { border-color: #7aa2ff; box-shadow: 0 0 10px rgba(100, 150, 255, 0.3); }
+        .color-swatch { width: 20px; height: 20px; border-radius: 3px; display: flex; }
+        .color-swatch span { flex: 1; }
+        .stats { position: fixed; bottom: 20px; left: 20px; font-size: 0.75em; color: #666; }
+        .divider { height: 1px; background: rgba(100, 150, 255, 0.2); margin: 12px 0; }
+        .section-title { font-size: 0.85em; color: #7aa2ff; margin-bottom: 8px; }
+        .param-space-label {
+            position: fixed; bottom: 175px; right: 20px; font-size: 0.7em;
+            color: #666; text-align: center; width: 150px;
+        }
+        .anim-controls { display: flex; gap: 6px; margin-bottom: 12px; }
+        .anim-btn {
+            flex: 1; padding: 6px; background: rgba(100, 150, 255, 0.15);
+            border: 1px solid rgba(100, 150, 255, 0.3); color: #c0d0ff;
+            border-radius: 5px; cursor: pointer; font-size: 0.75em;
+        }
+        .anim-btn:hover { background: rgba(100, 150, 255, 0.3); }
+        .anim-btn.active { background: rgba(100, 200, 100, 0.3); border-color: #7aff7a; }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <canvas id="paramSpace" width="150" height="150"></canvas>
+    <div class="param-space-label">Parameter Space<br>(Click to explore)</div>
+
+    <div class="controls">
+        <h1>Turing Patterns</h1>
+        <p>Reaction-Diffusion Simulator</p>
+
+        <div class="section-title">Simulation Mode</div>
+        <div class="control-group">
+            <select id="simMode">
+                <option value="grayScott">Gray-Scott (Classic)</option>
+                <option value="fitzHughNagumo">FitzHugh-Nagumo</option>
+                <option value="giererMeinhardt">Gierer-Meinhardt</option>
+                <option value="schnakenberg">Schnakenberg</option>
+                <option value="brusselator">Brusselator</option>
+                <option value="belousov">Belousov-Zhabotinsky</option>
+            </select>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="section-title">Pattern Presets</div>
+        <div class="presets">
+            <button class="preset-btn" data-preset="spots">Spots</button>
+            <button class="preset-btn" data-preset="stripes">Stripes</button>
+            <button class="preset-btn" data-preset="waves">Waves</button>
+            <button class="preset-btn" data-preset="maze">Maze</button>
+            <button class="preset-btn" data-preset="spirals">Spirals</button>
+            <button class="preset-btn active" data-preset="coral">Coral</button>
+            <button class="preset-btn" data-preset="mitosis">Mitosis</button>
+            <button class="preset-btn" data-preset="honeycomb">Honeycomb</button>
+            <button class="preset-btn" data-preset="web">Web</button>
+            <button class="preset-btn" data-preset="dappling">Dappling</button>
+            <button class="preset-btn" data-preset="worms">Worms</button>
+            <button class="preset-btn" data-preset="fingerprint">Fingerprint</button>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="section-title">Color Schemes</div>
+        <div class="color-schemes">
+            <button class="color-btn active" data-colors="#8B8FCF,#FFD4A3">
+                <div class="color-swatch"><span style="background:#8B8FCF"></span><span style="background:#FFD4A3"></span></div>
+                Periwinkle/Orange
+            </button>
+            <button class="color-btn" data-colors="#FFFDD0,#89CFF0">
+                <div class="color-swatch"><span style="background:#FFFDD0"></span><span style="background:#89CFF0"></span></div>
+                Cream/Blue
+            </button>
+            <button class="color-btn" data-colors="#FF2400,#FFFFFF">
+                <div class="color-swatch"><span style="background:#FF2400"></span><span style="background:#FFFFFF"></span></div>
+                Scarlet/White
+            </button>
+            <button class="color-btn" data-colors="#000000,#FFFFFF">
+                <div class="color-swatch"><span style="background:#000000"></span><span style="background:#FFFFFF"></span></div>
+                Black/White
+            </button>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="section-title">Animation</div>
+        <div class="anim-controls">
+            <button class="anim-btn" id="animFeed">Animate Feed</button>
+            <button class="anim-btn" id="animKill">Animate Kill</button>
+            <button class="anim-btn" id="animBoth">Animate Both</button>
+        </div>
+
+        <div class="control-group">
+            <label>Animation Speed <span class="value-display" id="animSpeedValue">0.5</span></label>
+            <input type="range" id="animSpeed" min="0.1" max="2" step="0.1" value="0.5">
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="control-group">
+            <label>Feed Rate <span class="value-display" id="feedValue">0.055</span></label>
+            <input type="range" id="feedRate" min="0.01" max="0.1" step="0.001" value="0.055">
+        </div>
+
+        <div class="control-group">
+            <label>Kill Rate <span class="value-display" id="killValue">0.062</span></label>
+            <input type="range" id="killRate" min="0.03" max="0.075" step="0.001" value="0.062">
+        </div>
+
+        <div class="control-group">
+            <label>Simulation Speed <span class="value-display" id="speedValue">1.0</span></label>
+            <input type="range" id="speed" min="0.1" max="3" step="0.1" value="1">
+        </div>
+
+        <div class="control-group">
+            <label>Brush Size <span class="value-display" id="brushValue">10</span></label>
+            <input type="range" id="brushSize" min="2" max="30" step="1" value="10">
+        </div>
+
+        <div class="action-btns">
+            <button class="action-btn" id="clearBtn">Clear</button>
+            <button class="action-btn" id="seedBtn">Seed</button>
+            <button class="action-btn" id="pauseBtn">Pause</button>
+            <button class="action-btn" id="saveBtn">Save Image</button>
+        </div>
+    </div>
+
+    <div class="stats">
+        <span id="fps">0 FPS</span> |
+        <span id="iterations">0 iterations</span> |
+        Click to add pattern
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Simulation size (smaller for performance)
+        const SCALE = 4;
+        let simWidth, simHeight;
+        let gridA, gridB, nextA, nextB;
+
+        // Parameters
+        let params = {
+            feedRate: 0.055,
+            killRate: 0.062,
+            dA: 1.0,
+            dB: 0.5,
+            speed: 1.0,
+            brushSize: 10,
+            colorA: [139, 143, 207],
+            colorB: [255, 212, 163],
+            paused: false,
+            simMode: 'grayScott',
+            animMode: null,
+            animSpeed: 0.5,
+            animTime: 0
+        };
+
+        // Presets
+        const presets = {
+            spots: { f: 0.035, k: 0.065 },
+            stripes: { f: 0.025, k: 0.055 },
+            waves: { f: 0.018, k: 0.051 },
+            maze: { f: 0.029, k: 0.057 },
+            spirals: { f: 0.014, k: 0.045 },
+            coral: { f: 0.055, k: 0.062 },
+            mitosis: { f: 0.0367, k: 0.0649 },
+            honeycomb: { f: 0.034, k: 0.056 },
+            web: { f: 0.039, k: 0.058 },
+            dappling: { f: 0.082, k: 0.059 },
+            worms: { f: 0.078, k: 0.061 },
+            fingerprint: { f: 0.056, k: 0.065 }
+        };
+
+        function init() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            simWidth = Math.floor(canvas.width / SCALE);
+            simHeight = Math.floor(canvas.height / SCALE);
+
+            gridA = new Float32Array(simWidth * simHeight);
+            gridB = new Float32Array(simWidth * simHeight);
+            nextA = new Float32Array(simWidth * simHeight);
+            nextB = new Float32Array(simWidth * simHeight);
+
+            // Initialize: A = 1, B = 0
+            for (let i = 0; i < simWidth * simHeight; i++) {
+                gridA[i] = 1;
+                gridB[i] = 0;
+            }
+
+            seed();
+        }
+
+        function seed() {
+            // Add random seeds
+            const numSeeds = 15 + Math.random() * 20;
+            for (let s = 0; s < numSeeds; s++) {
+                const cx = Math.floor(Math.random() * simWidth);
+                const cy = Math.floor(Math.random() * simHeight);
+                const r = 2 + Math.random() * 5;
+
+                for (let y = Math.max(0, Math.floor(cy - r)); y < Math.min(simHeight, Math.ceil(cy + r)); y++) {
+                    for (let x = Math.max(0, Math.floor(cx - r)); x < Math.min(simWidth, Math.ceil(cx + r)); x++) {
+                        const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2);
+                        if (dist < r) {
+                            const idx = y * simWidth + x;
+                            gridB[idx] = 1;
+                        }
+                    }
+                }
+            }
+            iterations = 0;
+        }
+
+        function clear() {
+            for (let i = 0; i < simWidth * simHeight; i++) {
+                gridA[i] = 1;
+                gridB[i] = 0;
+            }
+            iterations = 0;
+        }
+
+        function idx(x, y) {
+            // Wrap around edges
+            x = (x + simWidth) % simWidth;
+            y = (y + simHeight) % simHeight;
+            return y * simWidth + x;
+        }
+
+        function laplacian(grid, x, y) {
+            // 9-point stencil
+            let sum = -grid[idx(x, y)];
+            sum += 0.2 * grid[idx(x + 1, y)];
+            sum += 0.2 * grid[idx(x - 1, y)];
+            sum += 0.2 * grid[idx(x, y + 1)];
+            sum += 0.2 * grid[idx(x, y - 1)];
+            sum += 0.05 * grid[idx(x + 1, y + 1)];
+            sum += 0.05 * grid[idx(x - 1, y + 1)];
+            sum += 0.05 * grid[idx(x + 1, y - 1)];
+            sum += 0.05 * grid[idx(x - 1, y - 1)];
+            return sum;
+        }
+
+        function simulate() {
+            const f = params.feedRate;
+            const k = params.killRate;
+            const Da = params.dA;
+            const Db = params.dB * 0.5;
+            const mode = params.simMode;
+
+            for (let y = 0; y < simHeight; y++) {
+                for (let x = 0; x < simWidth; x++) {
+                    const i = y * simWidth + x;
+                    let a = gridA[i];
+                    let b = gridB[i];
+                    const lapA = laplacian(gridA, x, y);
+                    const lapB = laplacian(gridB, x, y);
+
+                    let newA, newB;
+
+                    if (mode === 'grayScott') {
+                        // Gray-Scott
+                        const abb = a * b * b;
+                        newA = a + Da * lapA - abb + f * (1 - a);
+                        newB = b + Db * lapB + abb - (k + f) * b;
+                    }
+                    else if (mode === 'fitzHughNagumo') {
+                        // Barkley model (simpler, more stable FHN variant)
+                        const eps = 0.02;
+                        const aa = f * 0.5 + 0.3;  // 0.35-0.55
+                        const bb = k * 5 + 0.01;   // 0.16-0.4
+
+                        const aSafe = Math.max(a, 0.0001);
+                        newA = a + Da * lapA + (1/eps) * a * (1 - a) * (a - (b + bb) / aa);
+                        newB = b + Db * 0.1 * lapB + a - b;
+                    }
+                    else if (mode === 'giererMeinhardt') {
+                        // Gierer-Meinhardt activator-inhibitor
+                        const dt = 0.5;
+                        const rhoA = 0.01;
+                        const muA = f * 0.5 + 0.01;
+                        const muB = k + 0.02;
+
+                        const bSafe = Math.max(b, 0.01);
+                        newA = a + dt * (Da * lapA + rhoA * (a * a / bSafe) - muA * a + 0.001);
+                        newB = b + dt * (Db * 10 * lapB + rhoA * a * a - muB * b);
+                    }
+                    else if (mode === 'schnakenberg') {
+                        // Schnakenberg (glycolysis model)
+                        const dt = 0.1;
+                        const aa = f;          // feed of A
+                        const bb = k + 0.5;    // feed of B
+
+                        const aab = a * a * b;
+                        newA = a + dt * (Da * lapA + aa - a + aab);
+                        newB = b + dt * (Db * 5 * lapB + bb - aab);
+                    }
+                    else if (mode === 'brusselator') {
+                        // Brusselator
+                        const dt = 0.05;
+                        const A = f * 10 + 1;     // 1.1 - 2
+                        const B = k * 40 + 2.5;   // 3.7 - 5.5
+
+                        const aab = a * a * b;
+                        newA = a + dt * (Da * lapA + A - (B + 1) * a + aab);
+                        newB = b + dt * (Db * 5 * lapB + B * a - aab);
+                    }
+                    else if (mode === 'belousov') {
+                        // Oregonator (BZ reaction model)
+                        const dt = 0.001;
+                        const eps = 0.1;
+                        const q = 0.002;
+                        const ff = f * 3 + 1;
+
+                        const aSafe = Math.max(a, 0.0001);
+                        newA = a + dt * (Da * lapA * 50 + (1/eps) * (a - a*a - ff * b * (a - q) / (a + q)));
+                        newB = b + dt * (Db * lapB + a - b);
+                    }
+                    else {
+                        const abb = a * b * b;
+                        newA = a + Da * lapA - abb + f * (1 - a);
+                        newB = b + Db * lapB + abb - (k + f) * b;
+                    }
+
+                    nextA[i] = Math.max(0, Math.min(1, newA));
+                    nextB[i] = Math.max(0, Math.min(1, newB));
+                }
+            }
+
+            // Swap buffers
+            [gridA, nextA] = [nextA, gridA];
+            [gridB, nextB] = [nextB, gridB];
+        }
+
+        function render() {
+            const imageData = ctx.createImageData(simWidth, simHeight);
+            const data = imageData.data;
+            const cA = params.colorA;
+            const cB = params.colorB;
+
+            for (let i = 0; i < simWidth * simHeight; i++) {
+                const b = gridB[i];
+                const t = Math.min(1, b * 2); // Boost contrast
+
+                const pi = i * 4;
+                data[pi] = Math.floor(cA[0] + (cB[0] - cA[0]) * t);
+                data[pi + 1] = Math.floor(cA[1] + (cB[1] - cA[1]) * t);
+                data[pi + 2] = Math.floor(cA[2] + (cB[2] - cA[2]) * t);
+                data[pi + 3] = 255;
+            }
+
+            // Draw to offscreen canvas then scale up
+            const offscreen = document.createElement('canvas');
+            offscreen.width = simWidth;
+            offscreen.height = simHeight;
+            offscreen.getContext('2d').putImageData(imageData, 0, 0);
+
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(offscreen, 0, 0, canvas.width, canvas.height);
+        }
+
+        // Mouse interaction
+        let mouseDown = false;
+        let mouseX = 0, mouseY = 0;
+
+        canvas.addEventListener('mousedown', e => {
+            mouseDown = true;
+            updateMouse(e);
+            addChemical();
+        });
+        canvas.addEventListener('mouseup', () => mouseDown = false);
+        canvas.addEventListener('mouseleave', () => mouseDown = false);
+        canvas.addEventListener('mousemove', e => {
+            updateMouse(e);
+            if (mouseDown) addChemical();
+        });
+
+        canvas.addEventListener('touchstart', e => {
+            mouseDown = true;
+            updateTouch(e.touches[0]);
+            addChemical();
+            e.preventDefault();
+        });
+        canvas.addEventListener('touchend', () => mouseDown = false);
+        canvas.addEventListener('touchmove', e => {
+            updateTouch(e.touches[0]);
+            if (mouseDown) addChemical();
+            e.preventDefault();
+        });
+
+        function updateMouse(e) {
+            const rect = canvas.getBoundingClientRect();
+            mouseX = Math.floor((e.clientX - rect.left) / SCALE);
+            mouseY = Math.floor((e.clientY - rect.top) / SCALE);
+        }
+
+        function updateTouch(t) {
+            const rect = canvas.getBoundingClientRect();
+            mouseX = Math.floor((t.clientX - rect.left) / SCALE);
+            mouseY = Math.floor((t.clientY - rect.top) / SCALE);
+        }
+
+        function addChemical() {
+            const r = params.brushSize;
+            for (let dy = -r; dy <= r; dy++) {
+                for (let dx = -r; dx <= r; dx++) {
+                    if (dx * dx + dy * dy <= r * r) {
+                        const x = mouseX + dx;
+                        const y = mouseY + dy;
+                        if (x >= 0 && x < simWidth && y >= 0 && y < simHeight) {
+                            gridB[y * simWidth + x] = 1;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Parameter space
+        const paramCanvas = document.getElementById('paramSpace');
+        const paramCtx = paramCanvas.getContext('2d');
+
+        function drawParamSpace() {
+            const w = paramCanvas.width, h = paramCanvas.height;
+            const imgData = paramCtx.createImageData(w, h);
+
+            for (let py = 0; py < h; py++) {
+                for (let px = 0; px < w; px++) {
+                    const f = 0.01 + (px / w) * 0.09;
+                    const k = 0.03 + (py / h) * 0.045;
+                    const i = (py * w + px) * 4;
+
+                    const ratio = k / f;
+                    let r = 20, g = 25, b = 35;
+                    if (ratio > 0.5 && ratio < 2.5 && f > 0.02 && f < 0.08) {
+                        r = 40; g = 60; b = 90;
+                    }
+                    imgData.data[i] = r;
+                    imgData.data[i + 1] = g;
+                    imgData.data[i + 2] = b;
+                    imgData.data[i + 3] = 255;
+                }
+            }
+            paramCtx.putImageData(imgData, 0, 0);
+
+            // Preset dots
+            paramCtx.fillStyle = '#7aa2ff';
+            Object.values(presets).forEach(p => {
+                const px = ((p.f - 0.01) / 0.09) * w;
+                const py = ((p.k - 0.03) / 0.045) * h;
+                paramCtx.beginPath();
+                paramCtx.arc(px, py, 3, 0, Math.PI * 2);
+                paramCtx.fill();
+            });
+
+            // Current position
+            const cx = ((params.feedRate - 0.01) / 0.09) * w;
+            const cy = ((params.killRate - 0.03) / 0.045) * h;
+            paramCtx.strokeStyle = '#ff6666';
+            paramCtx.lineWidth = 2;
+            paramCtx.beginPath();
+            paramCtx.arc(cx, cy, 6, 0, Math.PI * 2);
+            paramCtx.stroke();
+
+            paramCtx.fillStyle = '#555';
+            paramCtx.font = '10px sans-serif';
+            paramCtx.fillText('f→', w - 18, h - 4);
+            paramCtx.fillText('k↓', 3, 12);
+        }
+
+        paramCanvas.addEventListener('click', e => {
+            const rect = paramCanvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            params.feedRate = 0.01 + (x / paramCanvas.width) * 0.09;
+            params.killRate = 0.03 + (y / paramCanvas.height) * 0.045;
+            updateSliders();
+        });
+
+        function updateSliders() {
+            document.getElementById('feedRate').value = params.feedRate;
+            document.getElementById('killRate').value = params.killRate;
+            document.getElementById('feedValue').textContent = params.feedRate.toFixed(3);
+            document.getElementById('killValue').textContent = params.killRate.toFixed(3);
+        }
+
+        // UI
+        document.getElementById('feedRate').addEventListener('input', e => {
+            params.feedRate = parseFloat(e.target.value);
+            document.getElementById('feedValue').textContent = params.feedRate.toFixed(3);
+        });
+
+        document.getElementById('killRate').addEventListener('input', e => {
+            params.killRate = parseFloat(e.target.value);
+            document.getElementById('killValue').textContent = params.killRate.toFixed(3);
+        });
+
+        document.getElementById('speed').addEventListener('input', e => {
+            params.speed = parseFloat(e.target.value);
+            document.getElementById('speedValue').textContent = params.speed.toFixed(1);
+        });
+
+        document.getElementById('brushSize').addEventListener('input', e => {
+            params.brushSize = parseInt(e.target.value);
+            document.getElementById('brushValue').textContent = params.brushSize;
+        });
+
+        document.getElementById('animSpeed').addEventListener('input', e => {
+            params.animSpeed = parseFloat(e.target.value);
+            document.getElementById('animSpeedValue').textContent = params.animSpeed.toFixed(1);
+        });
+
+        document.getElementById('simMode').addEventListener('change', e => {
+            params.simMode = e.target.value;
+            // Re-seed with appropriate initial conditions
+            clear();
+            seedForMode();
+        });
+
+        function seedForMode() {
+            const mode = params.simMode;
+
+            // All models: start with noise + seeds
+            for (let i = 0; i < simWidth * simHeight; i++) {
+                if (mode === 'grayScott') {
+                    gridA[i] = 1;
+                    gridB[i] = 0;
+                } else if (mode === 'fitzHughNagumo' || mode === 'belousov') {
+                    gridA[i] = Math.random() * 0.1;
+                    gridB[i] = Math.random() * 0.1;
+                } else if (mode === 'giererMeinhardt') {
+                    gridA[i] = 0.1 + Math.random() * 0.02;
+                    gridB[i] = 0.5 + Math.random() * 0.1;
+                } else {
+                    // schnakenberg, brusselator
+                    gridA[i] = 0.5 + (Math.random() - 0.5) * 0.1;
+                    gridB[i] = 0.5 + (Math.random() - 0.5) * 0.1;
+                }
+            }
+
+            // Add seed spots
+            const numSeeds = 15 + Math.floor(Math.random() * 15);
+            for (let s = 0; s < numSeeds; s++) {
+                const cx = Math.floor(Math.random() * simWidth);
+                const cy = Math.floor(Math.random() * simHeight);
+                const r = 2 + Math.random() * 5;
+
+                for (let dy = -Math.ceil(r); dy <= Math.ceil(r); dy++) {
+                    for (let dx = -Math.ceil(r); dx <= Math.ceil(r); dx++) {
+                        if (dx*dx + dy*dy <= r*r) {
+                            const x = (cx + dx + simWidth) % simWidth;
+                            const y = (cy + dy + simHeight) % simHeight;
+                            const i = y * simWidth + x;
+
+                            if (mode === 'grayScott') {
+                                gridB[i] = 1;
+                            } else if (mode === 'fitzHughNagumo' || mode === 'belousov') {
+                                gridA[i] = 0.9;
+                                gridB[i] = 0.1;
+                            } else if (mode === 'giererMeinhardt') {
+                                gridA[i] = 1;
+                            } else {
+                                gridA[i] = 1;
+                                gridB[i] = 0.2;
+                            }
+                        }
+                    }
+                }
+            }
+            iterations = 0;
+        }
+
+        // Color buttons
+        document.querySelectorAll('.color-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const [c1, c2] = btn.dataset.colors.split(',');
+                params.colorA = hexToRgb(c1);
+                params.colorB = hexToRgb(c2);
+                document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+            });
+        });
+
+        function hexToRgb(hex) {
+            const r = parseInt(hex.slice(1, 3), 16);
+            const g = parseInt(hex.slice(3, 5), 16);
+            const b = parseInt(hex.slice(5, 7), 16);
+            return [r, g, b];
+        }
+
+        // Preset buttons
+        document.querySelectorAll('.preset-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const p = presets[btn.dataset.preset];
+                if (p) {
+                    params.feedRate = p.f;
+                    params.killRate = p.k;
+                    updateSliders();
+                    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                }
+            });
+        });
+
+        // Animation buttons
+        ['animFeed', 'animKill', 'animBoth'].forEach(id => {
+            document.getElementById(id).addEventListener('click', function() {
+                const mode = id.replace('anim', '').toLowerCase();
+                params.animMode = params.animMode === mode ? null : mode;
+                document.querySelectorAll('.anim-btn').forEach(b => b.classList.remove('active'));
+                if (params.animMode) this.classList.add('active');
+            });
+        });
+
+        // Action buttons
+        document.getElementById('clearBtn').addEventListener('click', () => { clear(); seedForMode(); });
+        document.getElementById('seedBtn').addEventListener('click', seedForMode);
+        document.getElementById('pauseBtn').addEventListener('click', () => {
+            params.paused = !params.paused;
+            document.getElementById('pauseBtn').textContent = params.paused ? 'Resume' : 'Pause';
+        });
+        document.getElementById('saveBtn').addEventListener('click', () => {
+            const link = document.createElement('a');
+            link.download = 'turing-pattern.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        });
+
+        // Animation loop
+        let iterations = 0;
+        let lastTime = performance.now();
+        let frameCount = 0;
+        let fps = 0;
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            frameCount++;
+            const now = performance.now();
+            if (now - lastTime >= 1000) {
+                fps = frameCount;
+                frameCount = 0;
+                lastTime = now;
+                document.getElementById('fps').textContent = fps + ' FPS';
+                document.getElementById('iterations').textContent = iterations + ' iterations';
+            }
+
+            drawParamSpace();
+
+            if (params.paused) {
+                render();
+                return;
+            }
+
+            // Animation
+            if (params.animMode) {
+                params.animTime += 0.016 * params.animSpeed;
+                const wave = Math.sin(params.animTime) * 0.5 + 0.5;
+
+                if (params.animMode === 'feed' || params.animMode === 'both') {
+                    params.feedRate = 0.02 + wave * 0.06;
+                }
+                if (params.animMode === 'kill' || params.animMode === 'both') {
+                    params.killRate = 0.04 + wave * 0.03;
+                }
+                updateSliders();
+            }
+
+            // Run simulation steps (more steps for some models)
+            let stepsMultiplier = 1;
+            if (params.simMode === 'fitzHughNagumo') stepsMultiplier = 3;
+            else if (params.simMode === 'belousov') stepsMultiplier = 10;
+            else if (params.simMode === 'brusselator') stepsMultiplier = 2;
+
+            const steps = Math.ceil(params.speed * 5 * stepsMultiplier);
+            for (let i = 0; i < steps; i++) {
+                simulate();
+                iterations++;
+            }
+
+            render();
+        }
+
+        // Start
+        window.addEventListener('resize', init);
+        init();
+        animate();
+
+        console.log('Turing Pattern Simulator running!');
+    </script>
+</body>
+</html>

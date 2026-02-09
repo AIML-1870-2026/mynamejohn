@@ -1,57 +1,36 @@
-# AIML 1870 - The Royal Decree
+# mynamejohn Projects
 
-## Configuration
-UserGamertag: "mynamejohn"
-Organization: "AIML-1870-2026"
+Collection of interactive web simulations and visualizations.
 
-## Project Structure
-This folder is your entire AIML 1870 portfolio. It is a single git repository
-containing all your assignments as subfolders.
+## Projects
 
-Structure:
-- Root folder = Your Gamertag (this IS the git repo)
-- Each assignment = A subfolder (NOT a separate repo)
-- CLAUDE.md = Lives at the root, governs everything
+### turing-patterns/
+Reaction-diffusion Turing pattern simulator with multiple models:
+- **Gray-Scott**: Classic spots, stripes, coral, maze patterns
+- **FitzHugh-Nagumo**: Spiral waves, excitable media
+- **Gierer-Meinhardt**: Activator-inhibitor patterns
+- **Schnakenberg**: Glycolysis model patterns
+- **Brusselator**: Chemical oscillator
+- **Belousov-Zhabotinsky**: Oregonator spiral waves
 
-## Commands
+Controls: feed rate (f), kill rate (k), diffusion rates, brush size
+Features: parameter space explorer, animation modes, save image, color schemes
 
-### Deploy
-When I say "Deploy":
+### engine-simulator/
+Jet engine/flight simulator
 
-1. **Verify Location**
-   - Confirm we're inside the Gamertag folder (or a subfolder of it)
-   - Check that .git exists at the root level
+## Tech Stack
+- Vanilla HTML/CSS/JavaScript
+- Canvas 2D for rendering
+- No build tools required - open HTML files directly in browser
 
-2. **Stage and Commit**
-   - `git add .`
-   - `git commit -m "Update: [describe what changed]"`
+## Running
+```bash
+open <project>/index.html
+```
 
-3. **Push**
-   - `git push origin main`
-
-4. **Report Success**
-   - Confirm the push succeeded
-   - Remind me of my live URL: https://aiml-1870-2026.github.io/[Gamertag]/
-
-### New Assignment
-When I say "Start [AssignmentName]":
-
-1. Create a folder called `[AssignmentName]` in the root
-2. Create a starter `index.html` inside it
-3. Tell me the folder is ready
-
-### Show My URLs
-When I say "Show my URLs" or "Where's my stuff?":
-
-1. List all subfolders that contain an index.html
-2. For each, show the live URL pattern
-
-## Coding Standards
-- Single HTML file projects preferred (unless specified otherwise)
-- No personally identifiable information in code or comments
-- Use descriptive folder names (e.g., "Julia-Set-Explorer" not "assignment3")
-
-## File Naming
-- Main file: `index.html`
-- Assets: lowercase, hyphens (e.g., `particle-system.js`)
-- Assignment folders: Descriptive names or `Assignment-XX`
+## Color Schemes
+- Periwinkle / Pale Orange
+- Cream / Baby Blue
+- Scarlet / White
+- Black / White
