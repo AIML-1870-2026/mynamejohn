@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Readable Explorer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f0f2f5;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --text-primary: #1e293b;
+      --text-secondary: #64748b;
+      --accent: #6366f1;
+      --accent-light: #eef2ff;
+      --pass: #16a34a;
+      --pass-bg: #f0fdf4;
+      --pass-border: #86efac;
+      --fail: #dc2626;
+      --fail-bg: #fef2f2;
+      --fail-border: #fca5a5;
+      --radius: 14px;
+      --shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.05);
+      --shadow-md: 0 4px 12px rgba(0,0,0,.1);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text-primary);
+      min-height: 100vh;
+    }
+
+    /* ─── Header ─────────────────────────────────────── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 1.75rem;
+      display: flex;
+      align-items: baseline;
+      gap: 1rem;
+      box-shadow: var(--shadow);
+    }
+    header h1 {
+      font-size: 1.4rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #6366f1, #06b6d4);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -0.02em;
+    }
+    header p {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+    }
+
+    /* ─── Layout ──────────────────────────────────────── */
+    .layout {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 1.25rem;
+      padding: 1.25rem;
+      max-width: 1440px;
+      margin: 0 auto;
+      align-items: start;
+    }
+    @media (max-width: 860px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+
+    /* ─── Cards ───────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 1.1rem 1.25rem;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+    }
+    .card-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      margin-bottom: .85rem;
+    }
+    .controls { display: flex; flex-direction: column; gap: .9rem; }
+
+    /* ─── Color Preview Strip ─────────────────────────── */
+    .color-strip {
+      height: 36px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      margin-bottom: .75rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .color-strip-hex {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.72rem;
+      font-weight: 600;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      letter-spacing: .03em;
+      mix-blend-mode: difference;
+      color: white;
+      pointer-events: none;
+    }
+
+    /* ─── RGB Rows ────────────────────────────────────── */
+    .rgb-row {
+      display: grid;
+      grid-template-columns: 18px 1fr 56px;
+      align-items: center;
+      gap: .5rem;
+      margin-bottom: .45rem;
+    }
+    .rgb-row:last-child { margin-bottom: 0; }
+    .ch-label {
+      font-size: .7rem;
+      font-weight: 800;
+      text-align: center;
+    }
+    .ch-label.r { color: #ef4444; }
+    .ch-label.g { color: #22c55e; }
+    .ch-label.b { color: #3b82f6; }
+
+    input[type="range"] {
+      width: 100%;
+      height: 5px;
+      -webkit-appearance: none;
+      appearance: none;
+      border-radius: 99px;
+      background: #e2e8f0;
+      outline: none;
+      cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0,0,0,.25);
+      border: 2px solid white;
+    }
+    .r-track::-webkit-slider-thumb { background: #ef4444; }
+    .g-track::-webkit-slider-thumb { background: #22c55e; }
+    .b-track::-webkit-slider-thumb { background: #3b82f6; }
+    .sz-track::-webkit-slider-thumb { background: var(--accent); }
+
+    input[type="number"] {
+      width: 56px;
+      padding: .25rem .35rem;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      font-size: .8rem;
+      text-align: center;
+      background: #f8fafc;
+      color: var(--text-primary);
+      font-variant-numeric: tabular-nums;
+      -moz-appearance: textfield;
+    }
+    input[type="number"]::-webkit-outer-spin-button,
+    input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+    input[type="number"]:focus {
+      outline: 2px solid var(--accent);
+      border-color: transparent;
+    }
+
+    /* ─── Text Size ───────────────────────────────────── */
+    .size-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: .55rem;
+    }
+    .size-header span { font-size: .8rem; color: var(--text-secondary); }
+    .size-header strong { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+    .size-row {
+      display: grid;
+      grid-template-columns: 1fr 56px;
+      align-items: center;
+      gap: .5rem;
+    }
+
+    /* ─── Presets ─────────────────────────────────────── */
+    .presets-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .45rem;
+    }
+    .preset-btn {
+      padding: .55rem .6rem;
+      border-radius: 9px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      cursor: pointer;
+      font-size: .73rem;
+      font-weight: 500;
+      color: var(--text-primary);
+      text-align: left;
+      transition: border-color .15s, box-shadow .15s, transform .1s;
+      line-height: 1.3;
+    }
+    .preset-btn:hover:not(:disabled) {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(99,102,241,.12);
+      transform: translateY(-1px);
+    }
+    .preset-btn:active:not(:disabled) { transform: translateY(0); }
+    .preset-swatches {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 4px;
+    }
+    .swatch { width: 18px; height: 12px; border-radius: 3px; border: 1px solid rgba(0,0,0,.08); }
+
+    /* ─── Vision Simulation ───────────────────────────── */
+    .vision-list {
+      display: flex;
+      flex-direction: column;
+      gap: .4rem;
+    }
+    .vision-label {
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+      cursor: pointer;
+      padding: .35rem .5rem;
+      border-radius: 7px;
+      transition: background .12s;
+    }
+    .vision-label:hover { background: var(--accent-light); }
+    .vision-label input[type="radio"] {
+      accent-color: var(--accent);
+      width: 15px;
+      height: 15px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .vision-label span { font-size: .82rem; }
+    .vision-label small { font-size: .7rem; color: var(--text-secondary); display: block; }
+    .vision-note {
+      margin-top: .65rem;
+      padding: .55rem .65rem;
+      background: #fffbeb;
+      border-left: 3px solid #f59e0b;
+      border-radius: 0 7px 7px 0;
+      font-size: .75rem;
+      color: #92400e;
+      line-height: 1.5;
+    }
+
+    /* ─── Preview Panel ───────────────────────────────── */
+    .preview { display: flex; flex-direction: column; gap: .9rem; }
+
+    .text-display {
+      border-radius: var(--radius);
+      padding: 2rem 2.25rem;
+      min-height: 220px;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-md);
+      transition: background-color .05s, color .05s;
+      overflow: hidden;
+    }
+    .sample-heading {
+      font-weight: 700;
+      line-height: 1.25;
+      margin-bottom: .75rem;
+    }
+    .sample-body { line-height: 1.7; }
+    .sample-body p + p { margin-top: .75em; }
+
+    /* ─── Stats Row ───────────────────────────────────── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr 1fr;
+      gap: .75rem;
+    }
+    .stat-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 1.1rem 1rem;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      text-align: center;
+    }
+    .stat-label {
+      font-size: .68rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: .4rem;
+    }
+    .stat-value {
+      font-size: 1.55rem;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      color: var(--text-primary);
+      line-height: 1;
+    }
+    .stat-value.contrast { color: var(--accent); font-size: 1.8rem; }
+    .stat-sub {
+      font-size: .68rem;
+      color: var(--text-secondary);
+      margin-top: .3rem;
+    }
+
+    /* ─── WCAG Compliance ─────────────────────────────── */
+    .wcag-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .65rem;
+    }
+    .wcag-item {
+      padding: .9rem 1rem;
+      border-radius: 10px;
+      border: 2px solid;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .5rem;
+      transition: all .2s;
+    }
+    .wcag-item.pass { border-color: var(--pass-border); background: var(--pass-bg); }
+    .wcag-item.fail { border-color: var(--fail-border); background: var(--fail-bg); }
+    .wcag-info .wcag-type { font-size: .82rem; font-weight: 600; }
+    .wcag-info .wcag-threshold { font-size: .7rem; color: var(--text-secondary); margin-top: .1rem; }
+    .wcag-info .wcag-applies {
+      font-size: .68rem;
+      font-weight: 600;
+      color: var(--accent);
+      margin-top: .2rem;
+    }
+    .wcag-badge {
+      padding: .2rem .65rem;
+      border-radius: 99px;
+      font-size: .72rem;
+      font-weight: 800;
+      letter-spacing: .05em;
+      flex-shrink: 0;
+    }
+    .wcag-item.pass .wcag-badge { background: var(--pass); color: white; }
+    .wcag-item.fail .wcag-badge { background: var(--fail); color: white; }
+
+    /* ─── Disabled state for controls ────────────────── */
+    input:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+    .preset-btn:disabled {
+      opacity: .4;
+      cursor: not-allowed;
+      transform: none;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Readable Explorer</h1>
+  <p>Explore how color and type choices affect readability &amp; WCAG accessibility</p>
+</header>
+
+<main class="layout">
+
+  <!-- ── Controls ── -->
+  <aside class="controls" id="controls">
+
+    <!-- Background Color -->
+    <div class="card">
+      <div class="card-title">Background Color</div>
+      <div class="color-strip" id="bgStrip">
+        <span class="color-strip-hex" id="bgHex">#ffffff</span>
+      </div>
+      <div class="rgb-row">
+        <span class="ch-label r">R</span>
+        <input type="range" class="r-track" id="bgR" min="0" max="255" value="255">
+        <input type="number" id="bgRn" min="0" max="255" value="255">
+      </div>
+      <div class="rgb-row">
+        <span class="ch-label g">G</span>
+        <input type="range" class="g-track" id="bgG" min="0" max="255" value="255">
+        <input type="number" id="bgGn" min="0" max="255" value="255">
+      </div>
+      <div class="rgb-row">
+        <span class="ch-label b">B</span>
+        <input type="range" class="b-track" id="bgB" min="0" max="255" value="255">
+        <input type="number" id="bgBn" min="0" max="255" value="255">
+      </div>
+    </div>
+
+    <!-- Text Color -->
+    <div class="card">
+      <div class="card-title">Text Color</div>
+      <div class="color-strip" id="textStrip">
+        <span class="color-strip-hex" id="textHex">#000000</span>
+      </div>
+      <div class="rgb-row">
+        <span class="ch-label r">R</span>
+        <input type="range" class="r-track" id="txR" min="0" max="255" value="0">
+        <input type="number" id="txRn" min="0" max="255" value="0">
+      </div>
+      <div class="rgb-row">
+        <span class="ch-label g">G</span>
+        <input type="range" class="g-track" id="txG" min="0" max="255" value="0">
+        <input type="number" id="txGn" min="0" max="255" value="0">
+      </div>
+      <div class="rgb-row">
+        <span class="ch-label b">B</span>
+        <input type="range" class="b-track" id="txB" min="0" max="255" value="0">
+        <input type="number" id="txBn" min="0" max="255" value="0">
+      </div>
+    </div>
+
+    <!-- Text Size -->
+    <div class="card">
+      <div class="card-title">Text Size</div>
+      <div class="size-header">
+        <span>Font size</span>
+        <strong><span id="sizeVal">18</span> px</strong>
+      </div>
+      <div class="size-row">
+        <input type="range" class="sz-track" id="szSlider" min="8" max="72" value="18">
+        <input type="number" id="szNum" min="8" max="72" value="18">
+      </div>
+    </div>
+
+    <!-- Preset Color Schemes (Option C) -->
+    <div class="card">
+      <div class="card-title">Preset Color Schemes</div>
+      <div class="presets-grid" id="presetsGrid"></div>
+    </div>
+
+    <!-- Vision Type Simulation (Option A) -->
+    <div class="card">
+      <div class="card-title">Vision Type Simulation</div>
+      <div class="vision-list">
+        <label class="vision-label">
+          <input type="radio" name="vision" value="normal" checked>
+          <span>Normal Vision</span>
+        </label>
+        <label class="vision-label">
+          <input type="radio" name="vision" value="protanopia">
+          <div>
+            <span>Protanopia</span>
+            <small>Red-blind — missing red cones</small>
+          </div>
+        </label>
+        <label class="vision-label">
+          <input type="radio" name="vision" value="deuteranopia">
+          <div>
+            <span>Deuteranopia</span>
+            <small>Green-blind — missing green cones</small>
+          </div>
+        </label>
+        <label class="vision-label">
+          <input type="radio" name="vision" value="tritanopia">
+          <div>
+            <span>Tritanopia</span>
+            <small>Blue-blind — missing blue cones</small>
+          </div>
+        </label>
+        <label class="vision-label">
+          <input type="radio" name="vision" value="monochromacy">
+          <div>
+            <span>Monochromacy</span>
+            <small>Complete color blindness — grayscale only</small>
+          </div>
+        </label>
+      </div>
+      <div class="vision-note" id="visionNote" style="display:none">
+        Color controls are disabled while simulating vision types — switch back to Normal Vision to adjust colors.
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- ── Preview ── -->
+  <section class="preview">
+
+    <!-- Text Display Area -->
+    <div class="text-display" id="textDisplay">
+      <div class="sample-heading" id="sampleHeading">
+        The quick brown fox jumps over the lazy dog
+      </div>
+      <div class="sample-body" id="sampleBody">
+        <p>Typography plays a critical role in web accessibility. When text is rendered with sufficient contrast against its background, users with visual impairments can read content far more easily.</p>
+        <p>This sample updates in real time as you adjust the sliders. Notice how your contrast ratio changes — and watch the WCAG indicators below to see if your choices meet accessibility standards.</p>
+      </div>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">Background Luminosity</div>
+        <div class="stat-value" id="bgLum">1.000</div>
+        <div class="stat-sub">relative luminance</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Contrast Ratio</div>
+        <div class="stat-value contrast" id="contrastDisplay">21.00:1</div>
+        <div class="stat-sub">WCAG formula</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Text Luminosity</div>
+        <div class="stat-value" id="txLum">0.000</div>
+        <div class="stat-sub">relative luminance</div>
+      </div>
+    </div>
+
+    <!-- WCAG Compliance (Option B) -->
+    <div class="card">
+      <div class="card-title">WCAG 2.1 Compliance (Level AA)</div>
+      <div class="wcag-grid">
+        <div class="wcag-item pass" id="wcagNormal">
+          <div class="wcag-info">
+            <div class="wcag-type">Normal Text</div>
+            <div class="wcag-threshold">Minimum 4.5 : 1</div>
+            <div class="wcag-applies" id="normalApplies">← applies at current size</div>
+          </div>
+          <span class="wcag-badge" id="normalBadge">PASS</span>
+        </div>
+        <div class="wcag-item pass" id="wcagLarge">
+          <div class="wcag-info">
+            <div class="wcag-type">Large Text</div>
+            <div class="wcag-threshold">Minimum 3.0 : 1</div>
+            <div class="wcag-applies" id="largeApplies"></div>
+          </div>
+          <span class="wcag-badge" id="largeBadge">PASS</span>
+        </div>
+      </div>
+    </div>
+
+  </section>
+</main>
+
+<script>
+// ─── State ────────────────────────────────────────────────────────────────────
+const state = {
+  bg:   { r: 255, g: 255, b: 255 },
+  text: { r:   0, g:   0, b:   0 },
+  size: 18,
+  vision: 'normal'
+};
+
+// ─── Color Blindness Matrices ──────────────────────────────────────────────────
+// Applied in linear RGB space (Viénot, Brettel, Mollon 1999 / Machado 2009)
+const MATRICES = {
+  normal:      [[1,0,0],[0,1,0],[0,0,1]],
+  protanopia:  [[0.567,0.433,0],[0.558,0.442,0],[0,0.242,0.758]],
+  deuteranopia:[[0.625,0.375,0],[0.700,0.300,0],[0,0.300,0.700]],
+  tritanopia:  [[0.950,0.050,0],[0,0.433,0.567],[0,0.475,0.525]],
+  monochromacy:[[0.299,0.587,0.114],[0.299,0.587,0.114],[0.299,0.587,0.114]]
+};
+
+// ─── Presets (Option C) ────────────────────────────────────────────────────────
+const PRESETS = [
+  { name:'Black on White',   bg:[255,255,255], text:[0,0,0]         },
+  { name:'White on Black',   bg:[0,0,0],       text:[255,255,255]   },
+  { name:'GitHub / Docs',    bg:[255,255,255], text:[31,35,40]      },
+  { name:'Ocean Dark',       bg:[10,25,47],    text:[144,202,249]   },
+  { name:'Warm Cream',       bg:[255,248,220], text:[92,51,23]      },
+  { name:'Navy on Ice Blue', bg:[240,248,255], text:[0,0,128]       },
+  { name:'Fails AA ✗',       bg:[153,153,153], text:[187,187,187]   },
+  { name:'Problematic Red',  bg:[255,80,80],   text:[200,0,0]       },
+];
+
+// ─── Color math ───────────────────────────────────────────────────────────────
+function toLinear(c) {
+  c /= 255;
+  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
+function fromLinear(c) {
+  return c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1/2.4) - 0.055;
+}
+
+function simulateVision(r, g, b, type) {
+  if (type === 'normal') return [r, g, b];
+  const m = MATRICES[type];
+  const rl = toLinear(r), gl = toLinear(g), bl = toLinear(b);
+  return [0,1,2].map(i => {
+    const lin = m[i][0]*rl + m[i][1]*gl + m[i][2]*bl;
+    return Math.round(Math.max(0, Math.min(1, fromLinear(lin))) * 255);
+  });
+}
+
+function luminance(r, g, b) {
+  return 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
+}
+
+function contrastRatio(l1, l2) {
+  const hi = Math.max(l1, l2), lo = Math.min(l1, l2);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+function toHex(r, g, b) {
+  return '#' + [r,g,b].map(v => v.toString(16).padStart(2,'0')).join('');
+}
+
+// ─── Clamp helper ─────────────────────────────────────────────────────────────
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+// ─── Slider ↔ Number sync ─────────────────────────────────────────────────────
+function bindColorPair(sliderId, numId, target, channel) {
+  const slider = document.getElementById(sliderId);
+  const num    = document.getElementById(numId);
+
+  slider.addEventListener('input', () => {
+    const v = clamp(parseInt(slider.value) || 0, 0, 255);
+    state[target][channel] = v;
+    num.value = v;
+    render();
+  });
+
+  num.addEventListener('input', () => {
+    const v = clamp(parseInt(num.value) || 0, 0, 255);
+    state[target][channel] = v;
+    slider.value = v;
+    render();
+  });
+}
+
+function bindSizePair() {
+  const slider = document.getElementById('szSlider');
+  const num    = document.getElementById('szNum');
+
+  slider.addEventListener('input', () => {
+    const v = clamp(parseInt(slider.value) || 8, 8, 72);
+    state.size = v;
+    num.value = v;
+    document.getElementById('sizeVal').textContent = v;
+    render();
+  });
+
+  num.addEventListener('input', () => {
+    const v = clamp(parseInt(num.value) || 8, 8, 72);
+    state.size = v;
+    slider.value = v;
+    document.getElementById('sizeVal').textContent = v;
+    render();
+  });
+}
+
+// ─── Render ───────────────────────────────────────────────────────────────────
+function render() {
+  const { bg, text, size, vision } = state;
+
+  // Simulated colors (what a vision-type sees)
+  const simBg   = simulateVision(bg.r,   bg.g,   bg.b,   vision);
+  const simText = simulateVision(text.r, text.g, text.b, vision);
+
+  // Color strip previews (always show actual/chosen colors)
+  const bgHex = toHex(bg.r, bg.g, bg.b);
+  const txHex = toHex(text.r, text.g, text.b);
+  document.getElementById('bgStrip').style.background = bgHex;
+  document.getElementById('textStrip').style.background = txHex;
+  document.getElementById('bgHex').textContent  = bgHex.toUpperCase();
+  document.getElementById('textHex').textContent = txHex.toUpperCase();
+
+  // Text display area uses simulated colors
+  const display = document.getElementById('textDisplay');
+  display.style.backgroundColor = `rgb(${simBg.join(',')})`;
+  display.style.color           = `rgb(${simText.join(',')})`;
+
+  // Font size
+  const headingSz = Math.round(size * 1.5);
+  document.getElementById('sampleHeading').style.fontSize = headingSz + 'px';
+  document.getElementById('sampleBody').style.fontSize    = size + 'px';
+
+  // Luminance from simulated colors
+  const bgL  = luminance(...simBg);
+  const txL  = luminance(...simText);
+  const ratio = contrastRatio(bgL, txL);
+
+  document.getElementById('bgLum').textContent      = bgL.toFixed(3);
+  document.getElementById('txLum').textContent      = txL.toFixed(3);
+  document.getElementById('contrastDisplay').textContent = ratio.toFixed(2) + ':1';
+
+  // WCAG compliance (Option B)
+  const passNormal = ratio >= 4.5;
+  const passLarge  = ratio >= 3.0;
+  const isLargeSize = size >= 24; // WCAG: 18pt = ~24px
+
+  const normalEl = document.getElementById('wcagNormal');
+  normalEl.className = 'wcag-item ' + (passNormal ? 'pass' : 'fail');
+  document.getElementById('normalBadge').textContent = passNormal ? 'PASS' : 'FAIL';
+
+  const largeEl = document.getElementById('wcagLarge');
+  largeEl.className = 'wcag-item ' + (passLarge ? 'pass' : 'fail');
+  document.getElementById('largeBadge').textContent = passLarge ? 'PASS' : 'FAIL';
+
+  // Indicate which standard applies at the current font size
+  document.getElementById('normalApplies').textContent = !isLargeSize ? '← applies at current size' : '';
+  document.getElementById('largeApplies').textContent  =  isLargeSize ? '← applies at current size' : '';
+}
+
+// ─── Vision radio buttons ─────────────────────────────────────────────────────
+const COLOR_INPUTS = ['bgR','bgG','bgB','txR','txG','txB',
+                      'bgRn','bgGn','bgBn','txRn','txGn','txBn'];
+
+document.querySelectorAll('input[name="vision"]').forEach(radio => {
+  radio.addEventListener('change', e => {
+    state.vision = e.target.value;
+    const simulating = state.vision !== 'normal';
+    document.getElementById('visionNote').style.display = simulating ? 'block' : 'none';
+
+    COLOR_INPUTS.forEach(id => {
+      const el = document.getElementById(id);
+      el.disabled = simulating;
+    });
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+      btn.disabled = simulating;
+    });
+
+    render();
+  });
+});
+
+// ─── Presets ──────────────────────────────────────────────────────────────────
+function buildPresets() {
+  const grid = document.getElementById('presetsGrid');
+  PRESETS.forEach(p => {
+    const btn = document.createElement('button');
+    btn.className = 'preset-btn';
+    btn.innerHTML =
+      `<div class="preset-swatches">
+         <div class="swatch" style="background:rgb(${p.bg.join(',')})"></div>
+         <div class="swatch" style="background:rgb(${p.text.join(',')})"></div>
+       </div>${p.name}`;
+    btn.addEventListener('click', () => loadPreset(p));
+    grid.appendChild(btn);
+  });
+}
+
+function loadPreset(p) {
+  const [br, bg_, bb] = p.bg;
+  const [tr, tg, tb]  = p.text;
+
+  state.bg   = { r: br, g: bg_, b: bb };
+  state.text = { r: tr, g: tg,  b: tb };
+
+  // Sync all sliders and number inputs
+  const pairs = [
+    ['bgR', 'bgRn', br], ['bgG', 'bgGn', bg_], ['bgB', 'bgBn', bb],
+    ['txR', 'txRn', tr], ['txG', 'txGn', tg],  ['txB', 'txBn', tb],
+  ];
+  pairs.forEach(([sId, nId, v]) => {
+    document.getElementById(sId).value = v;
+    document.getElementById(nId).value = v;
+  });
+
+  render();
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+bindColorPair('bgR', 'bgRn', 'bg',   'r');
+bindColorPair('bgG', 'bgGn', 'bg',   'g');
+bindColorPair('bgB', 'bgBn', 'bg',   'b');
+bindColorPair('txR', 'txRn', 'text', 'r');
+bindColorPair('txG', 'txGn', 'text', 'g');
+bindColorPair('txB', 'txBn', 'text', 'b');
+bindSizePair();
+buildPresets();
+render();
+</script>
+</body>
+</html>
