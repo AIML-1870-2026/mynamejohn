@@ -1358,6 +1358,7 @@ function setButtons(state) {
 // ═══════════════════════════════════════════════════════════════
 function addBet(amount) {
   if (gameState !== 'BETTING') return;
+  hideDialogue();
   const toAdd = Math.min(amount, balance - bet);
   if (toAdd <= 0) return;
   bet += toAdd;
@@ -1712,7 +1713,7 @@ function runGaryIntro() {
   showDialogue(CHARS.dealer,
     '"HEY! I\'m Gary!! I\'ll be your dealer for tonight."',
     [{ label: 'Hi.', cb: () => {
-      runIntroDialogue(() => { introShown = true; hideDialogue(); });
+      runIntroDialogue(() => { introShown = true; });
     }}]
   );
 }
@@ -1751,14 +1752,65 @@ function runGaryEnthusiasm(proceed) {
 
   ticker.textContent = ' ★ DEAL! DEAL! DEAL! ★ DEAL! DEAL! DEAL! ★ DEAL! DEAL! DEAL! ★ DEAL! DEAL! DEAL! ★ ';
   flash.classList.add('flashing');
-  showDialogue(CHARS.dealer, '"Alright! Let\'s get dealing!!!"');
 
+  // Set up dialogue bar manually so we can run the typo sequence without showDialogue resetting it mid-animation.
+  if (_typingTimer !== null) { clearTimeout(_typingTimer); _typingTimer = null; }
+  const bar  = document.getElementById('dialogue-bar');
+  const port = document.getElementById('dlg-portrait');
+  const spkr = document.getElementById('dlg-speaker');
+  const spch = document.getElementById('dlg-speech');
+  const chEl = document.getElementById('dlg-choices');
+  port.innerHTML   = CHARS.dealer.portrait;
+  spkr.textContent = CHARS.dealer.name;
+  spch.innerHTML   = '';
+  spch.classList.remove('typing');
+  chEl.innerHTML   = '';
+  bar.classList.add('visible');
+
+  // Phase 1: type "Alright! Let's gumbl"
+  const part1 = '"Alright! Let\'s gumbl';
+  typeHTML(spch, part1, 60, () => {
+    // Phase 2: pause, then backspace "gumbl" (5 chars, 80ms each)
+    const afterBS = '"Alright! Let\'s ';
+    const bsSteps = [
+      '"Alright! Let\'s gumb',
+      '"Alright! Let\'s gum',
+      '"Alright! Let\'s gu',
+      '"Alright! Let\'s g',
+      afterBS,
+    ];
+    let bi = 0;
+    function doBS() {
+      spch.classList.add('typing');
+      spch.innerHTML = bsSteps[bi++];
+      if (bi < bsSteps.length) {
+        _typingTimer = setTimeout(doBS, 80);
+      } else {
+        // Phase 3: type "gamble!!" from where we left off
+        const suffix = 'gamble!!"';
+        let si = 0;
+        _typingTimer = setTimeout(function doFwd() {
+          si++;
+          spch.innerHTML = afterBS + suffix.slice(0, si);
+          if (si < suffix.length) {
+            _typingTimer = setTimeout(doFwd, 60);
+          } else {
+            spch.classList.remove('typing');
+            _typingTimer = null;
+          }
+        }, 120);
+      }
+    }
+    _typingTimer = setTimeout(doBS, 380); // pause at "gumbl" before catching the typo
+  });
+
+  // After animation + brief hold, flash off and show the bet prompt
   setTimeout(() => {
     flash.classList.remove('flashing');
     ticker.textContent = saved;
-    hideDialogue();
-    proceed();
-  }, 2500);
+    proceed(); // sets introShown = true
+    showDialogue(CHARS.dealer, '"Alright. Place your bet."');
+  }, 4200);
 }
 
 function setupScriptedHand1() {
