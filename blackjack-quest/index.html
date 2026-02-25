@@ -524,8 +524,8 @@
     filter: drop-shadow(2px 6px 12px rgba(0,0,0,0.75));
   }
   .dealer-hand-svg.dealing { top: 42px; }
-  #dealer-hand-left  { left: calc(50% - 100px); }
-  #dealer-hand-right { left: calc(50% + 8px); transform: scaleX(-1); }
+  #dealer-hand-left  { left: calc(50% - 100px); transform: scaleY(-1); }
+  #dealer-hand-right { left: calc(50% + 8px);  transform: scaleX(-1) scaleY(-1); }
 
   /* ── DIALOGUE BAR (point-and-click style) ── */
   .dialogue-bar {
@@ -771,14 +771,6 @@
         <ellipse cx="52" cy="158" rx="3" ry="2"/>
       </g>
       <circle cx="68" cy="132" r="4.5" fill="#7a3a18" opacity="0.55"/>
-      <!-- Dark fingernails (matches sketch) -->
-      <g fill="#3a2010" stroke="#1a0a04" stroke-width="0.6" opacity="0.88">
-        <ellipse cx="18" cy="4" rx="7.5" ry="3.5"/>
-        <ellipse cx="41" cy="2.5" rx="8" ry="3.8"/>
-        <ellipse cx="67" cy="1.5" rx="8.5" ry="4"/>
-        <ellipse cx="93" cy="4" rx="7.5" ry="3.5"/>
-        <ellipse cx="112" cy="137" rx="5" ry="3.2" transform="rotate(35,112,137)"/>
-      </g>
     </svg>
 
     <!-- RIGHT HAND — mirrored via CSS scaleX(-1) -->
@@ -819,13 +811,6 @@
         <ellipse cx="38" cy="144" rx="3.5" ry="2.2"/><ellipse cx="52" cy="158" rx="3" ry="2"/>
       </g>
       <circle cx="58" cy="145" r="4" fill="#7a3a18" opacity="0.5"/>
-      <g fill="#3a2010" stroke="#1a0a04" stroke-width="0.6" opacity="0.88">
-        <ellipse cx="18" cy="4" rx="7.5" ry="3.5"/>
-        <ellipse cx="41" cy="2.5" rx="8" ry="3.8"/>
-        <ellipse cx="67" cy="1.5" rx="8.5" ry="4"/>
-        <ellipse cx="93" cy="4" rx="7.5" ry="3.5"/>
-        <ellipse cx="112" cy="137" rx="5" ry="3.2" transform="rotate(35,112,137)"/>
-      </g>
     </svg>
 
     <!-- DIALOGUE BAR (LucasArts / point-and-click style) -->
