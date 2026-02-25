@@ -1498,7 +1498,7 @@ function showDialogue(char, speech, choices = []) {
   bar.classList.add('visible');
 
   // Type the speech; reveal choices when done.
-  typeHTML(spch, speech, 28, () => {
+  typeHTML(spch, speech, 60, () => {
     buttons.forEach(b => b.style.visibility = '');
   });
 }
