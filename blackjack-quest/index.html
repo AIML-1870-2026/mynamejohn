@@ -47,13 +47,13 @@
     border-top: 6px double gold;
     border-bottom: 6px double gold;
     text-align: center;
-    padding: 8px 0 4px;
+    padding: 3px 0 2px;
     position: relative;
   }
 
   .title-main {
     font-family: 'Playfair Display', 'Times New Roman', serif;
-    font-size: 2.6rem;
+    font-size: 2rem;
     font-weight: 900;
     color: gold;
     text-shadow: 3px 3px 0 #000, -1px -1px 0 #8B6914, 0 0 30px gold, 0 0 60px #ff6600;
@@ -99,9 +99,10 @@
   /* ── THREE-COLUMN LAYOUT ── */
   .page-layout {
     display: grid;
-    grid-template-columns: 220px 1fr 220px;
-    min-height: calc(100vh - 120px);
+    grid-template-columns: 180px 1fr 180px;
+    height: calc(100vh - 88px);
     gap: 0;
+    overflow: hidden;
   }
 
   /* ── AD SIDEBAR ── */
@@ -109,10 +110,12 @@
     background: #0a0a0a;
     border-left: 3px solid gold;
     border-right: 3px solid gold;
-    padding: 10px 6px;
+    padding: 6px 5px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
+    overflow-y: auto;
+    overflow-x: hidden;
   }
 
   .fake-ad {
@@ -190,11 +193,12 @@
   /* ── GAME AREA ── */
   .game-area {
     background: radial-gradient(ellipse at center, #1a4a2a 0%, #0d2e18 60%, #061409 100%);
-    padding: 12px 16px;
+    padding: 8px 14px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 6px;
     position: relative;
+    overflow: hidden;
   }
 
   /* ── HUD ── */
@@ -237,8 +241,8 @@
       inset 0 0 20px rgba(0,0,0,0.8),
       0 0 20px rgba(255,215,0,0.3);
     border-radius: 2px;
-    padding: 10px 14px;
-    min-height: 150px;
+    padding: 8px 12px;
+    min-height: 120px;
     position: relative;
   }
 
@@ -282,13 +286,13 @@
   .cards {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
-    min-height: 100px;
+    gap: 5px;
+    min-height: 84px;
     align-items: flex-start;
   }
 
   /* ── CARDS ── */
-  .card-wrapper { perspective: 600px; width: 68px; height: 102px; flex-shrink: 0; }
+  .card-wrapper { perspective: 600px; width: 58px; height: 87px; flex-shrink: 0; }
 
   .card {
     width: 100%;
@@ -329,7 +333,7 @@
   }
   .card-face .corner.tl { top: 3px; left: 4px; }
   .card-face .corner.br { bottom: 3px; right: 4px; transform: rotate(180deg); }
-  .card-face .center-suit { font-size: 1.8rem; line-height: 1; }
+  .card-face .center-suit { font-size: 1.5rem; line-height: 1; }
   .card-face.red * { color: #cc0000; }
   .card-face.black * { color: #111; }
 
@@ -349,15 +353,15 @@
   .card-wrapper.new { animation: slideIn 0.3s cubic-bezier(0.34,1.56,0.64,1) forwards; }
 
   /* ── MESSAGE ── */
-  .message-area { min-height: 54px; display: flex; align-items: center; justify-content: center; }
+  .message-area { min-height: 40px; display: flex; align-items: center; justify-content: center; }
 
   .message {
     font-family: 'Playfair Display', serif;
-    font-size: 1.4rem;
+    font-size: 1.2rem;
     font-weight: 900;
     letter-spacing: 3px;
     text-transform: uppercase;
-    padding: 8px 24px;
+    padding: 5px 18px;
     border: 4px double gold;
     box-shadow: 0 0 0 2px #8B6914, 0 0 30px rgba(255,215,0,0.4);
     animation: popIn 0.35s cubic-bezier(0.175,0.885,0.32,1.275) forwards;
@@ -377,15 +381,15 @@
     background: linear-gradient(135deg, #0a0500, #1a0e00, #0a0500);
     border: 4px solid gold;
     box-shadow: 0 0 0 2px #8B6914, 0 0 20px rgba(255,215,0,0.2), inset 0 0 20px rgba(0,0,0,0.5);
-    padding: 12px 14px;
+    padding: 7px 12px;
   }
 
   .bet-row {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     flex-wrap: wrap;
-    margin-bottom: 8px;
+    margin-bottom: 5px;
   }
   .bet-label {
     font-family: 'Playfair Display', serif;
@@ -406,8 +410,8 @@
 
   /* Chips */
   .chip {
-    width: 54px;
-    height: 54px;
+    width: 46px;
+    height: 46px;
     border-radius: 50%;
     border: 4px solid;
     font-family: Impact, 'Arial Black', sans-serif;
@@ -453,7 +457,7 @@
   .actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
 
   .btn {
-    padding: 10px 22px;
+    padding: 8px 18px;
     border: 3px solid gold;
     border-radius: 0;
     font-family: 'Playfair Display', serif;
@@ -509,78 +513,85 @@
     text-transform: uppercase;
   }
 
-  /* ── SHUFFLE OVERLAY ── */
-  .shuffle-overlay {
+  /* ── DEALER HAND SVG ── */
+  .dealer-hand-svg {
     position: absolute;
-    inset: 0;
-    background: rgba(0,0,0,0.82);
+    width: 78px;
+    left: 50%;
+    top: -190px;
+    transform: translateX(-50%);
+    transition: top 0.38s cubic-bezier(0.25,0.46,0.45,0.94), left 0.28s ease;
+    pointer-events: none;
+    z-index: 20;
+    filter: drop-shadow(2px 6px 12px rgba(0,0,0,0.75));
+  }
+  .dealer-hand-svg.dealing { top: 42px; }
+
+  /* ── DIALOGUE BAR (point-and-click style) ── */
+  .dialogue-bar {
+    display: none;
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: #06070e;
+    border-top: 3px solid gold;
+    box-shadow: 0 -8px 30px rgba(0,0,0,0.95);
+    padding: 10px 14px 12px;
+    flex-direction: row;
+    gap: 12px;
+    align-items: flex-start;
+    z-index: 60;
+    min-height: 80px;
+  }
+  .dialogue-bar.visible { display: flex; }
+
+  .dialogue-portrait {
+    font-size: 2.2rem;
+    flex-shrink: 0;
+    line-height: 1;
+    padding-top: 2px;
+  }
+
+  .dialogue-content { flex: 1; }
+
+  .dialogue-speaker {
+    font-family: 'Courier New', monospace;
+    font-size: 0.58rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: gold;
+    margin-bottom: 4px;
+  }
+
+  .dialogue-speech {
+    font-family: 'Courier New', monospace;
+    color: #ddd;
+    font-size: 0.82rem;
+    line-height: 1.55;
+    margin-bottom: 8px;
+  }
+
+  .dialogue-choices {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 14px;
-    z-index: 50;
-    border: 4px solid gold;
+    gap: 1px;
   }
 
-  .shuffle-dealer {
-    font-size: 4rem;
-    animation: dealerBob 0.5s ease-in-out infinite alternate;
-  }
-  @keyframes dealerBob {
-    from { transform: translateY(0) rotate(-3deg); }
-    to   { transform: translateY(-6px) rotate(3deg); }
-  }
-  .shuffle-dealer.drop {
-    animation: dealerDrop 0.6s ease forwards;
-  }
-  @keyframes dealerDrop {
-    0%   { transform: rotate(0deg); }
-    30%  { transform: rotate(-20deg) translateY(10px); }
-    60%  { transform: rotate(15deg) translateY(5px); }
-    100% { transform: rotate(0deg); }
-  }
-
-  .shuffle-text {
-    font-family: 'Playfair Display', serif;
-    font-size: 1.1rem;
-    color: gold;
-    letter-spacing: 3px;
-    text-align: center;
-    max-width: 280px;
-    line-height: 1.5;
-  }
-
-  .shuffle-sub {
+  .dialogue-choice {
     font-family: 'Courier New', monospace;
-    font-size: 0.7rem;
-    color: #8B6914;
-    letter-spacing: 1px;
-    text-align: center;
-    font-style: italic;
-    max-width: 280px;
-    line-height: 1.6;
+    background: none;
+    border: none;
+    color: #c9a84c;
+    cursor: pointer;
+    font-size: 0.78rem;
+    padding: 2px 0 2px 0;
+    text-align: left;
+    display: block;
+    transition: color 0.08s, padding-left 0.1s;
+    letter-spacing: 0.5px;
   }
-
-  .shuffle-cards {
-    display: flex;
-    gap: -4px;
-    font-size: 1.6rem;
-    animation: cardRiffle 0.3s ease infinite alternate;
-    letter-spacing: -4px;
-  }
-  @keyframes cardRiffle {
-    from { transform: skewX(-5deg); }
-    to   { transform: skewX(5deg); }
-  }
-  .shuffle-cards.drop-cards {
-    animation: cardsScatter 0.5s ease forwards;
-  }
-  @keyframes cardsScatter {
-    0%   { transform: translateY(0) rotate(0); opacity: 1; }
-    50%  { transform: translateY(30px) rotate(15deg); opacity: 0.6; }
-    100% { transform: translateY(60px) rotate(-5deg); opacity: 0; }
-  }
+  .dialogue-choice::before { content: '▶  '; opacity: 0.45; font-size: 0.65rem; }
+  .dialogue-choice:hover { color: #fff; padding-left: 5px; }
+  .dialogue-choice:hover::before { opacity: 1; }
 
   /* ── GAME OVER ── */
   .game-over-overlay {
@@ -659,20 +670,8 @@
 
 <!-- TITLE -->
 <div class="title-banner">
-  <div class="stars-row">★ ★ ★ ★ ★ ★ ★ ★ ★ ★ ★</div>
   <div class="title-main">♠ BLACKJACK QUEST ♠</div>
-  <div class="title-sub">PRO DELUXE ULTIMATE CHAMPIONSHIP EDITION™ · EST. 2024</div>
-  <div class="stars-row">★ ★ ★ ★ ★ ★ ★ ★ ★ ★ ★</div>
-</div>
-
-<!-- TRUST BAR -->
-<div class="trust-bar">
-  <span class="trust-badge">🔒 SSL SECURED</span>
-  <span class="trust-badge">✅ CERTIFIED FAIR</span>
-  <span class="trust-badge">🏆 #1 ONLINE SINCE 1999</span>
-  <span class="trust-badge">💳 FAST PAYOUTS*</span>
-  <span class="trust-badge">🎰 24/7 SUPPORT</span>
-  <span class="trust-badge">⚡ INSTANT PLAY</span>
+  <div class="title-sub">PRO DELUXE ULTIMATE CHAMPIONSHIP EDITION™ &nbsp;★&nbsp; 🔒 SSL SECURED &nbsp;★&nbsp; ✅ CERTIFIED FAIR &nbsp;★&nbsp; 🏆 #1 SINCE 1999 &nbsp;★&nbsp; ⚡ INSTANT PLAY</div>
 </div>
 
 <!-- THREE COLUMN LAYOUT -->
@@ -730,6 +729,80 @@
   <!-- MAIN GAME -->
   <div class="game-area">
     <div class="winner-stamp">YOU ARE A WINNER</div>
+
+    <!-- WRINKLY DEALER HAND SVG -->
+    <svg id="dealer-hand" class="dealer-hand-svg" viewBox="0 0 110 190" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="hf">
+          <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="4" result="n"/>
+          <feDisplacementMap in="SourceGraphic" in2="n" scale="1.4" xChannelSelector="R" yChannelSelector="G"/>
+        </filter>
+        <radialGradient id="palmG" cx="50%" cy="65%">
+          <stop offset="0%" stop-color="#d4906a"/>
+          <stop offset="100%" stop-color="#a86040"/>
+        </radialGradient>
+      </defs>
+      <!-- Fingers + palm with skin texture filter -->
+      <g filter="url(#hf)">
+        <!-- PINKY -->
+        <path d="M8,94 C6,70 6,44 8,18 C10,6 14,2 19,2 C24,2 28,6 29,18 C31,44 30,70 28,94 Z" fill="#c8886a"/>
+        <!-- RING -->
+        <path d="M31,108 C29,78 28,50 30,20 C31,6 37,1 43,1 C49,1 53,7 54,20 C56,50 55,78 53,108 Z" fill="#cb8e6e"/>
+        <!-- MIDDLE (longest) -->
+        <path d="M56,122 C54,88 53,56 55,20 C57,5 63,0 69,0 C75,0 79,5 81,20 C83,56 82,88 80,122 Z" fill="#c88a6a"/>
+        <!-- INDEX -->
+        <path d="M83,110 C81,80 80,52 82,22 C83,8 89,3 95,3 C101,3 105,9 106,22 C108,52 107,80 105,110 Z" fill="#c5866a"/>
+        <!-- PALM -->
+        <path d="M8,94 C6,120 7,152 12,164 C20,176 44,182 62,182 C80,182 98,176 104,164 C109,150 110,120 105,110 C98,114 88,118 69,118 C50,118 34,114 26,108 C18,104 10,100 8,94 Z" fill="url(#palmG)"/>
+        <!-- THUMB -->
+        <path d="M104,132 C110,120 118,123 120,136 C122,150 116,166 106,170 C98,173 93,164 93,152 C93,140 97,130 104,132 Z" fill="#c5876a"/>
+      </g>
+      <!-- Wrinkle lines (no texture filter, drawn sharp) -->
+      <g fill="none" stroke="#8a4e2a" stroke-linecap="round" opacity="0.65">
+        <!-- Pinky knuckles -->
+        <path d="M9,76 Q18,74 27,76" stroke-width="1"/><path d="M10,58 Q18,56 26,58" stroke-width="0.9"/><path d="M10,38 Q18,36 26,38" stroke-width="0.8"/>
+        <!-- Ring knuckles -->
+        <path d="M32,88 Q43,86 52,88" stroke-width="1"/><path d="M33,68 Q43,66 51,68" stroke-width="0.9"/><path d="M34,46 Q43,44 50,46" stroke-width="0.8"/>
+        <!-- Middle knuckles -->
+        <path d="M57,100 Q69,98 79,100" stroke-width="1"/><path d="M58,78 Q69,76 78,78" stroke-width="0.9"/><path d="M59,55 Q69,53 77,55" stroke-width="0.8"/>
+        <!-- Index knuckles -->
+        <path d="M84,90 Q95,88 104,90" stroke-width="1"/><path d="M85,70 Q95,68 103,70" stroke-width="0.9"/><path d="M86,50 Q95,48 102,50" stroke-width="0.8"/>
+        <!-- Palm creases -->
+        <path d="M20,134 Q60,130 96,134" stroke-width="1.2" opacity="0.5"/>
+        <path d="M16,150 Q60,146 102,150" stroke-width="1" opacity="0.4"/>
+        <path d="M30,124 Q48,136 44,152" stroke-width="1" opacity="0.4"/>
+        <!-- Thumb knuckles -->
+        <path d="M96,148 Q107,146 116,150" stroke-width="0.9"/><path d="M95,158 Q106,156 114,160" stroke-width="0.8"/>
+      </g>
+      <!-- Knuckle base highlights -->
+      <g fill="none" stroke="#e0a880" stroke-linecap="round" stroke-width="0.8" opacity="0.5">
+        <path d="M9,94 Q18,92 27,94"/><path d="M31,108 Q43,106 52,108"/>
+        <path d="M56,122 Q69,120 79,122"/><path d="M83,110 Q95,108 104,110"/>
+      </g>
+      <!-- Age spots -->
+      <g fill="#8a5030" opacity="0.22">
+        <ellipse cx="38" cy="144" rx="3.5" ry="2.2"/><ellipse cx="66" cy="140" rx="3" ry="2"/>
+        <ellipse cx="84" cy="152" rx="2.5" ry="1.8"/><ellipse cx="52" cy="158" rx="3" ry="2"/>
+      </g>
+      <!-- Fingernails -->
+      <g fill="#f2d0b0" stroke="#c49070" stroke-width="0.6" opacity="0.85">
+        <ellipse cx="18" cy="4" rx="7.5" ry="3.5"/>
+        <ellipse cx="41" cy="2.5" rx="8" ry="3.8"/>
+        <ellipse cx="67" cy="1.5" rx="8.5" ry="4"/>
+        <ellipse cx="93" cy="4" rx="7.5" ry="3.5"/>
+        <ellipse cx="112" cy="137" rx="5" ry="3.2" transform="rotate(35,112,137)"/>
+      </g>
+    </svg>
+
+    <!-- DIALOGUE BAR (LucasArts / point-and-click style) -->
+    <div id="dialogue-bar" class="dialogue-bar">
+      <div class="dialogue-portrait" id="dlg-portrait">🧑‍💼</div>
+      <div class="dialogue-content">
+        <div class="dialogue-speaker" id="dlg-speaker">DEALER</div>
+        <div class="dialogue-speech" id="dlg-speech"></div>
+        <div class="dialogue-choices" id="dlg-choices"></div>
+      </div>
+    </div>
 
     <!-- HUD -->
     <div class="hud-bar">
@@ -1070,73 +1143,71 @@ function clearBet() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  SHUFFLE OVERLAY HELPERS
+//  CHARACTER DEFINITIONS  (add new characters here)
 // ═══════════════════════════════════════════════════════════════
-function createShuffleOverlay(text, sub, dropped, btnLabel, onBtn) {
-  const ov = document.createElement('div');
-  ov.className = 'shuffle-overlay';
-  ov.id = 'shuffle-overlay';
+const CHARS = {
+  dealer: { name: 'Gary  (Dealer)', portrait: '🧑‍💼', portraitAlt: '🫠' },
+  // pitBoss: { name: 'Pit Boss', portrait: '😤', portraitAlt: '😤' },
+};
 
-  const dealerEl = document.createElement('div');
-  dealerEl.className = 'shuffle-dealer' + (dropped ? ' drop' : '');
-  dealerEl.textContent = dropped ? '🫠' : '🧑‍💼';
+// ═══════════════════════════════════════════════════════════════
+//  DIALOGUE SYSTEM
+// ═══════════════════════════════════════════════════════════════
+function showDialogue(char, speech, choices = []) {
+  const bar   = document.getElementById('dialogue-bar');
+  const port  = document.getElementById('dlg-portrait');
+  const spkr  = document.getElementById('dlg-speaker');
+  const spch  = document.getElementById('dlg-speech');
+  const chEl  = document.getElementById('dlg-choices');
 
-  const textEl = document.createElement('div');
-  textEl.className = 'shuffle-text';
-  textEl.innerHTML = text;
+  port.textContent  = char.portrait;
+  spkr.textContent  = char.name;
+  spch.innerHTML    = speech;
+  chEl.innerHTML    = '';
 
-  ov.appendChild(dealerEl);
-
-  if (!dropped) {
-    const cardsEl = document.createElement('div');
-    cardsEl.className = 'shuffle-cards';
-    cardsEl.textContent = '🂠🂠🂠🂠🂠🂠';
-    ov.appendChild(cardsEl);
-  }
-
-  ov.appendChild(textEl);
-
-  if (sub) {
-    const subEl = document.createElement('div');
-    subEl.className = 'shuffle-sub';
-    subEl.innerHTML = sub;
-    ov.appendChild(subEl);
-  }
-
-  if (btnLabel && onBtn) {
+  choices.forEach(({ label, cb }) => {
     const btn = document.createElement('button');
-    btn.className = 'btn btn-new';
-    btn.style.cssText = 'margin-top:10px;font-size:0.85rem;padding:10px 22px;letter-spacing:1px;';
-    btn.textContent = btnLabel;
-    btn.onclick = onBtn;
-    ov.appendChild(btn);
-  }
+    btn.className   = 'dialogue-choice';
+    btn.textContent = label;
+    btn.onclick = () => { hideDialogue(); cb(); };
+    chEl.appendChild(btn);
+  });
 
-  return ov;
+  bar.classList.add('visible');
 }
 
-function removeShuffleOverlay() {
-  document.getElementById('shuffle-overlay')?.remove();
+function showDialogueAlt(char, speech, choices = []) {
+  // Same as showDialogue but uses the alt portrait (e.g. distressed face)
+  showDialogue({ ...char, portrait: char.portraitAlt }, speech, choices);
 }
 
+function hideDialogue() {
+  document.getElementById('dialogue-bar').classList.remove('visible');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  DEALER HAND ANIMATION
+// ═══════════════════════════════════════════════════════════════
+const handEl = () => document.getElementById('dealer-hand');
+
+function handIn()  { handEl().classList.add('dealing'); }
+function handOut() { handEl().classList.remove('dealing'); }
+
+// ═══════════════════════════════════════════════════════════════
+//  SHUFFLE + DROP SEQUENCES
+// ═══════════════════════════════════════════════════════════════
 function runShuffle(onDone) {
-  const gameArea = document.querySelector('.game-area');
-  const ov = createShuffleOverlay('Shuffling...', null, false, null, null);
-  gameArea.appendChild(ov);
-  setTimeout(() => { removeShuffleOverlay(); onDone(); }, 1200);
+  showDialogue(CHARS.dealer, 'shuffling cards...');
+  handIn();
+  setTimeout(() => { hideDialogue(); onDone(); }, 900);
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  DEAL
-// ═══════════════════════════════════════════════════════════════
 function deal() {
   if (bet === 0 || gameState !== 'BETTING') return;
-
   document.getElementById('btn-deal').disabled = true;
   document.querySelectorAll('.chip').forEach(c => c.disabled = true);
 
   const DROPPED = Math.random() < 0.35;
-
   if (DROPPED) {
     dropCount++;
     runDropSequence(dropCount, () => runShuffle(doDeal));
@@ -1146,52 +1217,34 @@ function deal() {
 }
 
 function runDropSequence(count, onDone) {
-  const gameArea = document.querySelector('.game-area');
-
-  // Phase 1 (auto): dealer drops the cards — same every time
-  const ov1 = createShuffleOverlay(
-    '"Oh shoot. I dropped them again.&nbsp; Sorry, I\'m new here. Heh. Lawyer bills!"',
-    null, true, null, null
-  );
-  gameArea.appendChild(ov1);
+  // Phase 1 (auto, 2.2s): dealer drops the cards
+  showDialogueAlt(CHARS.dealer, '"Oh shoot. I dropped them again.&nbsp; Sorry, I\'m new here. Heh. Lawyer bills!"');
 
   setTimeout(() => {
-    removeShuffleOverlay();
+    hideDialogue();
 
     if (count === 1) {
-      // First drop: Sharon moment — player responds politely
-      const ov2 = createShuffleOverlay(
+      showDialogueAlt(CHARS.dealer,
         '"...*sigh*&nbsp; I miss you, Sharon."',
-        '— picks cards up off the floor —',
-        true,
-        'Respond Politely',
-        () => { removeShuffleOverlay(); onDone(); }
+        [{ label: 'Respond Politely', cb: onDone }]
       );
-      gameArea.appendChild(ov2);
-
     } else if (count === 2) {
-      // Second drop: oversharing about the bosses
-      const ov2 = createShuffleOverlay(
+      showDialogueAlt(CHARS.dealer,
         '"You know, it gets tough working here. The bosses... they don\'t play!"',
-        '— cards still scattered on the floor —',
-        true,
-        'Respond Politely',
-        () => { removeShuffleOverlay(); onDone(); }
+        [{ label: 'Respond Politely', cb: onDone }]
       );
-      gameArea.appendChild(ov2);
-
     } else {
-      // Third drop (and beyond): tries to go there
-      const ov2 = createShuffleOverlay(
+      showDialogueAlt(CHARS.dealer,
         '"You ever go through a divor-?"',
-        null,
-        true,
-        'Just shuffle the cards, man.',
-        () => { removeShuffleOverlay(); onDone(); }
+        [{ label: 'Just shuffle the cards, man.', cb: onDone }]
       );
-      gameArea.appendChild(ov2);
     }
-  }, 2400);
+  }, 2200);
+}
+
+// Helper: append a single card to a container
+function appendCard(containerId, card) {
+  document.getElementById(containerId).appendChild(renderCard(card));
 }
 
 function doDeal() {
@@ -1201,22 +1254,39 @@ function doDeal() {
   gameState = 'PLAYER_TURN';
   stats.hands++;
 
-  renderHand('player-cards', playerHand);
-  renderHand('dealer-cards', dealerHand);
-  updateValues();
-  updateHUD();
+  // Clear both hands
+  document.getElementById('dealer-cards').innerHTML = '';
+  document.getElementById('player-cards').innerHTML = '';
   showMessage('', '');
-  setButtons('PLAYER_TURN');
+  updateHUD();
 
-  const playerBJ = isBlackjack(playerHand);
-  const dealerBJ = isBlackjack(dealerHand.map(c => ({ ...c, faceUp: true })));
+  // Deal 4 cards alternating dealer/player, staggered — hand already visible from runShuffle()
+  const sequence = [
+    { card: dealerHand[0], id: 'dealer-cards' },
+    { card: playerHand[0], id: 'player-cards' },
+    { card: dealerHand[1], id: 'dealer-cards' },
+    { card: playerHand[1], id: 'player-cards' },
+  ];
+  sequence.forEach(({ card, id }, i) => {
+    setTimeout(() => {
+      appendCard(id, card);
+      updateValues();
+    }, i * 380);
+  });
 
-  if (playerBJ || dealerBJ) {
-    dealerHand = dealerHand.map(c => ({ ...c, faceUp: true }));
-    renderHand('dealer-cards', dealerHand, true);
-    updateValues();
-    settleResult(playerBJ && dealerBJ ? 'push' : playerBJ ? 'blackjack' : 'lose');
-  }
+  const totalDealTime = sequence.length * 380 + 200;
+  setTimeout(() => {
+    handOut();
+    setButtons('PLAYER_TURN');
+    const playerBJ = isBlackjack(playerHand);
+    const dealerBJ = isBlackjack(dealerHand.map(c => ({ ...c, faceUp: true })));
+    if (playerBJ || dealerBJ) {
+      dealerHand = dealerHand.map(c => ({ ...c, faceUp: true }));
+      renderHand('dealer-cards', dealerHand, true);
+      updateValues();
+      settleResult(playerBJ && dealerBJ ? 'push' : playerBJ ? 'blackjack' : 'lose');
+    }
+  }, totalDealTime);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1324,6 +1394,8 @@ function newHand() {
   document.getElementById('dealer-value').textContent = '—';
   document.getElementById('dealer-value').className = 'hand-value';
   showMessage('', '');
+  hideDialogue();
+  handOut();
   updateHUD();
   setButtons('BETTING');
 }
