@@ -1069,8 +1069,7 @@ function handLabel(hand) {
 // ═══════════════════════════════════════════════════════════════
 function renderCard(card) {
   const wrapper = document.createElement('div');
-  const slow = storyPhase !== 2 && storyPhase < 6;
-  wrapper.className = 'card-wrapper new' + (slow ? ' slow' : '');
+  wrapper.className = 'card-wrapper new';
 
   const cardEl = document.createElement('div');
   cardEl.className = 'card' + (card.faceUp ? '' : ' flipped');
@@ -1438,49 +1437,48 @@ function handOut() {
   r.style.transition = '';
 }
 
-function animateHandDeal(targetId) {
+function slideCardFromDeck(wrapper) {
   if (storyPhase === 2 || storyPhase >= 6) return;
   const l = document.getElementById('dealer-hand-left');
   const r = document.getElementById('dealer-hand-right');
-  const gameArea = document.querySelector('.game-area');
-  const target   = document.getElementById(targetId);
-  if (!l || !r || !gameArea || !target) return;
 
-  const gRect = gameArea.getBoundingClientRect();
-  const tRect = target.getBoundingClientRect();
+  // Kill the CSS pop-in animation; we're doing a JS slide instead
+  wrapper.style.animation = 'none';
+  wrapper.style.opacity   = '1';
 
-  // Center of destination zone relative to game area
-  const destX = tRect.left + tRect.width  / 2 - gRect.left;
-  const destY = tRect.top  + tRect.height / 2 - gRect.top;
+  const lRect = l.getBoundingClientRect();
+  const cRect = wrapper.getBoundingClientRect();
 
-  // Approximate home center of both hands at top:20px
-  const homeX = gRect.width / 2 - 56;
-  const homeY = 20 + 95; // top + half of 190px hand height
+  // Offset: card starts at hand center, slides to its slot
+  const dx = (lRect.left + lRect.width / 2) - (cRect.left + cRect.width / 2);
+  const dy = (lRect.top  + lRect.height / 2) - (cRect.top  + cRect.height / 2);
 
-  const dx = destX - homeX;
-  const dy = destY - homeY;
-
-  const DRAG   = 1500;
-  const PAUSE  = 300;
-  const RETURN = 1400;
-  const trans  = (ms) =>
+  const SLIDE  = 3000;
+  const RETURN = 1200;
+  const htrans = (ms) =>
     `top 0.45s cubic-bezier(0.25,0.46,0.45,0.94), transform ${ms}ms ease-in-out`;
 
-  l.style.transition = trans(DRAG);
-  r.style.transition = trans(DRAG);
-  l.style.transform  = `translate(${dx}px, ${dy}px)`;
-  r.style.transform  = `translate(${dx}px, ${dy}px)`;
+  // Snap card to hand position, then slide both card + hand to destination
+  wrapper.style.transform  = `translate(${dx}px, ${dy}px)`;
+  wrapper.style.transition = 'none';
 
-  setTimeout(() => {
-    l.style.transition = trans(RETURN);
-    r.style.transition = trans(RETURN);
-    l.style.transform  = 'translate(0, 0)';
-    r.style.transform  = 'translate(0, 0)';
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    wrapper.style.transition = `transform ${SLIDE}ms ease-in-out`;
+    wrapper.style.transform  = '';
+
+    l.style.transition = htrans(SLIDE);
+    r.style.transition = htrans(SLIDE);
+    l.style.transform  = `translate(${-dx}px, ${-dy}px)`;
+    r.style.transform  = `translate(${-dx}px, ${-dy}px)`;
+
     setTimeout(() => {
-      l.style.transition = '';
-      r.style.transition = '';
-    }, RETURN);
-  }, DRAG + PAUSE);
+      l.style.transition = htrans(RETURN);
+      r.style.transition = htrans(RETURN);
+      l.style.transform  = '';
+      r.style.transform  = '';
+      setTimeout(() => { l.style.transition = ''; r.style.transition = ''; }, RETURN);
+    }, SLIDE + 200);
+  }));
 }
 
 // Deal stagger: comically slow (hands), professional (shoe), instant (Moe)
@@ -1599,9 +1597,10 @@ function runDropSequence(count, onDone) {
   }, 4800);
 }
 
-// Helper: append a single card to a container
 function appendCard(containerId, card) {
-  document.getElementById(containerId).appendChild(renderCard(card));
+  const wrapper = renderCard(card);
+  document.getElementById(containerId).appendChild(wrapper);
+  requestAnimationFrame(() => slideCardFromDeck(wrapper));
 }
 
 function doDeal() {
@@ -1627,7 +1626,6 @@ function doDeal() {
   const stagger = dealStagger();
   sequence.forEach(({ card, id }, i) => {
     setTimeout(() => {
-      animateHandDeal(id);
       appendCard(id, card);
       updateValues();
     }, i * stagger);
