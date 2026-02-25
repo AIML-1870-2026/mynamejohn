@@ -1428,8 +1428,59 @@ function handIn() {
   document.getElementById('dealer-hand-right').classList.add('dealing');
 }
 function handOut() {
-  document.getElementById('dealer-hand-left').classList.remove('dealing');
-  document.getElementById('dealer-hand-right').classList.remove('dealing');
+  const l = document.getElementById('dealer-hand-left');
+  const r = document.getElementById('dealer-hand-right');
+  l.classList.remove('dealing');
+  r.classList.remove('dealing');
+  l.style.transform = '';
+  r.style.transform = '';
+  l.style.transition = '';
+  r.style.transition = '';
+}
+
+function animateHandDeal(targetId) {
+  if (storyPhase === 2 || storyPhase >= 6) return;
+  const l = document.getElementById('dealer-hand-left');
+  const r = document.getElementById('dealer-hand-right');
+  const gameArea = document.querySelector('.game-area');
+  const target   = document.getElementById(targetId);
+  if (!l || !r || !gameArea || !target) return;
+
+  const gRect = gameArea.getBoundingClientRect();
+  const tRect = target.getBoundingClientRect();
+
+  // Center of destination zone relative to game area
+  const destX = tRect.left + tRect.width  / 2 - gRect.left;
+  const destY = tRect.top  + tRect.height / 2 - gRect.top;
+
+  // Approximate home center of both hands at top:20px
+  const homeX = gRect.width / 2 - 56;
+  const homeY = 20 + 95; // top + half of 190px hand height
+
+  const dx = destX - homeX;
+  const dy = destY - homeY;
+
+  const DRAG   = 1500;
+  const PAUSE  = 300;
+  const RETURN = 1400;
+  const trans  = (ms) =>
+    `top 0.45s cubic-bezier(0.25,0.46,0.45,0.94), transform ${ms}ms ease-in-out`;
+
+  l.style.transition = trans(DRAG);
+  r.style.transition = trans(DRAG);
+  l.style.transform  = `translate(${dx}px, ${dy}px)`;
+  r.style.transform  = `translate(${dx}px, ${dy}px)`;
+
+  setTimeout(() => {
+    l.style.transition = trans(RETURN);
+    r.style.transition = trans(RETURN);
+    l.style.transform  = 'translate(0, 0)';
+    r.style.transform  = 'translate(0, 0)';
+    setTimeout(() => {
+      l.style.transition = '';
+      r.style.transition = '';
+    }, RETURN);
+  }, DRAG + PAUSE);
 }
 
 // Deal stagger: comically slow (hands), professional (shoe), instant (Moe)
@@ -1576,6 +1627,7 @@ function doDeal() {
   const stagger = dealStagger();
   sequence.forEach(({ card, id }, i) => {
     setTimeout(() => {
+      animateHandDeal(id);
       appendCard(id, card);
       updateValues();
     }, i * stagger);
