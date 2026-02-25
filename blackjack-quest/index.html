@@ -1558,7 +1558,7 @@ function deal() {
   document.getElementById('btn-deal').disabled = true;
   document.querySelectorAll('.chip').forEach(c => c.disabled = true);
 
-  checkPreDealNarrative(() => {
+  const proceed = () => checkPreDealNarrative(() => {
     const canDrop = storyPhase !== 2 && storyPhase < 6;
     const DROPPED = canDrop && Math.random() < 0.35;
     if (DROPPED) {
@@ -1568,6 +1568,39 @@ function deal() {
       runShuffle(doDeal);
     }
   });
+
+  if (stats.hands === 0 && storyPhase === 0) {
+    runIntroDialogue(proceed);
+  } else {
+    proceed();
+  }
+}
+
+function runIntroDialogue(proceed) {
+  showDialogue(CHARS.dealer,
+    '"So, uh— are you familiar with Blackjack?"',
+    [
+      { label: 'All too well.',  cb: proceed },
+      { label: 'Not at all.',    cb: () => runRulesExplanation(proceed) },
+    ]
+  );
+}
+
+function runRulesExplanation(proceed) {
+  showDialogue(CHARS.dealer,
+    '"Right, okay! So. The goal is to get closer to twenty-one than the dealer — that\'s me — without going over. Going over is called a bust. Bad."',
+    [{ label: 'Okay.', cb: () => {
+      showDialogue(CHARS.dealer,
+        '"Cards are worth their number. Face cards — Jack, Queen, King — worth ten. Ace is one <em>or</em> eleven. It just... sorts itself out automatically. You\'ll see."',
+        [{ label: 'Got it.', cb: () => {
+          showDialogue(CHARS.dealer,
+            '"You bet before each hand. Hit means another card. Stand means stop. Double Down means double your bet and get exactly one more card. My ex-wife\'s lawyer did a lot of doubling down, actually. On our— sorry. Are you ready?"',
+            [{ label: 'Let\'s go.', cb: proceed }]
+          );
+        }}]
+      );
+    }}]
+  );
 }
 
 function runDropSequence(count, onDone) {
