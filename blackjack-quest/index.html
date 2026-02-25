@@ -2168,12 +2168,6 @@ function checkPreDealNarrative(proceed) {
 function checkPostResultNarrative(outcome) {
   if (storyPhase === 0 && stats.hands >= 1) {
     storyPhase = 1;
-    setTimeout(() => {
-      showDialogueAlt(CHARS.dealer,
-        '"Hey hey, there you go! First try! ...Not everything goes well, on the first try."',
-        [{ label: 'break awkward silence', cb: hideDialogue }]
-      );
-    }, 1400);
   } else if (storyPhase === 2) {
     // Shoe round done — it breaks
     storyPhase = 3;
