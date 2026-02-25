@@ -1,0 +1,1333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BLACKJACK QUEST PRO DELUXE ULTIMATE EDITION ™©®</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: repeating-linear-gradient(
+      45deg,
+      #8B0000 0px, #8B0000 20px,
+      #6B0000 20px, #6B0000 40px
+    );
+    font-family: 'Times New Roman', Times, serif;
+    overflow-x: hidden;
+  }
+
+  /* ── SEIZURE HEADER ── */
+  #top-ticker {
+    background: linear-gradient(90deg, #000 0%, #111 50%, #000 100%);
+    border-top: 4px solid gold;
+    border-bottom: 4px solid gold;
+    color: gold;
+    font-size: 0.85rem;
+    padding: 4px 0;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  #ticker-inner {
+    display: inline-block;
+    animation: ticker 18s linear infinite;
+    font-family: 'Courier New', monospace;
+    letter-spacing: 2px;
+  }
+  @keyframes ticker {
+    from { transform: translateX(100vw); }
+    to   { transform: translateX(-100%); }
+  }
+
+  /* ── TITLE BANNER ── */
+  .title-banner {
+    background: linear-gradient(180deg, #1a0000, #4a0000, #8B0000, #4a0000, #1a0000);
+    border-top: 6px double gold;
+    border-bottom: 6px double gold;
+    text-align: center;
+    padding: 8px 0 4px;
+    position: relative;
+  }
+
+  .title-main {
+    font-family: 'Playfair Display', 'Times New Roman', serif;
+    font-size: 2.6rem;
+    font-weight: 900;
+    color: gold;
+    text-shadow: 3px 3px 0 #000, -1px -1px 0 #8B6914, 0 0 30px gold, 0 0 60px #ff6600;
+    letter-spacing: 4px;
+    animation: titlePulse 1.5s ease-in-out infinite alternate;
+  }
+  @keyframes titlePulse {
+    from { text-shadow: 3px 3px 0 #000, 0 0 20px gold, 0 0 40px #ff6600; }
+    to   { text-shadow: 3px 3px 0 #000, 0 0 40px gold, 0 0 80px #ffaa00, 0 0 100px #ff6600; }
+  }
+
+  .title-sub {
+    font-size: 0.7rem;
+    color: #ffcc00;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    margin-top: -4px;
+  }
+
+  .stars-row {
+    color: gold;
+    font-size: 1.2rem;
+    letter-spacing: 3px;
+    animation: starSpin 2s linear infinite;
+  }
+  @keyframes starSpin {
+    0%,100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* ── GOLD RIM EVERYTHING ── */
+  .gold-rim {
+    border: 4px solid gold;
+    box-shadow:
+      0 0 0 2px #8B6914,
+      0 0 0 4px gold,
+      0 0 0 6px #8B6914,
+      inset 0 0 0 2px #8B6914,
+      0 0 20px rgba(255, 215, 0, 0.5),
+      0 0 40px rgba(255, 165, 0, 0.3);
+  }
+
+  /* ── THREE-COLUMN LAYOUT ── */
+  .page-layout {
+    display: grid;
+    grid-template-columns: 220px 1fr 220px;
+    min-height: calc(100vh - 120px);
+    gap: 0;
+  }
+
+  /* ── AD SIDEBAR ── */
+  .sidebar {
+    background: #0a0a0a;
+    border-left: 3px solid gold;
+    border-right: 3px solid gold;
+    padding: 10px 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .fake-ad {
+    background: linear-gradient(135deg, #1a0a2e, #0d1b4a, #1a0a2e);
+    border: 3px solid gold;
+    border-radius: 4px;
+    padding: 8px;
+    text-align: center;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    box-shadow: inset 0 0 15px rgba(0,0,255,0.3), 0 0 10px rgba(255,215,0,0.4);
+  }
+  .fake-ad:hover { filter: brightness(1.2); }
+
+  .fake-ad::before {
+    content: '★ AD ★';
+    position: absolute;
+    top: 2px; right: 3px;
+    font-size: 0.5rem;
+    color: rgba(255,215,0,0.5);
+    letter-spacing: 1px;
+  }
+
+  .ad-title {
+    font-family: Impact, Arial Black, sans-serif;
+    font-size: 0.85rem;
+    color: #ff0;
+    text-transform: uppercase;
+    line-height: 1.2;
+    text-shadow: 1px 1px 0 #000, 0 0 8px #ff0;
+    margin-bottom: 4px;
+  }
+  .ad-sub {
+    font-size: 0.6rem;
+    color: #aef;
+    font-family: 'Courier New', monospace;
+    line-height: 1.3;
+  }
+  .ad-cta {
+    display: inline-block;
+    margin-top: 5px;
+    background: linear-gradient(90deg, #ff4400, #ff0000, #ff4400);
+    color: #fff;
+    font-family: Impact, sans-serif;
+    font-size: 0.75rem;
+    padding: 3px 8px;
+    border: 2px solid #ffaa00;
+    letter-spacing: 1px;
+    animation: ctaPulse 0.8s ease infinite alternate;
+  }
+  @keyframes ctaPulse {
+    from { box-shadow: 0 0 5px #ff0; }
+    to   { box-shadow: 0 0 15px #ff0, 0 0 25px red; }
+  }
+
+  .ad-icon { font-size: 1.8rem; line-height: 1; margin-bottom: 3px; }
+
+  .ad-marquee {
+    font-size: 0.55rem;
+    color: #0f0;
+    font-family: 'Courier New', monospace;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .ad-marquee-inner {
+    display: inline-block;
+    animation: marquee 6s linear infinite;
+  }
+  @keyframes marquee {
+    from { transform: translateX(100%); }
+    to   { transform: translateX(-100%); }
+  }
+
+  /* ── GAME AREA ── */
+  .game-area {
+    background: radial-gradient(ellipse at center, #1a4a2a 0%, #0d2e18 60%, #061409 100%);
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    position: relative;
+  }
+
+  /* ── HUD ── */
+  .hud-bar {
+    background: linear-gradient(90deg, #000, #1a0000, #000);
+    border-top: 3px double gold;
+    border-bottom: 3px double gold;
+    border-left: 3px solid gold;
+    border-right: 3px solid gold;
+    padding: 6px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .hud-item { text-align: center; }
+  .hud-label {
+    font-size: 0.55rem;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    color: #cc9900;
+    font-family: 'Courier New', monospace;
+  }
+  .hud-value {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: gold;
+    text-shadow: 0 0 10px gold;
+  }
+
+  /* ── ZONES ── */
+  .zone {
+    background: rgba(0, 0, 0, 0.5);
+    border: 4px solid gold;
+    box-shadow:
+      0 0 0 2px #8B6914,
+      0 0 0 4px gold,
+      inset 0 0 20px rgba(0,0,0,0.8),
+      0 0 20px rgba(255,215,0,0.3);
+    border-radius: 2px;
+    padding: 10px 14px;
+    min-height: 150px;
+    position: relative;
+  }
+
+  .zone::before {
+    content: '';
+    position: absolute;
+    inset: 4px;
+    border: 1px solid rgba(255,215,0,0.2);
+    pointer-events: none;
+  }
+
+  .zone-label {
+    font-family: 'Playfair Display', serif;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+    color: gold;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .hand-value {
+    background: #000;
+    border: 2px solid gold;
+    border-radius: 0;
+    padding: 1px 8px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: gold;
+    font-family: 'Courier New', monospace;
+    box-shadow: 0 0 8px gold;
+  }
+  .hand-value.bust { border-color: #f00; color: #f00; box-shadow: 0 0 8px red; animation: bustBlink 0.4s step-end infinite; }
+  .hand-value.bj   { border-color: #0f0; color: #0f0; box-shadow: 0 0 8px lime; animation: bjGlow 0.5s ease infinite alternate; }
+
+  @keyframes bustBlink { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
+  @keyframes bjGlow    { from { box-shadow: 0 0 8px lime; } to { box-shadow: 0 0 25px lime, 0 0 50px #00ff00; } }
+
+  .cards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-height: 100px;
+    align-items: flex-start;
+  }
+
+  /* ── CARDS ── */
+  .card-wrapper { perspective: 600px; width: 68px; height: 102px; flex-shrink: 0; }
+
+  .card {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    transform-style: preserve-3d;
+    transition: transform 0.4s ease;
+  }
+  .card.flipped { transform: rotateY(180deg); }
+
+  .card-face, .card-back-face {
+    position: absolute;
+    inset: 0;
+    border-radius: 3px;
+    backface-visibility: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .card-face {
+    background: #fffdf8;
+    border: 3px solid gold;
+    box-shadow: 0 0 0 1px #8B6914, 0 4px 12px rgba(0,0,0,0.8), inset 0 0 0 2px rgba(255,215,0,0.1);
+    flex-direction: column;
+    padding: 3px;
+  }
+
+  .card-face .corner {
+    position: absolute;
+    font-size: 0.7rem;
+    font-weight: 700;
+    font-family: 'Playfair Display', serif;
+    line-height: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .card-face .corner.tl { top: 3px; left: 4px; }
+  .card-face .corner.br { bottom: 3px; right: 4px; transform: rotate(180deg); }
+  .card-face .center-suit { font-size: 1.8rem; line-height: 1; }
+  .card-face.red * { color: #cc0000; }
+  .card-face.black * { color: #111; }
+
+  .card-back-face {
+    background:
+      repeating-linear-gradient(45deg, #8B0000 0, #8B0000 5px, #6B0000 5px, #6B0000 10px);
+    border: 3px solid gold;
+    box-shadow: 0 0 0 1px #8B6914, 0 4px 12px rgba(0,0,0,0.8);
+    transform: rotateY(180deg);
+    font-size: 1.6rem;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-25px) scale(0.8) rotate(-5deg); }
+    to   { opacity: 1; transform: translateY(0) scale(1) rotate(0deg); }
+  }
+  .card-wrapper.new { animation: slideIn 0.3s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+
+  /* ── MESSAGE ── */
+  .message-area { min-height: 54px; display: flex; align-items: center; justify-content: center; }
+
+  .message {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.4rem;
+    font-weight: 900;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    padding: 8px 24px;
+    border: 4px double gold;
+    box-shadow: 0 0 0 2px #8B6914, 0 0 30px rgba(255,215,0,0.4);
+    animation: popIn 0.35s cubic-bezier(0.175,0.885,0.32,1.275) forwards;
+  }
+  @keyframes popIn {
+    from { opacity: 0; transform: scale(0.5) rotate(-3deg); }
+    to   { opacity: 1; transform: scale(1) rotate(0deg); }
+  }
+  .message.win  { background: #001a00; color: lime; border-color: lime; text-shadow: 0 0 15px lime; }
+  .message.lose { background: #1a0000; color: #ff3333; border-color: red; text-shadow: 0 0 15px red; animation: popIn 0.35s cubic-bezier(0.175,0.885,0.32,1.275) forwards, loseBlink 0.3s step-end 3; }
+  .message.push { background: #1a1000; color: #ffaa00; border-color: #ffaa00; }
+  .message.info { background: #000; color: gold; }
+  @keyframes loseBlink { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* ── BET AREA ── */
+  .bet-area {
+    background: linear-gradient(135deg, #0a0500, #1a0e00, #0a0500);
+    border: 4px solid gold;
+    box-shadow: 0 0 0 2px #8B6914, 0 0 20px rgba(255,215,0,0.2), inset 0 0 20px rgba(0,0,0,0.5);
+    padding: 12px 14px;
+  }
+
+  .bet-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+  .bet-label {
+    font-family: 'Playfair Display', serif;
+    font-size: 0.75rem;
+    letter-spacing: 2px;
+    color: #cc9900;
+    text-transform: uppercase;
+    min-width: 90px;
+  }
+  .current-bet {
+    font-family: 'Courier New', monospace;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: gold;
+    text-shadow: 0 0 12px gold;
+    min-width: 80px;
+  }
+
+  /* Chips */
+  .chip {
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    border: 4px solid;
+    font-family: Impact, 'Arial Black', sans-serif;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.1s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    line-height: 1;
+    text-transform: uppercase;
+    position: relative;
+    overflow: hidden;
+  }
+  .chip::before {
+    content: '';
+    position: absolute;
+    inset: 5px;
+    border-radius: 50%;
+    border: 2px dashed rgba(255,255,255,0.3);
+    pointer-events: none;
+  }
+  .chip:hover:not(:disabled) { transform: translateY(-4px) scale(1.1); }
+  .chip:active:not(:disabled) { transform: scale(0.92); }
+  .chip:disabled { opacity: 0.25; cursor: not-allowed; transform: none !important; }
+
+  .chip-10  { background: radial-gradient(#3498db, #1a5276); border-color: #aed6f1; color: #fff; box-shadow: 0 4px 0 #1a3a52, 0 0 12px rgba(52,152,219,0.5); }
+  .chip-25  { background: radial-gradient(#2ecc71, #1a7a42); border-color: #a9dfbf; color: #fff; box-shadow: 0 4px 0 #0e4424, 0 0 12px rgba(46,204,113,0.5); }
+  .chip-50  { background: radial-gradient(#9b59b6, #5e2d73); border-color: #d7bde2; color: #fff; box-shadow: 0 4px 0 #3d1a4a, 0 0 12px rgba(155,89,182,0.5); }
+  .chip-100 { background: radial-gradient(#e74c3c, #7b241c); border-color: #f1948a; color: #fff; box-shadow: 0 4px 0 #4a1010, 0 0 12px rgba(231,76,60,0.5); }
+
+  .chip-clear {
+    background: transparent;
+    border-color: #666;
+    color: #888;
+    font-size: 0.6rem;
+    box-shadow: none;
+  }
+  .chip-clear:hover:not(:disabled) { border-color: red; color: red; box-shadow: 0 0 10px red; }
+
+  /* ── ACTION BUTTONS ── */
+  .actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
+  .btn {
+    padding: 10px 22px;
+    border: 3px solid gold;
+    border-radius: 0;
+    font-family: 'Playfair Display', serif;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.1s;
+    box-shadow: 0 0 0 1px #8B6914, 0 4px 0 #8B6914, 0 0 15px rgba(255,215,0,0.2);
+    position: relative;
+  }
+  .btn:hover:not(:disabled) { transform: translateY(-3px); box-shadow: 0 0 0 1px #8B6914, 0 7px 0 #8B6914, 0 0 25px rgba(255,215,0,0.4); }
+  .btn:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 0 0 1px #8B6914, 0 2px 0 #8B6914; }
+  .btn:disabled { opacity: 0.25; cursor: not-allowed; transform: none; }
+
+  .btn-deal   { background: linear-gradient(135deg, #8B6914, #c9a84c, #8B6914); color: #000; min-width: 140px; font-size: 1.1rem; animation: dealGlow 1.5s ease infinite alternate; }
+  @keyframes dealGlow { from { box-shadow: 0 0 0 1px #8B6914, 0 4px 0 #8B6914, 0 0 15px rgba(255,215,0,0.3); } to { box-shadow: 0 0 0 1px #8B6914, 0 4px 0 #8B6914, 0 0 40px rgba(255,215,0,0.7), 0 0 60px rgba(255,165,0,0.4); } }
+  .btn-deal:disabled { animation: none; }
+  .btn-hit    { background: linear-gradient(135deg, #145a14, #2ecc71, #145a14); color: #fff; }
+  .btn-stand  { background: linear-gradient(135deg, #5a1414, #e74c3c, #5a1414); color: #fff; }
+  .btn-double { background: linear-gradient(135deg, #3d1460, #9b59b6, #3d1460); color: #fff; }
+  .btn-new    { background: linear-gradient(135deg, #144a5a, #3498db, #144a5a); color: #fff; min-width: 140px; }
+
+  /* ── STREAK ── */
+  .streak-row {
+    display: flex;
+    gap: 5px;
+    justify-content: center;
+    align-items: center;
+    font-size: 0.6rem;
+    color: #8B6914;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-family: 'Courier New', monospace;
+  }
+  .streak-dot { width: 10px; height: 10px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.2); }
+  .streak-dot.w { background: lime; box-shadow: 0 0 4px lime; }
+  .streak-dot.l { background: red;  box-shadow: 0 0 4px red; }
+  .streak-dot.p { background: #ffaa00; box-shadow: 0 0 4px #ffaa00; }
+
+  /* ── WINNER WATERMARK ── */
+  .winner-stamp {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) rotate(-20deg);
+    font-family: Impact, sans-serif;
+    font-size: 4rem;
+    color: rgba(255,215,0,0.04);
+    white-space: nowrap;
+    pointer-events: none;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+  }
+
+  /* ── SHUFFLE OVERLAY ── */
+  .shuffle-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.82);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    z-index: 50;
+    border: 4px solid gold;
+  }
+
+  .shuffle-dealer {
+    font-size: 4rem;
+    animation: dealerBob 0.5s ease-in-out infinite alternate;
+  }
+  @keyframes dealerBob {
+    from { transform: translateY(0) rotate(-3deg); }
+    to   { transform: translateY(-6px) rotate(3deg); }
+  }
+  .shuffle-dealer.drop {
+    animation: dealerDrop 0.6s ease forwards;
+  }
+  @keyframes dealerDrop {
+    0%   { transform: rotate(0deg); }
+    30%  { transform: rotate(-20deg) translateY(10px); }
+    60%  { transform: rotate(15deg) translateY(5px); }
+    100% { transform: rotate(0deg); }
+  }
+
+  .shuffle-text {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem;
+    color: gold;
+    letter-spacing: 3px;
+    text-align: center;
+    max-width: 280px;
+    line-height: 1.5;
+  }
+
+  .shuffle-sub {
+    font-family: 'Courier New', monospace;
+    font-size: 0.7rem;
+    color: #8B6914;
+    letter-spacing: 1px;
+    text-align: center;
+    font-style: italic;
+    max-width: 280px;
+    line-height: 1.6;
+  }
+
+  .shuffle-cards {
+    display: flex;
+    gap: -4px;
+    font-size: 1.6rem;
+    animation: cardRiffle 0.3s ease infinite alternate;
+    letter-spacing: -4px;
+  }
+  @keyframes cardRiffle {
+    from { transform: skewX(-5deg); }
+    to   { transform: skewX(5deg); }
+  }
+  .shuffle-cards.drop-cards {
+    animation: cardsScatter 0.5s ease forwards;
+  }
+  @keyframes cardsScatter {
+    0%   { transform: translateY(0) rotate(0); opacity: 1; }
+    50%  { transform: translateY(30px) rotate(15deg); opacity: 0.6; }
+    100% { transform: translateY(60px) rotate(-5deg); opacity: 0; }
+  }
+
+  /* ── GAME OVER ── */
+  .game-over-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.9);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 20px; z-index: 100;
+  }
+  .game-over-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 4rem;
+    font-weight: 900;
+    color: gold;
+    text-shadow: 0 0 30px gold, 0 0 60px orange;
+    letter-spacing: 6px;
+    animation: titlePulse 0.8s ease infinite alternate;
+  }
+  .game-over-sub { color: #cc9900; font-size: 0.9rem; letter-spacing: 3px; font-family: 'Courier New', monospace; }
+
+  /* ── BOTTOM TICKER ── */
+  .bottom-ticker {
+    background: #000;
+    border-top: 4px double gold;
+    color: #0f0;
+    font-family: 'Courier New', monospace;
+    font-size: 0.7rem;
+    padding: 3px 0;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .bottom-ticker-inner {
+    display: inline-block;
+    animation: ticker 22s linear infinite reverse;
+    letter-spacing: 2px;
+  }
+
+  /* ── TRUST BADGES ── */
+  .trust-bar {
+    background: linear-gradient(90deg, #000, #0a0500, #000);
+    border-top: 2px solid gold;
+    border-bottom: 2px solid gold;
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    padding: 5px 0;
+    flex-wrap: wrap;
+  }
+  .trust-badge {
+    font-family: 'Courier New', monospace;
+    font-size: 0.55rem;
+    color: #8B6914;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  /* mobile */
+  @media (max-width: 768px) {
+    .page-layout { grid-template-columns: 1fr; }
+    .sidebar { display: none; }
+    .title-main { font-size: 1.6rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- TOP TICKER -->
+<div id="top-ticker">
+  <span id="ticker-inner">
+    🃏 JACKPOT ALERT: User "CasinoKing99" just won $49,999 !! &nbsp;★&nbsp; FREE SPINS AVAILABLE NOW &nbsp;★&nbsp; MEGA BLACKJACK DELUXE — 500% WELCOME BONUS &nbsp;★&nbsp; 🔥 HOT TABLE TONIGHT: 14 BLACKJACKS IN A ROW 🔥 &nbsp;★&nbsp; DOWNLOAD OUR APP FOR EVEN MORE LOSSES &nbsp;★&nbsp; THE HOUSE ALWAYS WINS... OR DOES IT? &nbsp;★&nbsp; CLICK HERE TO CLAIM YOUR FREE $10,000 &nbsp;★&nbsp;
+  </span>
+</div>
+
+<!-- TITLE -->
+<div class="title-banner">
+  <div class="stars-row">★ ★ ★ ★ ★ ★ ★ ★ ★ ★ ★</div>
+  <div class="title-main">♠ BLACKJACK QUEST ♠</div>
+  <div class="title-sub">PRO DELUXE ULTIMATE CHAMPIONSHIP EDITION™ · EST. 2024</div>
+  <div class="stars-row">★ ★ ★ ★ ★ ★ ★ ★ ★ ★ ★</div>
+</div>
+
+<!-- TRUST BAR -->
+<div class="trust-bar">
+  <span class="trust-badge">🔒 SSL SECURED</span>
+  <span class="trust-badge">✅ CERTIFIED FAIR</span>
+  <span class="trust-badge">🏆 #1 ONLINE SINCE 1999</span>
+  <span class="trust-badge">💳 FAST PAYOUTS*</span>
+  <span class="trust-badge">🎰 24/7 SUPPORT</span>
+  <span class="trust-badge">⚡ INSTANT PLAY</span>
+</div>
+
+<!-- THREE COLUMN LAYOUT -->
+<div class="page-layout">
+
+  <!-- LEFT SIDEBAR ADS -->
+  <div class="sidebar">
+
+    <div class="fake-ad" onclick="void(0)">
+      <div class="ad-icon">🃏</div>
+      <div class="ad-title">MEGA BLACKJACK PRO 2000!!</div>
+      <div class="ad-sub">Play with REAL dealers!<br>500% WELCOME BONUS!<br>No wagering required*</div>
+      <div class="ad-cta">PLAY FREE NOW</div>
+      <div class="ad-marquee"><span class="ad-marquee-inner">★ LIMITED TIME OFFER ★ 24HRS ONLY ★</span></div>
+    </div>
+
+    <div class="fake-ad" onclick="void(0)">
+      <div class="ad-icon">💰</div>
+      <div class="ad-title">BLACKJACK KINGS CASINO</div>
+      <div class="ad-sub">$10,000 sign-up bonus!<br>Over 1,000 games!<br>Rated ⭐⭐⭐⭐⭐</div>
+      <div class="ad-cta">JOIN NOW!</div>
+    </div>
+
+    <div class="fake-ad" onclick="void(0)" style="background: linear-gradient(135deg,#1a1a00,#3a3a00,#1a1a00); box-shadow: inset 0 0 15px rgba(255,255,0,0.2), 0 0 10px rgba(255,215,0,0.4);">
+      <div class="ad-icon">🎰</div>
+      <div class="ad-title" style="color:#ff0; font-size:1rem;">JACKPOT PALACE</div>
+      <div class="ad-sub" style="color:#ffd">Progressive jackpots!<br>$2.4M up for grabs<br>RIGHT NOW!!</div>
+      <div class="ad-cta" style="background: linear-gradient(90deg,#ffaa00,#ff6600,#ffaa00); color:#000;">SPIN TO WIN</div>
+    </div>
+
+    <div class="fake-ad" onclick="void(0)" style="background: linear-gradient(135deg,#001a00,#003300); border-color:lime; box-shadow: 0 0 15px lime;">
+      <div class="ad-icon">🤑</div>
+      <div class="ad-title" style="color:lime;">LUCKY ACES ONLINE</div>
+      <div class="ad-sub" style="color:#afa;">FREE chips daily!<br>VIP program available<br>Withdraw anytime!†</div>
+      <div class="ad-cta" style="background:linear-gradient(90deg,#006600,#00aa00,#006600);">CLAIM CHIPS</div>
+      <div class="ad-marquee"><span class="ad-marquee-inner" style="color:lime;">† TERMS APPLY ★ 18+ ★ GAMBLE RESPONSIBLY ★</span></div>
+    </div>
+
+    <div class="fake-ad" onclick="void(0)">
+      <div class="ad-icon">♦</div>
+      <div class="ad-title">DIAMOND CLUB VIP</div>
+      <div class="ad-sub">Exclusive members only!<br>Private tables available<br>Butler service*</div>
+      <div class="ad-cta">APPLY NOW</div>
+    </div>
+
+    <div style="text-align:center; font-family:'Courier New',monospace; font-size:0.5rem; color:#444; letter-spacing:1px; padding: 4px;">
+      *TERMS AND CONDITIONS APPLY.<br>
+      18+ ONLY. GAMBLING INVOLVES RISK.<br>
+      Please play responsibly.<br>
+      This is a fake ad.
+    </div>
+
+  </div>
+
+  <!-- MAIN GAME -->
+  <div class="game-area">
+    <div class="winner-stamp">YOU ARE A WINNER</div>
+
+    <!-- HUD -->
+    <div class="hud-bar">
+      <div class="hud-item">
+        <div class="hud-label">★ Balance ★</div>
+        <div class="hud-value" id="balance-display">$500</div>
+      </div>
+      <div class="hud-item">
+        <div class="hud-label">Hands Played</div>
+        <div class="hud-value" id="hands-display">0</div>
+      </div>
+      <div class="hud-item">
+        <div class="hud-label">W / L / P</div>
+        <div class="hud-value" id="record-display">0/0/0</div>
+      </div>
+    </div>
+
+    <!-- Dealer zone -->
+    <div class="zone">
+      <div class="zone-label">
+        ♣ Dealer's Hand ♣
+        <span class="hand-value" id="dealer-value">—</span>
+      </div>
+      <div class="cards" id="dealer-cards"></div>
+    </div>
+
+    <!-- Message -->
+    <div class="message-area" id="message-area">
+      <div class="message info">Place your bet to begin!</div>
+    </div>
+
+    <!-- Player zone -->
+    <div class="zone">
+      <div class="zone-label">
+        ♥ Your Hand ♥
+        <span class="hand-value" id="player-value">—</span>
+      </div>
+      <div class="cards" id="player-cards"></div>
+    </div>
+
+    <!-- Bet area -->
+    <div class="bet-area" id="bet-area">
+      <div class="bet-row">
+        <span class="bet-label">★ Current Bet</span>
+        <span class="current-bet" id="bet-display">$0</span>
+        <button class="chip chip-clear" id="btn-clear" onclick="clearBet()">✕ Clear</button>
+      </div>
+      <div class="bet-row">
+        <span class="bet-label">Add Chips:</span>
+        <button class="chip chip-10"  onclick="addBet(10)">$10</button>
+        <button class="chip chip-25"  onclick="addBet(25)">$25</button>
+        <button class="chip chip-50"  onclick="addBet(50)">$50</button>
+        <button class="chip chip-100" onclick="addBet(100)">$100</button>
+      </div>
+    </div>
+
+    <!-- Streak -->
+    <div class="streak-row" id="streak-row">
+      <span>★ History:</span>
+      <span id="streak-dots"></span>
+    </div>
+
+    <!-- Action buttons -->
+    <div class="actions" id="action-area">
+      <button class="btn btn-deal" id="btn-deal" onclick="deal()">♠ Deal ♠</button>
+      <button class="btn btn-hit"    id="btn-hit"    onclick="hit()"       style="display:none">Hit ▶</button>
+      <button class="btn btn-stand"  id="btn-stand"  onclick="stand()"     style="display:none">Stand ■</button>
+      <button class="btn btn-double" id="btn-double" onclick="doubleDown()" style="display:none">Double ◆</button>
+      <button class="btn btn-new"    id="btn-new"    onclick="newHand()"   style="display:none">♣ New Hand ♣</button>
+    </div>
+
+  </div>
+
+  <!-- RIGHT SIDEBAR ADS -->
+  <div class="sidebar">
+
+    <div class="fake-ad" onclick="void(0)" style="background:linear-gradient(135deg,#1a0000,#4a0000); border-color:#ff4444; box-shadow: 0 0 15px rgba(255,0,0,0.4);">
+      <div class="ad-icon">🔴</div>
+      <div class="ad-title" style="color:#ff4444;">ACE HIGH CASINO</div>
+      <div class="ad-sub" style="color:#faa;">Las Vegas-style tables!<br>RNG certified by us!<br>Win BIG tonight!!</div>
+      <div class="ad-cta">PLAY NOW</div>
+    </div>
+
+    <div class="fake-ad" onclick="void(0)">
+      <div class="ad-icon">🌟</div>
+      <div class="ad-title">ROYAL FLUSH CLUB</div>
+      <div class="ad-sub">Members earn CASH BACK<br>on every hand!<br>Invite friends, earn more!</div>
+      <div class="ad-cta">JOIN FREE</div>
+      <div class="ad-marquee"><span class="ad-marquee-inner">CASH BACK CAPPED AT $5 ★ SEE TERMS ★</span></div>
+    </div>
+
+    <div class="fake-ad" onclick="void(0)" style="background:linear-gradient(135deg,#00001a,#000033,#00001a); border-color:#6699ff; box-shadow: 0 0 15px rgba(100,150,255,0.4);">
+      <div class="ad-icon">🚀</div>
+      <div class="ad-title" style="color:#88aaff;">GALAXY BLACKJACK</div>
+      <div class="ad-sub" style="color:#aac;">Play in SPACE!<br>Crypto accepted!<br>Anonymous play!</div>
+      <div class="ad-cta" style="background:linear-gradient(90deg,#003399,#0055ff,#003399);">BLAST OFF</div>
+    </div>
+
+    <div class="fake-ad" onclick="void(0)">
+      <div class="ad-icon">👑</div>
+      <div class="ad-title">EMPEROR'S TABLE</div>
+      <div class="ad-sub">$500 no-deposit bonus!<br>Bet with house money!<br>Keep what you win!</div>
+      <div class="ad-cta">CLAIM BONUS</div>
+      <div class="ad-marquee"><span class="ad-marquee-inner">35X wagering req. ★ Valid 24hrs ★ 18+ only ★</span></div>
+    </div>
+
+    <div class="fake-ad" onclick="void(0)" style="background:linear-gradient(135deg,#0a1a00,#1a3300); border-color:#aaff44; box-shadow: 0 0 15px rgba(170,255,68,0.3);">
+      <div class="ad-icon">🍀</div>
+      <div class="ad-title" style="color:#aaff44;">SHAMROCK CASINO</div>
+      <div class="ad-sub" style="color:#cfa;">Luck of the Irish!<br>Leprechaun jackpots<br>every Saturday!</div>
+      <div class="ad-cta" style="background:linear-gradient(90deg,#226600,#44aa00,#226600);">GET LUCKY</div>
+    </div>
+
+    <div style="text-align:center; font-family:'Courier New',monospace; font-size:0.5rem; color:#444; letter-spacing:1px; padding: 4px;">
+      ALL ADS ARE FICTIONAL.<br>
+      FOR EDUCATIONAL USE ONLY.<br>
+      BLACKJACK QUEST · 2024
+    </div>
+
+  </div>
+</div>
+
+<!-- BOTTOM TICKER -->
+<div class="bottom-ticker">
+  <span class="bottom-ticker-inner">
+    ⚠️ REMINDER: This is an educational game. No real money. ★ The house edge in real blackjack is ~0.5% with basic strategy. ★ Card counting is not illegal but casinos may ask you to leave. ★ Blackjack pays 3:2 in a real casino (or 6:5 at sketchy ones, avoid those). ★ Always split Aces and 8s. Never split 10s. ★ Dealer must hit soft 16. ★ Hit on soft 17 or less. Stand on hard 17+. ★ 18+ only in real casinos. Gamble responsibly. ★
+  </span>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════════════
+const SUITS  = ['♠','♥','♦','♣'];
+const RANKS  = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+const RED    = new Set(['♥','♦']);
+
+let balance  = 500;
+let bet      = 0;
+let shoe     = [];
+let playerHand = [];
+let dealerHand = [];
+let gameState  = 'BETTING';
+let stats = { w: 0, l: 0, p: 0, hands: 0 };
+let history = [];
+
+// ═══════════════════════════════════════════════════════════════
+//  DECK
+// ═══════════════════════════════════════════════════════════════
+function buildShoe(n = 6) {
+  const cards = [];
+  for (let d = 0; d < n; d++)
+    for (const suit of SUITS)
+      for (const rank of RANKS)
+        cards.push({ rank, suit });
+  return cards;
+}
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function drawCard(faceUp = true) {
+  if (shoe.length < 15) shoe = shuffle(buildShoe(6));
+  const card = shoe.pop();
+  card.faceUp = faceUp;
+  return card;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  HAND VALUE
+// ═══════════════════════════════════════════════════════════════
+function cardValue(rank) {
+  if (rank === 'A') return 11;
+  if (['J','Q','K'].includes(rank)) return 10;
+  return parseInt(rank);
+}
+
+function handTotal(hand) {
+  let total = 0, aces = 0;
+  for (const c of hand) {
+    if (!c.faceUp) continue;
+    if (c.rank === 'A') aces++;
+    total += cardValue(c.rank);
+  }
+  while (total > 21 && aces > 0) { total -= 10; aces--; }
+  return total;
+}
+
+function isBust(hand)      { return handTotal(hand) > 21; }
+function isBlackjack(hand) { return hand.length === 2 && handTotal(hand) === 21; }
+
+function handLabel(hand) {
+  const t = handTotal(hand);
+  if (isBust(hand))      return { text: 'BUST', cls: 'bust' };
+  if (isBlackjack(hand)) return { text: 'BJ!',  cls: 'bj'   };
+  return { text: t, cls: '' };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  RENDER
+// ═══════════════════════════════════════════════════════════════
+function renderCard(card) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'card-wrapper new';
+
+  const cardEl = document.createElement('div');
+  cardEl.className = 'card' + (card.faceUp ? '' : ' flipped');
+
+  const color = RED.has(card.suit) ? 'red' : 'black';
+
+  const front = document.createElement('div');
+  front.className = `card-face ${color}`;
+  front.innerHTML = `
+    <div class="corner tl"><span>${card.rank}</span><span>${card.suit}</span></div>
+    <div class="center-suit">${card.suit}</div>
+    <div class="corner br"><span>${card.rank}</span><span>${card.suit}</span></div>
+  `;
+
+  const back = document.createElement('div');
+  back.className = 'card-back-face';
+  back.textContent = '🂠';
+
+  cardEl.appendChild(front);
+  cardEl.appendChild(back);
+  wrapper.appendChild(cardEl);
+  return wrapper;
+}
+
+function renderHand(containerId, hand, revealAll = false) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = '';
+  hand.forEach(card => {
+    const display = revealAll ? { ...card, faceUp: true } : card;
+    el.appendChild(renderCard(display));
+  });
+}
+
+function updateValues() {
+  const pv = document.getElementById('player-value');
+  if (playerHand.length === 0) { pv.textContent = '—'; pv.className = 'hand-value'; }
+  else {
+    const pl = handLabel(playerHand);
+    pv.textContent = pl.text;
+    pv.className = 'hand-value ' + pl.cls;
+  }
+
+  const dv = document.getElementById('dealer-value');
+  const vis = dealerHand.filter(c => c.faceUp);
+  if (vis.length === 0) { dv.textContent = '—'; dv.className = 'hand-value'; }
+  else {
+    if (gameState === 'RESULT') {
+      const dl = handLabel(dealerHand.map(c => ({ ...c, faceUp: true })));
+      dv.textContent = dl.text;
+      dv.className = 'hand-value ' + dl.cls;
+    } else {
+      dv.textContent = handTotal(vis);
+      dv.className = 'hand-value';
+    }
+  }
+}
+
+function showMessage(text, type) {
+  const area = document.getElementById('message-area');
+  area.innerHTML = '';
+  if (!text) return;
+  const m = document.createElement('div');
+  m.className = `message ${type}`;
+  m.textContent = text;
+  area.appendChild(m);
+}
+
+function updateHUD() {
+  document.getElementById('balance-display').textContent = `$${balance}`;
+  document.getElementById('bet-display').textContent = `$${bet}`;
+  document.getElementById('hands-display').textContent = stats.hands;
+  document.getElementById('record-display').textContent = `${stats.w}/${stats.l}/${stats.p}`;
+}
+
+function updateStreak() {
+  const dots = document.getElementById('streak-dots');
+  dots.innerHTML = '';
+  history.slice(-12).forEach(o => {
+    const d = document.createElement('span');
+    d.className = `streak-dot ${o}`;
+    dots.appendChild(d);
+  });
+}
+
+function setButtons(state) {
+  const deal   = document.getElementById('btn-deal');
+  const hit    = document.getElementById('btn-hit');
+  const stand  = document.getElementById('btn-stand');
+  const dbl    = document.getElementById('btn-double');
+  const newH   = document.getElementById('btn-new');
+  const chips  = document.querySelectorAll('.chip');
+  const betArea= document.getElementById('bet-area');
+
+  deal.style.display  = state === 'BETTING'     ? '' : 'none';
+  hit.style.display   = state === 'PLAYER_TURN' ? '' : 'none';
+  stand.style.display = state === 'PLAYER_TURN' ? '' : 'none';
+  dbl.style.display   = state === 'PLAYER_TURN' ? '' : 'none';
+  newH.style.display  = state === 'RESULT'      ? '' : 'none';
+
+  if (state === 'PLAYER_TURN') dbl.disabled = playerHand.length !== 2 || balance < bet;
+  if (state === 'BETTING') {
+    deal.disabled = bet === 0;
+    chips.forEach(c => c.disabled = false);
+    betArea.style.display = '';
+  } else {
+    chips.forEach(c => c.disabled = true);
+    betArea.style.display = state === 'RESULT' ? '' : 'none';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  BET
+// ═══════════════════════════════════════════════════════════════
+function addBet(amount) {
+  if (gameState !== 'BETTING') return;
+  const toAdd = Math.min(amount, balance - bet);
+  if (toAdd <= 0) return;
+  bet += toAdd;
+  updateHUD();
+  setButtons('BETTING');
+}
+
+function clearBet() {
+  if (gameState !== 'BETTING') return;
+  bet = 0;
+  updateHUD();
+  setButtons('BETTING');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SHUFFLE OVERLAY HELPERS
+// ═══════════════════════════════════════════════════════════════
+function createShuffleOverlay(text, sub, dropped) {
+  const ov = document.createElement('div');
+  ov.className = 'shuffle-overlay';
+  ov.id = 'shuffle-overlay';
+
+  const dealerEl = document.createElement('div');
+  dealerEl.className = 'shuffle-dealer' + (dropped ? ' drop' : '');
+  dealerEl.textContent = dropped ? '🫠' : '🧑‍💼';
+
+  const cardsEl = document.createElement('div');
+  cardsEl.className = 'shuffle-cards' + (dropped ? ' drop-cards' : '');
+  cardsEl.textContent = '🂠🂠🂠🂠🂠🂠';
+
+  const textEl = document.createElement('div');
+  textEl.className = 'shuffle-text';
+  textEl.innerHTML = text;
+
+  ov.appendChild(dealerEl);
+  if (!dropped) ov.appendChild(cardsEl);
+  ov.appendChild(textEl);
+
+  if (sub) {
+    const subEl = document.createElement('div');
+    subEl.className = 'shuffle-sub';
+    subEl.innerHTML = sub;
+    ov.appendChild(subEl);
+  }
+
+  return ov;
+}
+
+function removeShuffleOverlay() {
+  document.getElementById('shuffle-overlay')?.remove();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  DEAL
+// ═══════════════════════════════════════════════════════════════
+function deal() {
+  if (bet === 0 || gameState !== 'BETTING') return;
+
+  // Disable buttons immediately so user can't double-click
+  document.getElementById('btn-deal').disabled = true;
+  document.querySelectorAll('.chip').forEach(c => c.disabled = true);
+
+  const gameArea = document.querySelector('.game-area');
+  const DROPPED = Math.random() < 0.35; // 35% chance dealer drops the cards
+
+  if (DROPPED) {
+    // Phase 1: dropping message
+    const ov1 = createShuffleOverlay(
+      '&quot;Oh shoot. I dropped them again.&nbsp; Sorry, I\'m new here. Heh. Lawyer bills!&quot;',
+      null,
+      true
+    );
+    gameArea.appendChild(ov1);
+
+    setTimeout(() => {
+      // Phase 2: sad follow-up
+      removeShuffleOverlay();
+      const ov2 = createShuffleOverlay(
+        '&quot;...&#x2019;sigh&#x2019; I miss you, Sharon.&quot;',
+        '— picks cards up off the floor, reshuffles —',
+        true
+      );
+      gameArea.appendChild(ov2);
+
+      setTimeout(() => {
+        // Phase 3: actually shuffling now
+        removeShuffleOverlay();
+        const ov3 = createShuffleOverlay('Shuffling...', null, false);
+        gameArea.appendChild(ov3);
+
+        setTimeout(() => {
+          removeShuffleOverlay();
+          doDeal();
+        }, 1400);
+      }, 2600);
+    }, 2400);
+
+  } else {
+    // Normal shuffle — dealer is fine, just slow
+    const ov = createShuffleOverlay('Shuffling...', null, false);
+    gameArea.appendChild(ov);
+
+    setTimeout(() => {
+      removeShuffleOverlay();
+      doDeal();
+    }, 1200);
+  }
+}
+
+function doDeal() {
+  balance -= bet;
+  playerHand = [drawCard(true), drawCard(true)];
+  dealerHand = [drawCard(true), drawCard(false)];
+  gameState = 'PLAYER_TURN';
+  stats.hands++;
+
+  renderHand('player-cards', playerHand);
+  renderHand('dealer-cards', dealerHand);
+  updateValues();
+  updateHUD();
+  showMessage('', '');
+  setButtons('PLAYER_TURN');
+
+  const playerBJ = isBlackjack(playerHand);
+  const dealerBJ = isBlackjack(dealerHand.map(c => ({ ...c, faceUp: true })));
+
+  if (playerBJ || dealerBJ) {
+    dealerHand = dealerHand.map(c => ({ ...c, faceUp: true }));
+    renderHand('dealer-cards', dealerHand, true);
+    updateValues();
+    settleResult(playerBJ && dealerBJ ? 'push' : playerBJ ? 'blackjack' : 'lose');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PLAYER ACTIONS
+// ═══════════════════════════════════════════════════════════════
+function hit() {
+  if (gameState !== 'PLAYER_TURN') return;
+  playerHand.push(drawCard(true));
+  renderHand('player-cards', playerHand);
+  updateValues();
+  if (isBust(playerHand)) settleResult('lose');
+  else if (handTotal(playerHand) === 21) stand();
+  else setButtons('PLAYER_TURN');
+}
+
+function stand() {
+  if (gameState !== 'PLAYER_TURN') return;
+  gameState = 'DEALER_TURN';
+  setButtons('DEALER_TURN');
+  runDealer();
+}
+
+function doubleDown() {
+  if (gameState !== 'PLAYER_TURN' || playerHand.length !== 2 || balance < bet) return;
+  balance -= bet;
+  bet *= 2;
+  updateHUD();
+  playerHand.push(drawCard(true));
+  renderHand('player-cards', playerHand);
+  updateValues();
+  if (isBust(playerHand)) settleResult('lose');
+  else { gameState = 'DEALER_TURN'; setButtons('DEALER_TURN'); runDealer(); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  DEALER
+// ═══════════════════════════════════════════════════════════════
+function runDealer() {
+  dealerHand = dealerHand.map(c => ({ ...c, faceUp: true }));
+  renderHand('dealer-cards', dealerHand, true);
+  updateValues();
+
+  function step() {
+    let total = 0, aces = 0;
+    for (const c of dealerHand) {
+      if (c.rank === 'A') aces++;
+      total += cardValue(c.rank);
+    }
+    while (total > 21 && aces > 0) { total -= 10; aces--; }
+    if (total >= 17) { resolveHands(); return; }
+    dealerHand.push(drawCard(true));
+    renderHand('dealer-cards', dealerHand, true);
+    updateValues();
+    setTimeout(step, 450);
+  }
+  setTimeout(step, 550);
+}
+
+function resolveHands() {
+  const p = handTotal(playerHand);
+  const d = handTotal(dealerHand);
+  if (isBust(dealerHand))  settleResult('win');
+  else if (p > d)          settleResult('win');
+  else if (p < d)          settleResult('lose');
+  else                     settleResult('push');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SETTLE
+// ═══════════════════════════════════════════════════════════════
+function settleResult(outcome) {
+  gameState = 'RESULT';
+  let msg, type, dot;
+  switch (outcome) {
+    case 'blackjack':
+      balance += Math.floor(bet * 2.5);
+      msg = `♠ BLACKJACK! +$${Math.floor(bet * 1.5)}`; type = 'win'; dot = 'w'; stats.w++; break;
+    case 'win':
+      balance += bet * 2;
+      msg = `✓ YOU WIN! +$${bet}`; type = 'win'; dot = 'w'; stats.w++; break;
+    case 'push':
+      balance += bet;
+      msg = '— PUSH — BET RETURNED'; type = 'push'; dot = 'p'; stats.p++; break;
+    case 'lose':
+      msg = isBust(playerHand) ? `✕ BUST! -$${bet}` : `✕ DEALER WINS -$${bet}`;
+      type = 'lose'; dot = 'l'; stats.l++; break;
+  }
+  history.push(dot);
+  showMessage(msg, type);
+  updateHUD();
+  updateStreak();
+  setButtons('RESULT');
+  if (balance <= 0) setTimeout(showGameOver, 1400);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  NEW HAND / GAME OVER
+// ═══════════════════════════════════════════════════════════════
+function newHand() {
+  playerHand = []; dealerHand = []; bet = 0; gameState = 'BETTING';
+  document.getElementById('player-cards').innerHTML = '';
+  document.getElementById('dealer-cards').innerHTML = '';
+  document.getElementById('player-value').textContent = '—';
+  document.getElementById('player-value').className = 'hand-value';
+  document.getElementById('dealer-value').textContent = '—';
+  document.getElementById('dealer-value').className = 'hand-value';
+  showMessage('', '');
+  updateHUD();
+  setButtons('BETTING');
+}
+
+function showGameOver() {
+  const o = document.createElement('div');
+  o.className = 'game-over-overlay';
+  o.innerHTML = `
+    <div class="game-over-title">★ BROKE! ★</div>
+    <div class="game-over-sub">${stats.hands} HANDS · ${stats.w}W / ${stats.l}L / ${stats.p}P</div>
+    <div style="color:#cc9900;font-family:'Courier New',monospace;font-size:0.65rem;text-align:center;letter-spacing:1px;max-width:300px;">Perhaps check out one of our AMAZING partner casinos to win it all back?</div>
+    <button class="btn btn-deal" onclick="restartGame()" style="font-size:1.1rem;padding:14px 40px">♠ PLAY AGAIN ♠</button>
+  `;
+  document.body.appendChild(o);
+}
+
+function restartGame() {
+  document.querySelector('.game-over-overlay')?.remove();
+  balance = 500; bet = 0; stats = { w:0,l:0,p:0,hands:0 }; history = [];
+  playerHand = []; dealerHand = []; gameState = 'BETTING';
+  shoe = shuffle(buildShoe(6));
+  document.getElementById('player-cards').innerHTML = '';
+  document.getElementById('dealer-cards').innerHTML = '';
+  document.getElementById('player-value').textContent = '—';
+  document.getElementById('dealer-value').textContent = '—';
+  showMessage('Place your bet to begin!', 'info');
+  updateHUD(); updateStreak(); setButtons('BETTING');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════════
+shoe = shuffle(buildShoe(6));
+updateHUD();
+setButtons('BETTING');
+</script>
+</body>
+</html>
