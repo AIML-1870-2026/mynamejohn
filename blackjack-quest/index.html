@@ -875,6 +875,7 @@ let dealerHand = [];
 let gameState  = 'BETTING';
 let stats = { w: 0, l: 0, p: 0, hands: 0 };
 let history = [];
+let dropCount = 0; // tracks how many times dealer has dropped cards
 
 // ═══════════════════════════════════════════════════════════════
 //  DECK
@@ -1071,7 +1072,7 @@ function clearBet() {
 // ═══════════════════════════════════════════════════════════════
 //  SHUFFLE OVERLAY HELPERS
 // ═══════════════════════════════════════════════════════════════
-function createShuffleOverlay(text, sub, dropped) {
+function createShuffleOverlay(text, sub, dropped, btnLabel, onBtn) {
   const ov = document.createElement('div');
   ov.className = 'shuffle-overlay';
   ov.id = 'shuffle-overlay';
@@ -1080,16 +1081,19 @@ function createShuffleOverlay(text, sub, dropped) {
   dealerEl.className = 'shuffle-dealer' + (dropped ? ' drop' : '');
   dealerEl.textContent = dropped ? '🫠' : '🧑‍💼';
 
-  const cardsEl = document.createElement('div');
-  cardsEl.className = 'shuffle-cards' + (dropped ? ' drop-cards' : '');
-  cardsEl.textContent = '🂠🂠🂠🂠🂠🂠';
-
   const textEl = document.createElement('div');
   textEl.className = 'shuffle-text';
   textEl.innerHTML = text;
 
   ov.appendChild(dealerEl);
-  if (!dropped) ov.appendChild(cardsEl);
+
+  if (!dropped) {
+    const cardsEl = document.createElement('div');
+    cardsEl.className = 'shuffle-cards';
+    cardsEl.textContent = '🂠🂠🂠🂠🂠🂠';
+    ov.appendChild(cardsEl);
+  }
+
   ov.appendChild(textEl);
 
   if (sub) {
@@ -1099,11 +1103,27 @@ function createShuffleOverlay(text, sub, dropped) {
     ov.appendChild(subEl);
   }
 
+  if (btnLabel && onBtn) {
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-new';
+    btn.style.cssText = 'margin-top:10px;font-size:0.85rem;padding:10px 22px;letter-spacing:1px;';
+    btn.textContent = btnLabel;
+    btn.onclick = onBtn;
+    ov.appendChild(btn);
+  }
+
   return ov;
 }
 
 function removeShuffleOverlay() {
   document.getElementById('shuffle-overlay')?.remove();
+}
+
+function runShuffle(onDone) {
+  const gameArea = document.querySelector('.game-area');
+  const ov = createShuffleOverlay('Shuffling...', null, false, null, null);
+  gameArea.appendChild(ov);
+  setTimeout(() => { removeShuffleOverlay(); onDone(); }, 1200);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1112,55 +1132,66 @@ function removeShuffleOverlay() {
 function deal() {
   if (bet === 0 || gameState !== 'BETTING') return;
 
-  // Disable buttons immediately so user can't double-click
   document.getElementById('btn-deal').disabled = true;
   document.querySelectorAll('.chip').forEach(c => c.disabled = true);
 
-  const gameArea = document.querySelector('.game-area');
-  const DROPPED = Math.random() < 0.35; // 35% chance dealer drops the cards
+  const DROPPED = Math.random() < 0.35;
 
   if (DROPPED) {
-    // Phase 1: dropping message
-    const ov1 = createShuffleOverlay(
-      '&quot;Oh shoot. I dropped them again.&nbsp; Sorry, I\'m new here. Heh. Lawyer bills!&quot;',
-      null,
-      true
-    );
-    gameArea.appendChild(ov1);
+    dropCount++;
+    runDropSequence(dropCount, () => runShuffle(doDeal));
+  } else {
+    runShuffle(doDeal);
+  }
+}
 
-    setTimeout(() => {
-      // Phase 2: sad follow-up
-      removeShuffleOverlay();
+function runDropSequence(count, onDone) {
+  const gameArea = document.querySelector('.game-area');
+
+  // Phase 1 (auto): dealer drops the cards — same every time
+  const ov1 = createShuffleOverlay(
+    '"Oh shoot. I dropped them again.&nbsp; Sorry, I\'m new here. Heh. Lawyer bills!"',
+    null, true, null, null
+  );
+  gameArea.appendChild(ov1);
+
+  setTimeout(() => {
+    removeShuffleOverlay();
+
+    if (count === 1) {
+      // First drop: Sharon moment — player responds politely
       const ov2 = createShuffleOverlay(
-        '&quot;...&#x2019;sigh&#x2019; I miss you, Sharon.&quot;',
-        '— picks cards up off the floor, reshuffles —',
-        true
+        '"...*sigh*&nbsp; I miss you, Sharon."',
+        '— picks cards up off the floor —',
+        true,
+        'Respond Politely',
+        () => { removeShuffleOverlay(); onDone(); }
       );
       gameArea.appendChild(ov2);
 
-      setTimeout(() => {
-        // Phase 3: actually shuffling now
-        removeShuffleOverlay();
-        const ov3 = createShuffleOverlay('Shuffling...', null, false);
-        gameArea.appendChild(ov3);
+    } else if (count === 2) {
+      // Second drop: oversharing about the bosses
+      const ov2 = createShuffleOverlay(
+        '"You know, it gets tough working here. The bosses... they don\'t play!"',
+        '— cards still scattered on the floor —',
+        true,
+        'Respond Politely',
+        () => { removeShuffleOverlay(); onDone(); }
+      );
+      gameArea.appendChild(ov2);
 
-        setTimeout(() => {
-          removeShuffleOverlay();
-          doDeal();
-        }, 1400);
-      }, 2600);
-    }, 2400);
-
-  } else {
-    // Normal shuffle — dealer is fine, just slow
-    const ov = createShuffleOverlay('Shuffling...', null, false);
-    gameArea.appendChild(ov);
-
-    setTimeout(() => {
-      removeShuffleOverlay();
-      doDeal();
-    }, 1200);
-  }
+    } else {
+      // Third drop (and beyond): tries to go there
+      const ov2 = createShuffleOverlay(
+        '"You ever go through a divor-?"',
+        null,
+        true,
+        'Just shuffle the cards, man.',
+        () => { removeShuffleOverlay(); onDone(); }
+      );
+      gameArea.appendChild(ov2);
+    }
+  }, 2400);
 }
 
 function doDeal() {
@@ -1311,7 +1342,7 @@ function showGameOver() {
 
 function restartGame() {
   document.querySelector('.game-over-overlay')?.remove();
-  balance = 500; bet = 0; stats = { w:0,l:0,p:0,hands:0 }; history = [];
+  balance = 500; bet = 0; stats = { w:0,l:0,p:0,hands:0 }; history = []; dropCount = 0;
   playerHand = []; dealerHand = []; gameState = 'BETTING';
   shoe = shuffle(buildShoe(6));
   document.getElementById('player-cards').innerHTML = '';
