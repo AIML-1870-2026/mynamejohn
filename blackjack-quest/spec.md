@@ -146,14 +146,16 @@ After any player response, Gary shuffles and deals normally.
 
 ---
 
-## Characters (Planned)
+## Characters
 
 - **Gary** — the dealer. Recently divorced. New to the job. Overshares. Drops cards.
-  - Portrait: 🧑‍💼 (normal) / 🫠 (distressed)
+  - Portrait: custom SVG (round glasses, balding, big ears, nervous grin) — normal + distressed variants
   - Sharon is his ex-wife. Gary misses her. The bosses apparently "don't play."
-- **Pit Boss** — watching from the side. Implied threat. Has not spoken yet.
-  - Stub in CHARS: `pitBoss: { name: 'Pit Boss', portrait: '😤', portraitAlt: '😤' }`
-- **Other players / characters** — TBD as dialogue is scripted
+- **Pit Boss** — watching from the side. Gets progressively angrier as Gary fumbles.
+  - Portrait: 😤 / 🤬 (placeholder — drawing TBD)
+- **Moe** — a small, scrungly guy who stands on the table and deals superhuman fast.
+  - Portrait: placeholder — drawing TBD (user will supply)
+  - Deals at 55ms stagger (vs Gary's 900ms hands-mode)
 
 ---
 
@@ -193,22 +195,39 @@ blackjack-quest/
 
 ---
 
-## What's Next — Scripting
+## Narrative Arc — The Dealing Crisis
 
-The game loop works. The dialogue system works. The visual style is set.
+The first session plays out as a linear story that overrides random events.
+Tracked via `storyPhase` (0–6). Resets on restart.
 
-**The remaining work is writing the script** — deciding what Gary (and eventually other
-characters) say, when they say it, and what the player's choices look like.
+| Phase | Mode | What happens |
+|---|---|---|
+| 0 | Hands (slow) | Gary deals with both hands. 900ms card stagger. Fumbling dialogue. |
+| 1 | Shoe offer | After hand 1 result: Gary apologises. Player can suggest a shoe (or Gary gets it anyway). |
+| 2 | Shoe (1 round) | Normal 380ms stagger. Gary is briefly professional. |
+| 3 | Hands post-shoe | Shoe breaks. Back to hands. Pit boss: "Gary." |
+| 4 | Hands | Pit boss: "GARY. I'm watching you." |
+| 5 | Hands | Pit boss: "Gary, this is your last chance." |
+| 6 | Moe | Pit boss: "THAT'S IT. MOE!!!" — Moe climbs on table. 55ms stagger forever. |
 
-Candidate moments to script next:
+**Dealer visuals:**
+- Phases 0–5 (hands): both hand SVGs animate in/out
+- Phase 2 (shoe): no hand SVGs (shoe is off-screen object, dialogue only)
+- Phase 6 (Moe): hand SVGs hidden; Moe character portrait (drawing TBD)
 
-- **Player wins big** — Gary momentarily impressed, then circles back to Sharon somehow
-- **Player busts** — Gary empathetic in a misplaced way ("Rough one. Sharon used to say I never knew when to stand either.")
-- **Player hits blackjack** — Gary snaps into professionalism for exactly one beat before losing it again
-- **Pit Boss cameo** — appears after Gary drops cards multiple times ("Gary. A word.")
-- **Gary's closing line** — when the session ends / game over
-- **Running gag continuations** — the three-beat drop joke has room for a fourth beat, a fifth
+**Deal speed function:** `dealStagger()` returns 900 / 380 / 55 based on phase.
+
+**Gary portrait:** Custom SVG face — round glasses, balding, big ears, nervous smile.
+Drawn by user. Coloured sparingly (warm skin wash only). Normal + distressed variants.
+Hand SVGs doubled up (left + right), dark nails, prominent knuckle mole, matching sketch.
+
+## What's Next
+
+- **Moe portrait** — user will supply drawing; replace `'🧍'` placeholder in `CHARS.moe`
+- **Pit Boss portrait** — optional drawing to replace `'😤'` placeholder
+- **Gary win/bust/blackjack lines** — still unscripted (see dialogue trigger table above)
+- **Sharon lore expansion** — more drop-sequence beats (4th, 5th drop)
+- **Game-over Gary line** — closing monologue when balance hits $0
 
 The `showDialogue` / `showDialogueAlt` / `hideDialogue` API is the only interface needed.
-Add new characters to `CHARS`. Add new trigger points by calling `showDialogue` inside any
-existing game function (`settleResult`, `newHand`, `showGameOver`, etc.).
+Add trigger points by calling `showDialogue` inside any existing game function.
