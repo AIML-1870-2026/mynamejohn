@@ -25,20 +25,9 @@ everywhere, scrolling ticker banners) — a parody of low-rent online gambling s
 
 ---
 
-## Game States
-
-1. **BETTING** — Chip buttons active ($10/$25/$50/$100). Deal button appears once bet > 0.
-2. **PLAYER_TURN** — Cards dealt. Hit, Stand, Double available.
-3. **DEALER_TURN** — Dealer flips hole card, draws to 17+. Buttons hidden.
-4. **RESULT** — Winner determined, payout applied, outcome message shown. New Hand button appears.
-5. **BUST** — Immediate result when player exceeds 21.
-6. **GAME_OVER** — Balance hits $0; overlay shown with "Perhaps check out one of our AMAZING partner casinos."
-
----
-
 ## Blackjack Rules
 
-- Standard 6-deck shoe, shuffled each round (when shoe drops below 15 cards)
+- Standard 6-deck shoe, shuffled when shoe drops below 15 cards
 - Dealer stands on soft 17
 - Blackjack (Ace + 10-value on initial deal) pays **1.5× bet** (2.5× total return)
 - Push (tie) returns the bet
@@ -52,10 +41,21 @@ everywhere, scrolling ticker banners) — a parody of low-rent online gambling s
 
 ---
 
-## Stretch Features (Already Implemented)
+## Game States
 
-- Card flip animation (CSS 3D transform, `rotateY`)
-- Sequential deal animation — cards dealt alternating dealer/player with 380ms stagger
+1. **BETTING** — Chip buttons active ($10/$25/$50/$100). Deal button appears once bet > 0.
+2. **PLAYER_TURN** — Cards dealt. Hit, Stand, Double available.
+3. **DEALER_TURN** — Dealer flips hole card, draws to 17+. Buttons hidden.
+4. **RESULT** — Winner determined, payout applied, outcome message shown. New Hand button appears.
+5. **BUST** — Immediate result when player exceeds 21.
+6. **GAME_OVER** — Balance hits $0; overlay shown.
+
+---
+
+## Implemented Features
+
+- Card flip animation (CSS 3D `rotateY`)
+- Sequential deal animation — stagger speed varies by story phase (see below)
 - Card slide-in animation (`slideIn` keyframe, cubic-bezier bounce)
 - Bet chip buttons with disabled/hover states
 - Double Down mechanic
@@ -63,120 +63,144 @@ everywhere, scrolling ticker banners) — a parody of low-rent online gambling s
 - Win/loss/push streak dots (last 12 hands)
 - Dealer hand value hidden until reveal
 - Game Over overlay with stats summary
-
----
-
-## Narrative System — Point-and-Click Dialogue
-
-### Architecture
-
-All dialogue uses a **LucasArts-style dialogue bar** anchored to the bottom of the game area.
-It slides in (`display: flex` + `.visible` class) over the game content without covering cards.
-
-```
-┌─────────────────────────────────────────────────┐
-│ 🧑‍💼  GARY  (DEALER)                              │
-│     "...some speech here."                       │
-│                                                  │
-│  ▶  Respond Politely                             │
-│  ▶  Ask about Sharon                             │
-└─────────────────────────────────────────────────┘
-```
-
-**Characters** are defined in the `CHARS` object:
-
-```javascript
-const CHARS = {
-  dealer: { name: 'Gary  (Dealer)', portrait: '🧑‍💼', portraitAlt: '🫠' },
-  // pitBoss: { name: 'Pit Boss', portrait: '😤', portraitAlt: '😤' },
-};
-```
-
-**Core dialogue functions:**
-
-```javascript
-showDialogue(char, speech, choices)      // normal portrait
-showDialogueAlt(char, speech, choices)   // alt portrait (distressed)
-hideDialogue()
-```
-
-`choices` is an array of `{ label: string, cb: function }`.
-Clicking a choice calls `hideDialogue()` then invokes `cb`.
-
----
-
-### Dealer Hand Animation
-
-An SVG wrinkly hand (Gary's) slides down from above the dealer zone during shuffling/dealing.
-
-```javascript
-handIn()   // adds .dealing class → top: 42px (visible)
-handOut()  // removes .dealing class → top: -190px (hidden)
-```
-
-The hand uses `feTurbulence` / `feDisplacementMap` SVG filters for organic skin texture,
-with bezier finger paths, knuckle stroke lines, age spots, and fingernails.
-
----
-
-### Gary the Dealer — Current Dialogue
-
-Gary drops the cards with **35% probability** each deal. `dropCount` tracks total drops per session
-(resets to 0 on game restart). Each drop escalates the oversharing:
-
-**Drop 1:**
-> "Oh shoot. I dropped them again. Sorry, I'm new here. Heh. Lawyer bills!"
-> [2.2s pause]
-> "...*sigh* I miss you, Sharon."
-> → Player: **"Respond Politely"**
-
-**Drop 2:**
-> "Oh shoot. I dropped them again. Sorry, I'm new here. Heh. Lawyer bills!"
-> [2.2s pause]
-> "You know, it gets tough working here. The bosses... they don't play!"
-> → Player: **"Respond Politely"**
-
-**Drop 3+:**
-> "Oh shoot. I dropped them again. Sorry, I'm new here. Heh. Lawyer bills!"
-> [2.2s pause]
-> "You ever go through a divor-?"
-> → Player: **"Just shuffle the cards, man."**
-
-After any player response, Gary shuffles and deals normally.
+- LucasArts-style dialogue bar (anchored bottom, slides in over game)
+- Two SVG dealer hands (left + right, flipped palm-down) that animate in/out
+- Full narrative arc (`storyPhase` 0–6, resets on restart)
 
 ---
 
 ## Characters
 
-- **Gary** — the dealer. Recently divorced. New to the job. Overshares. Drops cards.
-  - Portrait: custom SVG (round glasses, balding, big ears, nervous grin) — normal + distressed variants
-  - Sharon is his ex-wife. Gary misses her. The bosses apparently "don't play."
-- **Pit Boss** — watching from the side. Gets progressively angrier as Gary fumbles.
-  - Portrait: 😤 / 🤬 (placeholder — drawing TBD)
-- **Moe** — a small, scrungly guy who stands on the table and deals superhuman fast.
-  - Portrait: placeholder — drawing TBD (user will supply)
-  - Deals at 55ms stagger (vs Gary's 900ms hands-mode)
+All portraits are custom SVG drawn from user sketches. Stored as JS template literals in
+`GARY_NORMAL`, `GARY_ALT`, `PITBOSS_NORMAL`, `PITBOSS_ALT`, `MOE_PORTRAIT`.
+
+### Gary (Dealer)
+- Recently divorced. New to the job. Overshares constantly. Drops cards.
+- Portrait: round glasses, balding, big ears, jowly nervous smile — skin colour sparingly applied
+- Alt portrait: wider eyes, raised brows, sweat drop (distressed)
+- Sharon is his ex-wife. Gary misses her. The bosses "don't play."
+- Drops cards with **35% probability** each deal in hands mode
+- `dropCount` tracks drops per session, escalating oversharing
+
+**Drop dialogue (escalating):**
+
+| Drop # | Second beat |
+|---|---|
+| 1 | "...*sigh* I miss you, Sharon." → *Respond Politely* |
+| 2 | "You know, it gets tough working here. The bosses... they don't play!" → *Respond Politely* |
+| 3+ | "You ever go through a divor-?" → *Just shuffle the cards, man.* |
+
+### Pit Boss
+- Watches from the side. Gets progressively angrier as Gary fumbles with his hands.
+- Portrait: top hat, heavy eyebrows, cigar with smoke, plain dark collar
+- Alt portrait: flushed face, extreme brows, anger lines at temples
+
+### Moe
+- Small, scrungly guy. Stands on the table. Deals superhuman fast.
+- Portrait: white blob body (shirtless), big round eyes, two-dot nose, pencil mustache,
+  straight mouth, sparse upright hair
+- Deals at 55ms stagger — effectively instant
 
 ---
 
-## Dialogue Trigger Points (Where to Add Content)
+## Dealer Hands
 
-The dialogue system can fire at any game moment. Current hooks:
+Two SVG hands (Gary's) positioned either side of centre, slide down from above the game area.
+Palm-down orientation (fingers point toward table). Right hand is CSS-mirrored.
 
-| Trigger | Location in code | Current behavior |
+```css
+#dealer-hand-left  { left: calc(50% - 100px); transform: scaleY(-1); }
+#dealer-hand-right { left: calc(50% + 8px);   transform: scaleX(-1) scaleY(-1); }
+```
+
+- Organic skin texture via `feTurbulence` / `feDisplacementMap` SVG filters
+- Knuckle stroke lines, age spots, prominent mole (matching user sketch)
+- No fingernails
+
+```javascript
+handIn()   // adds .dealing → top: 42px (both hands visible)
+handOut()  // removes .dealing → top: -200px (hidden)
+```
+
+Hands are hidden in shoe mode (phase 2) and Moe mode (phase 6+).
+
+---
+
+## Narrative System
+
+### Dialogue Bar
+
+LucasArts-style bar anchored to the bottom of the game area.
+
+```
+┌──────────────────────────────────────────────────┐
+│ [portrait]  CHARACTER NAME                        │
+│             "...speech..."                        │
+│                                                   │
+│  ▶  Choice one                                    │
+│  ▶  Choice two                                    │
+└──────────────────────────────────────────────────┘
+```
+
+```javascript
+showDialogue(char, speech, choices)      // normal portrait
+showDialogueAlt(char, speech, choices)   // alt portrait
+hideDialogue()
+// choices: [{ label: string, cb: function }]
+```
+
+### Characters object
+
+```javascript
+const CHARS = {
+  dealer:  { name: 'Gary  (Dealer)', portrait: GARY_NORMAL,    portraitAlt: GARY_ALT    },
+  pitBoss: { name: 'Pit Boss',       portrait: PITBOSS_NORMAL, portraitAlt: PITBOSS_ALT },
+  moe:     { name: 'Moe',            portrait: MOE_PORTRAIT,   portraitAlt: MOE_PORTRAIT },
+};
+```
+
+---
+
+## Narrative Arc — The Dealing Crisis
+
+Linear story tracked via `storyPhase` (0–6). Resets on restart.
+
+| Phase | Dealer mode | Deal stagger | What happens |
+|---|---|---|---|
+| 0 | Hands (slow) | 900ms | Gary fumbles. Random drop (35%) still fires. |
+| 1 | Shoe offer | 900ms | After hand 1: Gary apologises. Player can suggest shoe (or Gary goes anyway). |
+| 2 | Shoe | 380ms | One round. Gary is briefly professional. |
+| 3 | Hands | 900ms | Shoe breaks. Pit Boss: *"Gary."* (fires pre-deal) |
+| 4 | Hands | 900ms | Pit Boss: *"GARY. I'm watching you."* (fires pre-deal) |
+| 5 | Hands | 900ms | Pit Boss: *"Gary, this is your last chance."* (fires pre-deal) |
+| 6 | Moe | 55ms | Pit Boss: *"THAT'S IT. MOE!!!"* Moe climbs on table. Fast forever. |
+
+**Story hooks:**
+- `checkPreDealNarrative(proceed)` — fires before each deal; shows pit boss in phases 3–5
+- `checkPostResultNarrative()` — fires after each settled result; advances story
+- `runShoeOffer()` — Gary retrieves the shoe; sets `storyPhase = 2`
+- `runMoeEntrance()` — pit boss calls Moe; sets `storyPhase = 6`
+
+**Deal speed:** `dealStagger()` returns 900 / 380 / 55 based on `storyPhase`.
+
+---
+
+## Dialogue Trigger Points
+
+| Trigger | Function | Current behaviour |
 |---|---|---|
-| Deal button pressed | `deal()` | Shuffle narration + optional drop sequence |
-| Card drop (35% chance) | `runDropSequence(count, onDone)` | Gary overshares |
-| Normal shuffle | `runShuffle(onDone)` | Gary says "shuffling cards..." |
-| Blackjack result | `settleResult('blackjack')` | No dialogue yet |
+| Deal button | `deal()` → `checkPreDealNarrative` | Pit boss in phases 3–5 |
+| Card drop (35%) | `runDropSequence(count, onDone)` | Gary overshares (Sharon, divorce) |
+| Shuffle | `runShuffle(onDone)` | Fumble lines (hands) / brisk (shoe) / instant (Moe) |
+| After result | `checkPostResultNarrative()` | Advances story phase |
+| Blackjack | `settleResult('blackjack')` | No dialogue yet |
 | Player busts | `settleResult('lose')` after bust | No dialogue yet |
 | Player wins | `settleResult('win')` | No dialogue yet |
 | Game over | `showGameOver()` | Static overlay |
-| New hand | `newHand()` | No dialogue yet |
 
-To add dialogue at any trigger point:
+To add dialogue anywhere:
 ```javascript
-showDialogue(CHARS.dealer, 'Some speech', [{ label: 'Response', cb: () => { /* continue */ } }]);
+showDialogue(CHARS.dealer, '"Some speech"', [{ label: 'Response', cb: () => { ... } }]);
 ```
 
 ---
@@ -185,7 +209,7 @@ showDialogue(CHARS.dealer, 'Some speech', [{ label: 'Response', cb: () => { /* c
 
 ```
 blackjack-quest/
-  index.html    — All CSS, HTML, and JS in one file (~1,437 lines)
+  index.html    — All CSS, HTML, and JS in one file
   spec.md       — This document
 ```
 
@@ -195,39 +219,10 @@ blackjack-quest/
 
 ---
 
-## Narrative Arc — The Dealing Crisis
-
-The first session plays out as a linear story that overrides random events.
-Tracked via `storyPhase` (0–6). Resets on restart.
-
-| Phase | Mode | What happens |
-|---|---|---|
-| 0 | Hands (slow) | Gary deals with both hands. 900ms card stagger. Fumbling dialogue. |
-| 1 | Shoe offer | After hand 1 result: Gary apologises. Player can suggest a shoe (or Gary gets it anyway). |
-| 2 | Shoe (1 round) | Normal 380ms stagger. Gary is briefly professional. |
-| 3 | Hands post-shoe | Shoe breaks. Back to hands. Pit boss: "Gary." |
-| 4 | Hands | Pit boss: "GARY. I'm watching you." |
-| 5 | Hands | Pit boss: "Gary, this is your last chance." |
-| 6 | Moe | Pit boss: "THAT'S IT. MOE!!!" — Moe climbs on table. 55ms stagger forever. |
-
-**Dealer visuals:**
-- Phases 0–5 (hands): both hand SVGs animate in/out
-- Phase 2 (shoe): no hand SVGs (shoe is off-screen object, dialogue only)
-- Phase 6 (Moe): hand SVGs hidden; Moe character portrait (drawing TBD)
-
-**Deal speed function:** `dealStagger()` returns 900 / 380 / 55 based on phase.
-
-**Gary portrait:** Custom SVG face — round glasses, balding, big ears, nervous smile.
-Drawn by user. Coloured sparingly (warm skin wash only). Normal + distressed variants.
-Hand SVGs doubled up (left + right), dark nails, prominent knuckle mole, matching sketch.
-
 ## What's Next
 
-- **Moe portrait** — user will supply drawing; replace `'🧍'` placeholder in `CHARS.moe`
-- **Pit Boss portrait** — optional drawing to replace `'😤'` placeholder
-- **Gary win/bust/blackjack lines** — still unscripted (see dialogue trigger table above)
-- **Sharon lore expansion** — more drop-sequence beats (4th, 5th drop)
+- **Gary win/bust/blackjack lines** — unscripted (hooks exist in `settleResult`)
+- **Sharon lore** — 4th and 5th drop beats
 - **Game-over Gary line** — closing monologue when balance hits $0
-
-The `showDialogue` / `showDialogueAlt` / `hideDialogue` API is the only interface needed.
-Add trigger points by calling `showDialogue` inside any existing game function.
+- **Pit Boss extended dialogue** — more than one line per phase
+- **Moe lines** — Moe speaking while dealing (fast, terse)
