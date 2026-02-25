@@ -734,6 +734,105 @@
   .dialogue-speech { cursor: default; }
 
   /* ── GAME OVER ── */
+  /* ── INTRO OVERLAY ── */
+  .intro-overlay {
+    position: fixed; inset: 0; z-index: 200;
+    background: #060e06;
+    display: flex; align-items: center; justify-content: center;
+    transition: opacity 0.7s ease;
+  }
+  .intro-overlay.fade-out { opacity: 0; pointer-events: none; }
+
+  .intro-box {
+    background: #0c200c;
+    border: 3px solid gold;
+    box-shadow: 0 0 80px rgba(255,215,0,0.25), inset 0 0 40px rgba(0,0,0,0.6);
+    padding: 44px 52px 40px;
+    max-width: 580px;
+    width: 92%;
+    text-align: center;
+  }
+
+  .intro-welcome {
+    font-family: 'Courier New', monospace;
+    color: #c9a84c;
+    font-size: 0.78rem;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .intro-title {
+    font-family: 'Playfair Display', serif;
+    color: gold;
+    font-size: 2rem;
+    font-weight: 900;
+    margin-bottom: 14px;
+    text-shadow: 0 0 24px rgba(255,215,0,0.45);
+    line-height: 1.2;
+  }
+
+  .intro-pitch {
+    font-family: 'Courier New', monospace;
+    color: #999;
+    font-size: 0.85rem;
+    margin-bottom: 22px;
+    letter-spacing: 0.3px;
+  }
+
+  .intro-rule {
+    border: none; border-top: 1px solid #2a4a2a;
+    margin: 0 0 20px;
+  }
+
+  .intro-game-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 7px;
+  }
+
+  .intro-game-btn {
+    font-family: 'Courier New', monospace;
+    background: #071407;
+    border: 1px solid #2a4a2a;
+    color: #c9a84c;
+    padding: 10px 14px;
+    cursor: pointer;
+    font-size: 0.88rem;
+    text-align: left;
+    transition: background 0.1s, border-color 0.1s, color 0.08s;
+    letter-spacing: 0.4px;
+  }
+  .intro-game-btn::before { content: '▶  '; opacity: 0.35; font-size: 0.72rem; }
+  .intro-game-btn:hover { background: #132413; border-color: gold; color: #fff; }
+  .intro-game-btn:hover::before { opacity: 1; }
+
+  @keyframes introConfirmFade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes introEnjoyIn {
+    from { opacity: 0; transform: scale(0.85) translateY(6px); }
+    to   { opacity: 1; transform: scale(1)    translateY(0);   }
+  }
+  .intro-confirm {
+    font-family: 'Courier New', monospace;
+    color: #ccc;
+    font-size: 0.95rem;
+    line-height: 1.7;
+    display: none;
+    animation: introConfirmFade 0.35s ease;
+  }
+  .intro-enjoy {
+    color: gold;
+    font-size: 1.7rem;
+    font-family: 'Playfair Display', serif;
+    font-weight: 900;
+    display: block;
+    margin-top: 14px;
+    text-shadow: 0 0 20px rgba(255,215,0,0.55);
+    opacity: 0;
+    animation: introEnjoyIn 0.45s ease 0.55s forwards;
+  }
+
+  /* ── GAME OVER ── */
   .game-over-overlay {
     position: fixed; inset: 0;
     background: rgba(0,0,0,0.9);
@@ -800,6 +899,30 @@
 </style>
 </head>
 <body>
+
+<!-- INTRO OVERLAY -->
+<div id="intro-overlay" class="intro-overlay">
+  <div class="intro-box">
+    <div class="intro-welcome">Welcome &nbsp; Welcome &nbsp; Welcome,</div>
+    <div class="intro-title">to The Gr<span style="color:#e8c84a">ae</span>test Casino!</div>
+    <div class="intro-pitch">We offer premium entertainment for the low price of!</div>
+    <hr class="intro-rule">
+    <div class="intro-game-grid" id="intro-game-grid">
+      <button class="intro-game-btn" onclick="selectIntroGame()">Craps</button>
+      <button class="intro-game-btn" onclick="selectIntroGame()">Roulette</button>
+      <button class="intro-game-btn" onclick="selectIntroGame()">Baccarat</button>
+      <button class="intro-game-btn" onclick="selectIntroGame()">Poker</button>
+      <button class="intro-game-btn" onclick="selectIntroGame()">Texas Hold Em</button>
+      <button class="intro-game-btn" onclick="selectIntroGame()">Snail Spin</button>
+      <button class="intro-game-btn" onclick="selectIntroGame()">Prongle</button>
+      <button class="intro-game-btn" onclick="selectIntroGame()">Blackjack</button>
+    </div>
+    <div class="intro-confirm" id="intro-confirm">
+      Thank you for informing us what you'd like to play!
+      <span class="intro-enjoy">Enjoy: Blackjack!</span>
+    </div>
+  </div>
+</div>
 
 <!-- TOP TICKER -->
 <div id="top-ticker">
@@ -1561,6 +1684,16 @@ function deal() {
   } else {
     proceed();
   }
+}
+
+function selectIntroGame() {
+  document.getElementById('intro-game-grid').style.display = 'none';
+  document.getElementById('intro-confirm').style.display  = 'block';
+  const overlay = document.getElementById('intro-overlay');
+  setTimeout(() => {
+    overlay.classList.add('fade-out');
+    overlay.addEventListener('transitionend', () => overlay.remove(), { once: true });
+  }, 2600);
 }
 
 function runIntroDialogue(proceed) {
