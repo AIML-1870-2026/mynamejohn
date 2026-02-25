@@ -1762,15 +1762,15 @@ function runGaryEnthusiasm(proceed) {
 }
 
 function setupScriptedHand1() {
-  // Cards drawn via shoe.pop() — push in reverse deal order so first draw = 8♠
-  // Deal sequence: dealer 8♠ (face up), player Q♥, dealer 9♦ (hole), player Q♠ → 20
-  // If player hits: A♣ → 21. Either way, player beats dealer's 17.
+  // shoe.pop() order: playerHand[0], playerHand[1], dealerHand[0], dealerHand[1]
+  // Push reverse so pop gives: Q♥, Q♠, 8♠, 9♦  →  player 20 vs dealer 17
+  // A♣ at bottom as a hit card (gives 21 if player hits instead of standing).
   shoe.push(
-    { rank: 'A', suit: '♣' },
-    { rank: 'Q', suit: '♠' },
-    { rank: '9', suit: '♦' },
-    { rank: 'Q', suit: '♥' },
-    { rank: '8', suit: '♠' }
+    { rank: 'A', suit: '♣' },  // hit card
+    { rank: '9', suit: '♦' },  // dealerHand[1] (hole)
+    { rank: '8', suit: '♠' },  // dealerHand[0] (face up)
+    { rank: 'Q', suit: '♠' },  // playerHand[1]
+    { rank: 'Q', suit: '♥' }   // playerHand[0]  →  Q+Q = 20
   );
 }
 
