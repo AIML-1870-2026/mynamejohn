@@ -1167,6 +1167,8 @@ let stats = { w: 0, l: 0, p: 0, hands: 0 };
 let history = [];
 let dropCount   = 0; // tracks how many times dealer has dropped cards
 let introShown  = false;
+let scriptedHand3Done = false;
+let pendingReactTimeout = null;
 
 // ── Story phase ──────────────────────────────────────────────
 // 0 = hands (slow, pre-shoe offer)
@@ -1673,7 +1675,8 @@ function deal() {
 
   const proceed = () => checkPreDealNarrative(() => {
     const canDrop = storyPhase !== 2 && storyPhase < 6;
-    const DROPPED = canDrop && Math.random() < 0.35;
+    const pitBossPhase = storyPhase === 3 || storyPhase === 4 || storyPhase === 5;
+    const DROPPED = canDrop && (pitBossPhase || Math.random() < 0.35);
     if (DROPPED) {
       dropCount++;
       runDropSequence(dropCount, () => runShuffle(doDeal));
@@ -1771,6 +1774,32 @@ function setupScriptedHand1() {
   );
 }
 
+function setupScriptedHand2() {
+  // Shoe's one-and-only hand: Player A♠ + K♥ = Blackjack!
+  // Dealer gets 6♦ (up) + 9♣ (hole) = 15.
+  // Draw order: playerHand[0], playerHand[1], dealerHand[0], dealerHand[1]
+  // Push reverse so pop gives: A♠, K♥, 6♦, 9♣
+  shoe.push(
+    { rank: '9',  suit: '♣' },  // dealerHand[1] (hole)
+    { rank: '6',  suit: '♦' },  // dealerHand[0] (face up)
+    { rank: 'K',  suit: '♥' },  // playerHand[1]
+    { rank: 'A',  suit: '♠' }   // playerHand[0] → Blackjack!
+  );
+}
+
+function setupScriptedHand3() {
+  // Last Gary hand before Moe: Player A♦ + 8♣ = soft 19.
+  // Dealer K♠ (up) + 5♥ (hole) = 15, draws 8♦ → busts at 23. Player wins!
+  // Push reverse so pop gives: A♦, 8♣, K♠, 5♥ ; then dealer draws 8♦
+  shoe.push(
+    { rank: '8',  suit: '♦' },  // dealer draw card (bust at 23)
+    { rank: '5',  suit: '♥' },  // dealerHand[1] (hole)
+    { rank: 'K',  suit: '♠' },  // dealerHand[0] (face up)
+    { rank: '8',  suit: '♣' },  // playerHand[1]
+    { rank: 'A',  suit: '♦' }   // playerHand[0] → soft 19
+  );
+}
+
 function runDropSequence(count, onDone) {
   showDropPile();
   showDialogueAlt(CHARS.dealer, '"Oh shoot. I dropped them again.&nbsp; Sorry, I\'m new here. Heh. Lawyer bills!"');
@@ -1778,6 +1807,27 @@ function runDropSequence(count, onDone) {
   setTimeout(() => {
     hideDialogue();
     const wrappedDone = () => hideDropPile(onDone);
+
+    // Pit boss reacts when Gary drops during escalation phases
+    if (storyPhase === 3) {
+      showDialogue(CHARS.pitBoss,
+        '"Gary."',
+        [{ label: '(Gary scrambles for the cards)', cb: wrappedDone }]
+      );
+      return;
+    } else if (storyPhase === 4) {
+      showDialogue(CHARS.pitBoss,
+        '"GARY. I\'m watching you."',
+        [{ label: '(tense silence)', cb: wrappedDone }]
+      );
+      return;
+    } else if (storyPhase === 5) {
+      showDialogue(CHARS.pitBoss,
+        '"Gary, this is your last chance. Those cards had better move."',
+        [{ label: '(Gary shuffles. Slower than usual.)', cb: wrappedDone }]
+      );
+      return;
+    }
 
     if (count === 1) {
       showDialogueAlt(CHARS.dealer,
@@ -1789,10 +1839,20 @@ function runDropSequence(count, onDone) {
         '"You know, it gets tough working here. The bosses... they don\'t play!"',
         [{ label: 'Respond Politely', cb: wrappedDone }]
       );
-    } else {
+    } else if (count === 3) {
       showDialogueAlt(CHARS.dealer,
         '"You ever go through a divor-?"',
         [{ label: 'Just shuffle the cards, man.', cb: wrappedDone }]
+      );
+    } else if (count === 4) {
+      showDialogueAlt(CHARS.dealer,
+        '"Okay so here\'s the thing. Sharon and the kids — she took them to her sister\'s, and I just— anyway. Cards. Right."',
+        [{ label: '(say nothing)', cb: wrappedDone }]
+      );
+    } else {
+      showDialogueAlt(CHARS.dealer,
+        '"...I\'m fine. I\'m completely fine. [picks up cards] Look. Fine. Let\'s just play."',
+        [{ label: '(nod slowly)', cb: wrappedDone }]
       );
     }
   }, 4800);
@@ -1805,6 +1865,12 @@ function appendCard(containerId, card) {
 }
 
 function doDeal() {
+  // Set up scripted hand 3 on the final Gary hand (phase 5, before Moe)
+  if (storyPhase === 5 && !scriptedHand3Done) {
+    setupScriptedHand3();
+    scriptedHand3Done = true;
+  }
+
   balance -= bet;
   playerHand = [drawCard(true), drawCard(true)];
   dealerHand = [drawCard(true), drawCard(false)];
@@ -1913,6 +1979,36 @@ function resolveHands() {
 }
 
 // ═══════════════════════════════════════════════════════════════
+//  GARY REACTIONS
+// ═══════════════════════════════════════════════════════════════
+function garyReact(outcome) {
+  const lines = {
+    blackjack: [
+      '"BLACKJACK! That is — wow. Yeah! That happened. Under my watch."',
+      '"Beautiful hand. Textbook. I totally meant to deal that."',
+    ],
+    win: [
+      '"Nice! See, that\'s the game. That\'s exactly the game right there."',
+      '"There you go! Good read. I had no idea what was in there, but good read."',
+      '"Hah! Yes! ...Sorry, I get excited. It\'s a good sign."',
+    ],
+    lose: [
+      '"Ah. Okay. That\'s... that\'s the house. Sorry about that."',
+      '"Oof. Tough one. You\'ll get \'em back. Statistically."',
+      '"Don\'t worry about it. I\'ve had worse. Emotionally speaking."',
+    ],
+    push: [
+      '"Push. Hm. Nobody wins, nobody loses. Very zen."',
+      '"It\'s a push! Your money comes back. Just like I keep telling Sharon— ...anyway."',
+    ],
+  };
+  const pool = lines[outcome] || [];
+  if (!pool.length) return;
+  const line = pool[Math.floor(Math.random() * pool.length)];
+  showDialogueAlt(CHARS.dealer, line, [{ label: 'Play again.', cb: hideDialogue }]);
+}
+
+// ═══════════════════════════════════════════════════════════════
 //  SETTLE
 // ═══════════════════════════════════════════════════════════════
 function settleResult(outcome) {
@@ -1938,13 +2034,14 @@ function settleResult(outcome) {
   updateStreak();
   setButtons('RESULT');
   if (balance <= 0) setTimeout(showGameOver, 1400);
-  else checkPostResultNarrative();
+  else checkPostResultNarrative(outcome);
 }
 
 // ═══════════════════════════════════════════════════════════════
 //  NEW HAND / GAME OVER
 // ═══════════════════════════════════════════════════════════════
 function newHand() {
+  if (pendingReactTimeout) { clearTimeout(pendingReactTimeout); pendingReactTimeout = null; }
   playerHand = []; dealerHand = []; bet = 0; gameState = 'BETTING';
   document.getElementById('player-cards').innerHTML = '';
   document.getElementById('dealer-cards').innerHTML = '';
@@ -1960,6 +2057,23 @@ function newHand() {
 }
 
 function showGameOver() {
+  showDialogueAlt(CHARS.dealer,
+    '"Oh. Oh no. You\'re... broke. That is on me. Well — not legally."',
+    [{ label: '...', cb: () => {
+      showDialogueAlt(CHARS.dealer,
+        '"Look, I know this looks bad. But statistically you were setting that up since hand two."',
+        [{ label: 'Gary.', cb: () => {
+          showDialogueAlt(CHARS.dealer,
+            '"Right. Game over. But hey — that\'s what the Play Again button\'s for.<br>...Please click it. I need the commission."',
+            [{ label: '(stare at Gary)', cb: () => { hideDialogue(); doShowGameOver(); } }]
+          );
+        }}]
+      );
+    }}]
+  );
+}
+
+function doShowGameOver() {
   const o = document.createElement('div');
   o.className = 'game-over-overlay';
   o.innerHTML = `
@@ -1974,7 +2088,7 @@ function showGameOver() {
 function restartGame() {
   document.querySelector('.game-over-overlay')?.remove();
   balance = 500; bet = 0; stats = { w:0,l:0,p:0,hands:0 }; history = []; dropCount = 0;
-  storyPhase = 0;
+  storyPhase = 0; scriptedHand3Done = false; pendingReactTimeout = null;
   playerHand = []; dealerHand = []; gameState = 'BETTING';
   shoe = shuffle(buildShoe(6));
   setupScriptedHand1();
@@ -1993,30 +2107,13 @@ function restartGame() {
 //  NARRATIVE ARC
 // ═══════════════════════════════════════════════════════════════
 
-// Fires BEFORE each deal; may intercept with pit boss dialogue.
+// Fires BEFORE each deal; pit boss now reacts inside runDropSequence instead.
 function checkPreDealNarrative(proceed) {
-  if (storyPhase === 3) {
-    showDialogue(CHARS.pitBoss,
-      '"Gary."',
-      [{ label: '(Gary shuffles)', cb: proceed }]
-    );
-  } else if (storyPhase === 4) {
-    showDialogue(CHARS.pitBoss,
-      '"GARY. I\'m watching you."',
-      [{ label: '(Silence)', cb: proceed }]
-    );
-  } else if (storyPhase === 5) {
-    showDialogue(CHARS.pitBoss,
-      '"Gary, this is your last chance. Those cards had better move."',
-      [{ label: '(Gary shuffles. Slower than usual.)', cb: proceed }]
-    );
-  } else {
-    proceed();
-  }
+  proceed();
 }
 
 // Fires AFTER each result settles.
-function checkPostResultNarrative() {
+function checkPostResultNarrative(outcome) {
   if (storyPhase === 0 && stats.hands >= 1) {
     storyPhase = 1;
     setTimeout(() => {
@@ -2041,8 +2138,10 @@ function checkPostResultNarrative() {
     }, 1400);
   } else if (storyPhase === 3) {
     storyPhase = 4;
+    pendingReactTimeout = setTimeout(() => garyReact(outcome), 1600);
   } else if (storyPhase === 4) {
     storyPhase = 5;
+    pendingReactTimeout = setTimeout(() => garyReact(outcome), 1600);
   } else if (storyPhase === 5) {
     storyPhase = 6;
     setTimeout(runMoeEntrance, 1600);
@@ -2054,7 +2153,7 @@ function runShoeOffer() {
   setTimeout(() => {
     showDialogue(CHARS.dealer,
       '"Found it! Okay! This is a shoe. Professional casino equipment. Much better."',
-      [{ label: 'Let\'s see it.', cb: () => { storyPhase = 2; hideDialogue(); } }]
+      [{ label: 'Let\'s see it.', cb: () => { storyPhase = 2; setupScriptedHand2(); hideDialogue(); } }]
     );
   }, 2200);
 }
