@@ -910,14 +910,14 @@
     <div class="intro-pitch">We offer premium entertainment for the low price of!</div>
     <hr class="intro-rule">
     <div class="intro-game-grid" id="intro-game-grid">
-      <button class="intro-game-btn" onclick="selectIntroGame()">Craps</button>
-      <button class="intro-game-btn" onclick="selectIntroGame()">Roulette</button>
-      <button class="intro-game-btn" onclick="selectIntroGame()">Baccarat</button>
-      <button class="intro-game-btn" onclick="selectIntroGame()">Poker</button>
-      <button class="intro-game-btn" onclick="selectIntroGame()">Texas Hold Em</button>
-      <button class="intro-game-btn" onclick="selectIntroGame()">Snail Spin</button>
-      <button class="intro-game-btn" onclick="selectIntroGame()">Prongle</button>
-      <button class="intro-game-btn" onclick="selectIntroGame()">Blackjack</button>
+      <button class="intro-game-btn">Craps</button>
+      <button class="intro-game-btn">Roulette</button>
+      <button class="intro-game-btn">Baccarat</button>
+      <button class="intro-game-btn">Poker</button>
+      <button class="intro-game-btn">Texas Hold Em</button>
+      <button class="intro-game-btn">Snail Spin</button>
+      <button class="intro-game-btn">Prongle</button>
+      <button class="intro-game-btn">Blackjack</button>
     </div>
     <div class="intro-confirm" id="intro-confirm">
       Thank you for informing us what you'd like to play!
@@ -1690,16 +1690,19 @@ function deal() {
 }
 
 function selectIntroGame() {
-  document.getElementById('intro-game-grid').style.display = 'none';
-  document.getElementById('intro-confirm').style.display  = 'block';
-  const overlay = document.getElementById('intro-overlay');
-  setTimeout(() => {
-    overlay.classList.add('fade-out');
-    overlay.addEventListener('transitionend', () => {
-      overlay.remove();
+  var grid    = document.getElementById('intro-game-grid');
+  var confirm = document.getElementById('intro-confirm');
+  var overlay = document.getElementById('intro-overlay');
+  grid.style.display    = 'none';
+  confirm.style.display = 'block';
+  // Fade out after "Enjoy: Blackjack!" has had time to land, then boot to game
+  setTimeout(function() {
+    overlay.style.opacity = '0';
+    setTimeout(function() {
+      overlay.parentNode && overlay.parentNode.removeChild(overlay);
       runGaryIntro();
-    }, { once: true });
-  }, 2600);
+    }, 750);
+  }, 2400);
 }
 
 function runGaryIntro() {
@@ -2111,6 +2114,11 @@ chromaKeyJpeg(MOE_RAW_B64).then(imgHtml => {
   MOE_PORTRAIT = imgHtml;
   CHARS.moe.portrait    = imgHtml;
   CHARS.moe.portraitAlt = imgHtml;
+});
+
+// Wire intro game buttons — avoids any inline-onclick timing edge cases
+document.querySelectorAll('.intro-game-btn').forEach(function(btn) {
+  btn.addEventListener('click', selectIntroGame);
 });
 </script>
 </body>
