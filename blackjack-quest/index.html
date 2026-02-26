@@ -1563,7 +1563,7 @@ function slideCardFromDeck(wrapper) {
   const dy = (lRect.top  + lRect.height / 2) - (cRect.top  + cRect.height / 2);
 
   const SLIDE  = 6000;
-  const RETURN = 2000;
+  const RETURN = 800;
 
   // Card starts at hand position (offset by dx,dy), slides to slot (0,0)
   // Hand starts at rest (0,0), follows card to slot (-dx,-dy), then returns
@@ -1651,16 +1651,18 @@ function runSlowShuffleLoop() {
   const fly  = document.getElementById('shuffle-fly-card');
   deck.classList.add('visible');
   fly.classList.add('animating', 'slow');
-  showDialogueAlt(CHARS.dealer, '"*heavy breathing*"', [{
-    label: 'Have you considered a shoe?',
-    cb: () => {
-      fly.classList.remove('animating', 'slow');
-      deck.classList.remove('visible');
-      hideDialogue();
-      setButtons('BETTING');
-      runShoeOffer();
-    }
-  }]);
+  setTimeout(() => {
+    showDialogueAlt(CHARS.dealer, '"*heavy breathing*"', [{
+      label: 'Have you considered a shoe?',
+      cb: () => {
+        fly.classList.remove('animating', 'slow');
+        deck.classList.remove('visible');
+        hideDialogue();
+        setButtons('BETTING');
+        runShoeOffer();
+      }
+    }]);
+  }, 5000);
 }
 
 
@@ -1991,7 +1993,7 @@ function doDeal() {
     }, i * stagger);
   });
 
-  const totalDealTime = sequence.length * stagger + 200;
+  const totalDealTime = (sequence.length - 1) * stagger + 7200;
   setTimeout(() => {
     handOut();
     setButtons('PLAYER_TURN');
