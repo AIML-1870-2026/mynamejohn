@@ -1747,8 +1747,39 @@ function runShuffle(onDone) {
         }}]
       );
     }, 3000);
-  } else if (storyPhase === 6 || storyPhase === 7) {
-    // Placeholder buffer rounds — silent shuffle
+  } else if (storyPhase === 6) {
+    // Pubert building to the divorce question — auto-timeout safety but player-driven
+    setTimeout(() => {
+      showDialogue(CHARS.dealer, '"..."',
+        [{ label: '(Hm?)', cb: () => {
+          setTimeout(() => {
+            showDialogue(CHARS.dealer, '"..."',
+              [{ label: '(...)', cb: () => {
+                setTimeout(() => {
+                  showDialogue(CHARS.dealer, '"..."',
+                    [{ label: '(...)', cb: () => {
+                      setTimeout(() => {
+                        showDialogue(CHARS.dealer,
+                          '"You know, I was just wondering if you've ever been divor-"'
+                        );
+                        setTimeout(() => {
+                          showDialogue(CHARS.pitBoss,
+                            '"Pubert. A woid."',
+                            [{ label: '(Pubert shuffles.)', cb: finishShuffle }]
+                          );
+                        }, 1500);
+                      }, 1500);
+                    }}]
+                  );
+                }, 1500);
+              }}]
+            );
+          }, 1500);
+        }}]
+      );
+    }, 2500);
+  } else if (storyPhase === 7) {
+    // Placeholder buffer round 2 — silent shuffle
     setTimeout(finishShuffle, 10000);
   } else {
     // Phases 0, 3: silent shuffle
