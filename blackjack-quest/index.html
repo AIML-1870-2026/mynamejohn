@@ -644,6 +644,7 @@
     100% { transform: translate(0,0) rotate(0deg); }
   }
   #shuffle-fly-card.animating { animation: overhandShuffle 2.6s ease-in-out infinite; }
+  #shuffle-fly-card.slow    { animation-duration: 5s; }
 
   /* ── DROP PILE ── */
   #drop-pile {
@@ -1628,6 +1629,41 @@ function hideDropPile(cb) {
 // ═══════════════════════════════════════════════════════════════
 //  SHUFFLE + DROP SEQUENCES
 // ═══════════════════════════════════════════════════════════════
+function runScriptedDrop1() {
+  handIn();
+  showDropPile();
+  showDialogue(CHARS.dealer,
+    '(Pubert dropped the cards)',
+    [{ label: '(Continue)', cb: () => {
+      hideDropPile(() => {
+        showDialogue(CHARS.dealer, '"That\'s my bad. Let me try again."');
+        setTimeout(() => {
+          hideDialogue();
+          runSlowShuffleLoop();
+        }, 1800);
+      });
+    }}]
+  );
+}
+
+function runSlowShuffleLoop() {
+  const deck = document.getElementById('shuffle-deck');
+  const fly  = document.getElementById('shuffle-fly-card');
+  deck.classList.add('visible');
+  fly.classList.add('animating', 'slow');
+  showDialogueAlt(CHARS.dealer, '"*heavy breathing*"', [{
+    label: 'Have you considered a shoe?',
+    cb: () => {
+      fly.classList.remove('animating', 'slow');
+      deck.classList.remove('visible');
+      hideDialogue();
+      setButtons('BETTING');
+      runShoeOffer();
+    }
+  }]);
+}
+
+
 function runShuffle(onDone) {
   if (storyPhase >= 6) {
     // Moe: no dialogue, instant
@@ -1658,24 +1694,8 @@ function runShuffle(onDone) {
     onDone();
   };
 
-  if (storyPhase === 1) {
-    // After first hand: shoe offer available during the shuffle
-    const t = setTimeout(finishShuffle, 10000);
-    showDialogueAlt(CHARS.dealer, line, [{
-      label: 'Have you considered a shoe?',
-      cb: () => {
-        clearTimeout(t);
-        fly.classList.remove('animating');
-        deck.classList.remove('visible');
-        hideDialogue();
-        setButtons('BETTING');
-        runShoeOffer();
-      }
-    }]);
-  } else {
-    showDialogueAlt(CHARS.dealer, line);
-    setTimeout(finishShuffle, 10000);
-  }
+  showDialogueAlt(CHARS.dealer, line);
+  setTimeout(finishShuffle, 10000);
 }
 
 function deal() {
@@ -1684,10 +1704,9 @@ function deal() {
   document.querySelectorAll('.chip').forEach(c => c.disabled = true);
 
   const proceed = () => checkPreDealNarrative(() => {
-    const canDrop = storyPhase !== 2 && storyPhase < 6;
-    const pitBossPhase = storyPhase === 3 || storyPhase === 4 || storyPhase === 5;
-    const DROPPED = canDrop && (pitBossPhase || Math.random() < 0.35);
-    if (DROPPED) {
+    if (storyPhase === 1) {
+      runScriptedDrop1();
+    } else if (storyPhase === 3 || storyPhase === 4 || storyPhase === 5) {
       dropCount++;
       runDropSequence(dropCount, () => runShuffle(doDeal));
     } else {
