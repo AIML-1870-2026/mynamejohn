@@ -1676,11 +1676,7 @@ function runShuffle(onDone) {
     setTimeout(() => { hideDialogue(); onDone(); }, 750);
     return;
   }
-  // Hands mode: ~10 second card-shuffle animation
-  const fumbles = [
-    '"*heavy breathing*"',
-  ];
-  const line = fumbles[Math.floor(Math.random() * fumbles.length)];
+  // Hands mode: ~10 second card-shuffle animation (no dialogue — heavy breathing is phase-1 only)
   handIn();
   const deck = document.getElementById('shuffle-deck');
   const fly  = document.getElementById('shuffle-fly-card');
@@ -1694,7 +1690,6 @@ function runShuffle(onDone) {
     onDone();
   };
 
-  showDialogueAlt(CHARS.dealer, line);
   setTimeout(finishShuffle, 10000);
 }
 
