@@ -1534,7 +1534,7 @@ function hideDialogue() {
 //  DEALER HAND ANIMATION (two hands)
 // ═══════════════════════════════════════════════════════════════
 function handIn() {
-  if (storyPhase === 2 || storyPhase >= 6) return;
+  if (storyPhase >= 6) return;
   document.getElementById('dealer-hand-left').classList.add('dealing');
   document.getElementById('dealer-hand-right').classList.add('dealing');
 }
@@ -1548,7 +1548,7 @@ function handOut() {
 }
 
 function slideCardFromDeck(wrapper) {
-  if (storyPhase === 2 || storyPhase >= 6) return;
+  if (storyPhase >= 6) return;
   const l = document.getElementById('dealer-hand-left');
 
   wrapper.style.animation = 'none';
@@ -1592,9 +1592,8 @@ function slideCardFromDeck(wrapper) {
 
 // Deal stagger: comically slow (hands), professional (shoe), instant (Moe)
 function dealStagger() {
-  if (storyPhase === 2) return 380;
   if (storyPhase >= 6)  return 55;
-  return 7000;
+  return 7000;  // shoe only speeds up shuffle, not dealing
 }
 
 // Drop pile visual helpers
