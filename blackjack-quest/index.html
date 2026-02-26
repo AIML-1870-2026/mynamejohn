@@ -1534,7 +1534,7 @@ function hideDialogue() {
 //  DEALER HAND ANIMATION (two hands)
 // ═══════════════════════════════════════════════════════════════
 function handIn() {
-  if (storyPhase >= 6) return;
+  if (storyPhase >= 9) return;
   document.getElementById('dealer-hand-left').classList.add('dealing');
   document.getElementById('dealer-hand-right').classList.add('dealing');
 }
@@ -1548,7 +1548,7 @@ function handOut() {
 }
 
 function slideCardFromDeck(wrapper) {
-  if (storyPhase >= 6) return;
+  if (storyPhase >= 9) return;
   const l = document.getElementById('dealer-hand-left');
 
   wrapper.style.animation = 'none';
@@ -1592,7 +1592,7 @@ function slideCardFromDeck(wrapper) {
 
 // Deal stagger: comically slow (hands), professional (shoe), instant (Moe)
 function dealStagger() {
-  if (storyPhase >= 6)  return 55;
+  if (storyPhase >= 9)  return 55;
   return 7000;  // shoe only speeds up shuffle, not dealing
 }
 
@@ -1621,6 +1621,26 @@ function hideDropPile(cb) {
   const pile = document.getElementById('drop-pile');
   pile.classList.add('returning');
   setTimeout(() => { pile.classList.remove('visible', 'returning'); if (cb) cb(); }, 950);
+}
+function showDropPileWide() {
+  const pile = document.getElementById('drop-pile');
+  pile.innerHTML = '';
+  pile.classList.remove('returning');
+  const rots = [
+    'translate(-58px,-38px) rotate(-52deg)',
+    'translate(48px,-30px) rotate(-20deg)',
+    'translate(-35px,45px) rotate(14deg)',
+    'translate(65px,22px) rotate(38deg)',
+    'translate(-22px,60px) rotate(62deg)',
+  ];
+  rots.forEach((rot, i) => {
+    const c = document.createElement('div');
+    c.className = 'drop-card';
+    c.style.setProperty('--rot', rot);
+    c.style.animationDelay = `${i * 0.12}s`;
+    pile.appendChild(c);
+  });
+  pile.classList.add('visible');
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1663,8 +1683,22 @@ function runSlowShuffleLoop() {
 }
 
 
+function runScriptedDrop2() {
+  handIn();
+  showDropPileWide();
+  showDialogue(CHARS.dealer,
+    '(The cards have gone everywhere.)',
+    [{ label: '(Collect them.)', cb: () => {
+      hideDropPile(() => {
+        storyPhase = 9;
+        runMoeEntrance();
+      });
+    }}]
+  );
+}
+
 function runShuffle(onDone) {
-  if (storyPhase >= 6) {
+  if (storyPhase >= 9) {
     // Moe: no dialogue, instant
     setTimeout(onDone, 120);
     return;
@@ -1675,7 +1709,7 @@ function runShuffle(onDone) {
     setTimeout(() => { hideDialogue(); onDone(); }, 750);
     return;
   }
-  // Hands mode: ~10 second card-shuffle animation (no dialogue — heavy breathing is phase-1 only)
+  // Hands mode: ~10 second card-shuffle animation
   handIn();
   const deck = document.getElementById('shuffle-deck');
   const fly  = document.getElementById('shuffle-fly-card');
@@ -1683,13 +1717,43 @@ function runShuffle(onDone) {
   fly.classList.add('animating');
 
   const finishShuffle = () => {
-    fly.classList.remove('animating');
+    fly.classList.remove('animating', 'slow');
     deck.classList.remove('visible');
     hideDialogue();
     onDone();
   };
 
-  setTimeout(finishShuffle, 10000);
+  if (storyPhase === 4) {
+    // Pit Boss beat 1: "..." — appears mid-shuffle, player must dismiss
+    setTimeout(() => {
+      showDialogue(CHARS.pitBoss, '"..."',
+        [{ label: '(Pubert shuffles.)', cb: hideDialogue }]
+      );
+    }, 4000);
+    setTimeout(finishShuffle, 10000);
+  } else if (storyPhase === 5) {
+    // Oversharing buffer round 1 — no auto-timeout, player drives finishShuffle
+    setTimeout(() => {
+      showDialogue(CHARS.dealer, '"Been working here about two weeks now."',
+        [{ label: "(That's nice.)", cb: () => {
+          showDialogue(CHARS.dealer,
+            '"Yeah. Been a nice change of pace since everything with the wife."',
+            [{ label: '(...)', cb: () => {
+              showDialogue(CHARS.dealer, '"Heh heh. You know. Law-yer bills."',
+                [{ label: '(...Please just deal.)', cb: finishShuffle }]
+              );
+            }}]
+          );
+        }}]
+      );
+    }, 3000);
+  } else if (storyPhase === 6 || storyPhase === 7) {
+    // Placeholder buffer rounds — silent shuffle
+    setTimeout(finishShuffle, 10000);
+  } else {
+    // Phases 0, 3: silent shuffle
+    setTimeout(finishShuffle, 10000);
+  }
 }
 
 function deal() {
@@ -1700,9 +1764,8 @@ function deal() {
   const proceed = () => checkPreDealNarrative(() => {
     if (storyPhase === 1) {
       runScriptedDrop1();
-    } else if (storyPhase === 3 || storyPhase === 4 || storyPhase === 5) {
-      dropCount++;
-      runDropSequence(dropCount, () => runShuffle(doDeal));
+    } else if (storyPhase === 8) {
+      runScriptedDrop2();
     } else {
       runShuffle(doDeal);
     }
@@ -1963,7 +2026,7 @@ function appendCard(containerId, card) {
 
 function doDeal() {
   // Set up scripted hand 3 on the final Gary hand (phase 5, before Moe)
-  if (storyPhase === 5 && !scriptedHand3Done) {
+  if (storyPhase === 7 && !scriptedHand3Done) {
     setupScriptedHand3();
     scriptedHand3Done = true;
   }
@@ -2228,14 +2291,20 @@ function checkPostResultNarrative(outcome) {
       );
     }, 1400);
   } else if (storyPhase === 3) {
+    // Free round post-shoe — garyReact fires, advance to pit boss phase
     storyPhase = 4;
     pendingReactTimeout = setTimeout(() => garyReact(outcome), 1600);
   } else if (storyPhase === 4) {
+    // After pit boss "..." shuffle — advance to oversharing round
     storyPhase = 5;
-    pendingReactTimeout = setTimeout(() => garyReact(outcome), 1600);
   } else if (storyPhase === 5) {
+    // After oversharing round — advance to placeholder
     storyPhase = 6;
-    setTimeout(runMoeEntrance, 1600);
+  } else if (storyPhase === 6) {
+    storyPhase = 7;
+  } else if (storyPhase === 7) {
+    // Last normal hand before second drop
+    storyPhase = 8;
   }
 }
 
@@ -2267,7 +2336,7 @@ function runMoeEntrance() {
         handOut();
         showDialogue(CHARS.moe,
           '"[Moe has climbed onto the table. He is already dealing.]"',
-          [{ label: 'Okay.', cb: hideDialogue }]
+          [{ label: 'Okay.', cb: () => { hideDialogue(); setButtons('BETTING'); } }]
         );
       }, 900);
     }}]
