@@ -1850,10 +1850,8 @@ function setupScriptedHand3() {
 
 function runDropSequence(count, onDone) {
   showDropPile();
-  showDialogueAlt(CHARS.dealer, '"Oh shoot. I dropped them again.&nbsp; Sorry, I\'m new here. Heh. Lawyer bills!"');
 
   setTimeout(() => {
-    hideDialogue();
     const wrappedDone = () => hideDropPile(onDone);
 
     // Pit boss reacts when Gary drops during escalation phases
@@ -1903,7 +1901,7 @@ function runDropSequence(count, onDone) {
         [{ label: '(nod slowly)', cb: wrappedDone }]
       );
     }
-  }, 4800);
+  }, 1600);
 }
 
 function appendCard(containerId, card) {
