@@ -101,6 +101,32 @@
   }
   #deal-flash-overlay.flashing { animation: dealFlashAnim 1.8s ease-in-out; }
 
+  /* Bet flash overlay */
+  #bet-flash-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 91;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+  }
+  .bet-flash-text {
+    font-family: 'Playfair Display', serif;
+    font-size: 4.5rem;
+    font-weight: 900;
+    color: gold;
+    text-shadow: 0 0 40px gold, 0 0 80px #ffaa00, 0 0 120px #ff8800;
+    letter-spacing: 0.15em;
+  }
+  #bet-flash-overlay.flashing { animation: betFlashAnim 2s ease-in-out forwards; }
+  @keyframes betFlashAnim {
+    0%,100% { opacity: 0; }
+    10%, 85% { opacity: 1; }
+  }
+  #ticker-inner.fast { animation-duration: 3s; }
+
   .title-sub {
     font-size: 0.7rem;
     color: #ffcc00;
@@ -1001,6 +1027,7 @@
     </div>
     <div id="drop-pile"></div>
     <div id="deal-flash-overlay"></div>
+    <div id="bet-flash-overlay"><span class="bet-flash-text">BET BET BET</span></div>
 
 
     <!-- DIALOGUE BAR (LucasArts / point-and-click style) -->
@@ -1402,7 +1429,7 @@ let MOE_PORTRAIT = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 44 56" 
 //  CHARACTER DEFINITIONS  (add new characters here)
 // ═══════════════════════════════════════════════════════════════
 const CHARS = {
-  dealer:  { name: 'Gary  (Dealer)', portrait: GARY_NORMAL,    portraitAlt: GARY_ALT     },
+  dealer:  { name: 'Pubert (Dealer)', portrait: GARY_NORMAL,    portraitAlt: GARY_ALT     },
   pitBoss: { name: 'Pit Boss',       portrait: PITBOSS_NORMAL, portraitAlt: PITBOSS_ALT  },
   moe:     { name: 'Moe',            portrait: MOE_PORTRAIT,   portraitAlt: MOE_PORTRAIT },
 };
@@ -1670,6 +1697,8 @@ function deal() {
 
   if (stats.hands === 0 && storyPhase === 0 && !introShown) {
     runGaryIntro();
+  } else if (stats.hands === 0 && introShown) {
+    runDealEnthusiasm(proceed);
   } else {
     proceed();
   }
@@ -1693,8 +1722,8 @@ function selectIntroGame() {
 
 function runGaryIntro() {
   showDialogue(CHARS.dealer,
-    '"HEY! I\'m Gary!! I\'ll be your dealer for tonight."',
-    [{ label: 'Hi.', cb: () => {
+    '"H-Hiya! My name\'s Pubert. I\'ll be your dealer for tonight."',
+    [{ label: 'Greet Pubert.', cb: () => {
       runIntroDialogue(() => { introShown = true; });
     }}]
   );
@@ -1702,9 +1731,9 @@ function runGaryIntro() {
 
 function runIntroDialogue(proceed) {
   showDialogue(CHARS.dealer,
-    '"So, uh— are you familiar with Blackjack?"',
+    '"Are you familiar with Blackjack?"',
     [
-      { label: 'All too well.',  cb: () => runGaryEnthusiasm(proceed) },
+      { label: 'All too well.',  cb: () => runBetAnimation(proceed) },
       { label: 'Who\'s Jack?',   cb: () => runRulesExplanation(proceed) },
     ]
   );
@@ -1712,22 +1741,20 @@ function runIntroDialogue(proceed) {
 
 function runRulesExplanation(proceed) {
   showDialogue(CHARS.dealer,
-    '"Right, okay! So. The goal is to get closer to twenty-one than the dealer — that\'s me — without going over. Going over is called a bust. Bad."',
-    [{ label: 'Okay.', cb: () => {
+    '"No problemo. Here\'s the gist. You wanna get closer to 21 than me (the dealer) without busting."',
+    [{ label: '...', cb: () => {
       showDialogue(CHARS.dealer,
-        '"Cards are worth their number. Face cards — Jack, Queen, King — ten. Ace is one <em>or</em> eleven. It sorts itself out automatically."',
-        [{ label: 'Got it.', cb: () => {
-          showDialogue(CHARS.dealer,
-            '"You bet before each hand. Hit means another card. Stand means stop. Double Down is double your bet, one more card. Simple game. Should be fine."',
-            [{ label: 'Let\'s go.', cb: () => runGaryEnthusiasm(proceed) }]
-          );
+        '"Going over 21, I mean. Face cards are worth uh, ten. Aces are one or eleven depending on how close you are to busting. You can \'hit\' which gives you another card, \'stand\' which means you, uh, stand, I guess. And then you can fold, which means like, quit. Or you can double down. That means you\'ll win twice as much, should you win. All clear?"',
+        [{ label: 'I guess.', cb: () => {
+          showDialogue(CHARS.dealer, '"Great!"');
+          setTimeout(() => runBetAnimation(proceed), 1000);
         }}]
       );
     }}]
   );
 }
 
-function runGaryEnthusiasm(proceed) {
+function runDealEnthusiasm(proceed) {
   const ticker = document.getElementById('ticker-inner');
   const saved  = ticker.textContent;
   const flash  = document.getElementById('deal-flash-overlay');
@@ -1735,7 +1762,6 @@ function runGaryEnthusiasm(proceed) {
   ticker.textContent = ' ★ DEAL! DEAL! DEAL! ★ DEAL! DEAL! DEAL! ★ DEAL! DEAL! DEAL! ★ DEAL! DEAL! DEAL! ★ ';
   flash.classList.add('flashing');
 
-  // Set up dialogue bar manually so we can run the typo sequence without showDialogue resetting it mid-animation.
   if (_typingTimer !== null) { clearTimeout(_typingTimer); _typingTimer = null; }
   const bar  = document.getElementById('dialogue-bar');
   const port = document.getElementById('dlg-portrait');
@@ -1749,10 +1775,8 @@ function runGaryEnthusiasm(proceed) {
   chEl.innerHTML   = '';
   bar.classList.add('visible');
 
-  // Phase 1: type "Alright! Let's gumbl"
   const part1 = '"Alright! Let\'s gumbl';
   typeHTML(spch, part1, 60, () => {
-    // Phase 2: pause, then backspace "gumbl" (5 chars, 80ms each)
     const afterBS = '"Alright! Let\'s ';
     const bsSteps = [
       '"Alright! Let\'s gumb',
@@ -1768,7 +1792,6 @@ function runGaryEnthusiasm(proceed) {
       if (bi < bsSteps.length) {
         _typingTimer = setTimeout(doBS, 80);
       } else {
-        // Phase 3: type "gamble!!" from where we left off
         const suffix = 'gamble!!"';
         let si = 0;
         _typingTimer = setTimeout(function doFwd() {
@@ -1783,17 +1806,36 @@ function runGaryEnthusiasm(proceed) {
         }, 120);
       }
     }
-    _typingTimer = setTimeout(doBS, 380); // pause at "gumbl" before catching the typo
+    _typingTimer = setTimeout(doBS, 380);
   });
 
-  // After animation + brief hold, flash off and show the bet prompt
   setTimeout(() => {
     flash.classList.remove('flashing');
     ticker.textContent = saved;
-    proceed(); // sets introShown = true
-    showDialogue(CHARS.dealer, '"Okay. Place your bet."');
+    hideDialogue();
+    proceed();
   }, 4200);
 }
+
+function runBetAnimation(proceed) {
+  const ticker   = document.getElementById('ticker-inner');
+  const saved    = ticker.textContent;
+  const betFlash = document.getElementById('bet-flash-overlay');
+
+  ticker.textContent = ' ★ BET BET BET ★ MUST BE 21+ TO PLAY ★ NOT RESPONSIBLE FOR LOSSES ★ BET BET BET ★ HOUSE ALWAYS WINS ★ THIS IS NOT FINANCIAL ADVICE ★ BET BET BET ★ ODDS ARE WORSE THAN YOU THINK ★ ';
+  ticker.classList.add('fast');
+  betFlash.classList.add('flashing');
+
+  setTimeout(() => {
+    betFlash.classList.remove('flashing');
+    ticker.classList.remove('fast');
+    ticker.textContent = saved;
+    proceed();
+    setButtons('BETTING');
+    showDialogue(CHARS.dealer, '"Alright. Place your bets!"');
+  }, 2000);
+}
+
 
 function setupScriptedHand1() {
   // shoe.pop() order: playerHand[0], playerHand[1], dealerHand[0], dealerHand[1]
@@ -1843,20 +1885,20 @@ function runDropSequence(count, onDone) {
     // Pit boss reacts when Gary drops during escalation phases
     if (storyPhase === 3) {
       showDialogue(CHARS.pitBoss,
-        '"Gary."',
-        [{ label: '(Gary scrambles for the cards)', cb: wrappedDone }]
+        '"Pubert."',
+        [{ label: '(Pubert scrambles for the cards)', cb: wrappedDone }]
       );
       return;
     } else if (storyPhase === 4) {
       showDialogue(CHARS.pitBoss,
-        '"GARY. I\'m watching you."',
+        '"PUBERT. I\'m watching you."',
         [{ label: '(tense silence)', cb: wrappedDone }]
       );
       return;
     } else if (storyPhase === 5) {
       showDialogue(CHARS.pitBoss,
-        '"Gary, this is your last chance. Those cards had better move."',
-        [{ label: '(Gary shuffles. Slower than usual.)', cb: wrappedDone }]
+        '"Pubert, this is your last chance. Those cards had better move."',
+        [{ label: '(Pubert shuffles. Slower than usual.)', cb: wrappedDone }]
       );
       return;
     }
@@ -2094,10 +2136,10 @@ function showGameOver() {
     [{ label: '...', cb: () => {
       showDialogueAlt(CHARS.dealer,
         '"Look, I know this looks bad. But statistically you were setting that up since hand two."',
-        [{ label: 'Gary.', cb: () => {
+        [{ label: 'Pubert.', cb: () => {
           showDialogueAlt(CHARS.dealer,
             '"Right. Game over. But hey — that\'s what the Play Again button\'s for.<br>...Please click it. I need the commission."',
-            [{ label: '(stare at Gary)', cb: () => { hideDialogue(); doShowGameOver(); } }]
+            [{ label: '(stare at Pubert)', cb: () => { hideDialogue(); doShowGameOver(); } }]
           );
         }}]
       );
