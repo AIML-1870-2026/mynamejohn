@@ -101,29 +101,27 @@
   }
   #deal-flash-overlay.flashing { animation: dealFlashAnim 1.8s ease-in-out; }
 
-  /* Bet flash overlay */
+  /* Bet flash overlay — driven by JS transitions, not CSS animation */
   #bet-flash-overlay {
     position: absolute;
     inset: 0;
     pointer-events: none;
     z-index: 91;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     opacity: 0;
+    transition: opacity 0.25s ease-in;
   }
   .bet-flash-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    white-space: nowrap;
     font-family: 'Playfair Display', serif;
     font-size: 4.5rem;
     font-weight: 900;
     color: gold;
     text-shadow: 0 0 40px gold, 0 0 80px #ffaa00, 0 0 120px #ff8800;
     letter-spacing: 0.15em;
-  }
-  #bet-flash-overlay.flashing { animation: betFlashAnim 2s ease-in-out forwards; }
-  @keyframes betFlashAnim {
-    0%,100% { opacity: 0; }
-    10%, 85% { opacity: 1; }
   }
   #ticker-inner.fast { animation-duration: 3s; }
 
@@ -1845,16 +1843,26 @@ function runBetAnimation(proceed) {
 
   ticker.textContent = ' ★ BET BET BET ★ MUST BE 21+ TO PLAY ★ NOT RESPONSIBLE FOR LOSSES ★ BET BET BET ★ HOUSE ALWAYS WINS ★ THIS IS NOT FINANCIAL ADVICE ★ BET BET BET ★ ODDS ARE WORSE THAN YOU THINK ★ ';
   ticker.classList.add('fast');
-  betFlash.classList.add('flashing');
 
+  // Fade in
+  betFlash.style.transition = 'opacity 0.25s ease-in';
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    betFlash.style.opacity = '1';
+  }));
+
+  // Fade out after hold, then proceed
   setTimeout(() => {
-    betFlash.classList.remove('flashing');
-    ticker.classList.remove('fast');
-    ticker.textContent = saved;
-    proceed();
-    setButtons('BETTING');
-    showDialogue(CHARS.dealer, '"Alright. Place your bets!"');
-  }, 2000);
+    betFlash.style.transition = 'opacity 0.4s ease-out';
+    betFlash.style.opacity = '0';
+    setTimeout(() => {
+      betFlash.style.transition = '';
+      ticker.classList.remove('fast');
+      ticker.textContent = saved;
+      proceed();
+      setButtons('BETTING');
+      showDialogue(CHARS.dealer, '"Alright. Place your bets!"');
+    }, 400);
+  }, 1700);
 }
 
 
