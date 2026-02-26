@@ -16,7 +16,10 @@
       #6B0000 20px, #6B0000 40px
     );
     font-family: 'Times New Roman', Times, serif;
-    overflow-x: hidden;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
   }
 
   /* ── SEIZURE HEADER ── */
@@ -133,7 +136,8 @@
   .page-layout {
     display: grid;
     grid-template-columns: 180px 1fr 180px;
-    height: calc(100vh - 88px);
+    flex: 1;
+    min-height: 0;
     gap: 0;
     overflow: hidden;
   }
