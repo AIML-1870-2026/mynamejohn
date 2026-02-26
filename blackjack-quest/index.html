@@ -25,8 +25,8 @@
     border-top: 4px solid gold;
     border-bottom: 4px solid gold;
     color: gold;
-    font-size: 0.85rem;
-    padding: 4px 0;
+    font-size: 1.1rem;
+    padding: 5px 0;
     white-space: nowrap;
     overflow: hidden;
   }
@@ -85,7 +85,11 @@
     pointer-events: none;
     z-index: 90;
     opacity: 0;
-    background: radial-gradient(ellipse at 50% 40%, rgba(255,215,0,0.35) 0%, transparent 70%);
+    background:
+      radial-gradient(ellipse at 0% 0%,   rgba(255,215,0,0.45) 0%, transparent 55%),
+      radial-gradient(ellipse at 100% 0%,  rgba(255,215,0,0.45) 0%, transparent 55%),
+      radial-gradient(ellipse at 0% 100%,  rgba(255,215,0,0.45) 0%, transparent 55%),
+      radial-gradient(ellipse at 100% 100%,rgba(255,215,0,0.45) 0%, transparent 55%);
   }
   @keyframes dealFlashAnim {
     0%,100% { opacity: 0; }
@@ -853,22 +857,6 @@
   }
   .game-over-sub { color: #cc9900; font-size: 0.9rem; letter-spacing: 3px; font-family: 'Courier New', monospace; }
 
-  /* ── BOTTOM TICKER ── */
-  .bottom-ticker {
-    background: #000;
-    border-top: 4px double gold;
-    color: #0f0;
-    font-family: 'Courier New', monospace;
-    font-size: 0.7rem;
-    padding: 3px 0;
-    overflow: hidden;
-    white-space: nowrap;
-  }
-  .bottom-ticker-inner {
-    display: inline-block;
-    animation: ticker 22s linear infinite reverse;
-    letter-spacing: 2px;
-  }
 
   /* ── TRUST BADGES ── */
   .trust-bar {
@@ -1142,12 +1130,6 @@
   </div>
 </div>
 
-<!-- BOTTOM TICKER -->
-<div class="bottom-ticker">
-  <span class="bottom-ticker-inner">
-    ⚠️ REMINDER: This is an educational game. No real money. ★ The house edge in real blackjack is ~0.5% with basic strategy. ★ Card counting is not illegal but casinos may ask you to leave. ★ Blackjack pays 3:2 in a real casino (or 6:5 at sketchy ones, avoid those). ★ Always split Aces and 8s. Never split 10s. ★ Dealer must hit soft 16. ★ Hit on soft 17 or less. Stand on hard 17+. ★ 18+ only in real casinos. Gamble responsibly. ★
-  </span>
-</div>
 
 <script>
 // ═══════════════════════════════════════════════════════════════
