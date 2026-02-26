@@ -2236,13 +2236,22 @@ function checkPostResultNarrative(outcome) {
 }
 
 function runShoeOffer() {
-  hideDialogue();
-  setTimeout(() => {
-    showDialogue(CHARS.dealer,
-      '"Found it! Okay! This is a shoe. Professional casino equipment. Much better."',
-      [{ label: 'Let\'s see it.', cb: () => { storyPhase = 2; setupScriptedHand2(); hideDialogue(); } }]
-    );
-  }, 2200);
+  showDialogue(CHARS.dealer,
+    '"A shoe? Why, that\'s a GREAT idea! I hadn\'t thought of that! Give me oooooone minute."',
+    [{ label: '...', cb: () => {
+      showDialogue(CHARS.dealer,
+        '(Pubert has gone to retrieve a shoe.)',
+        [{ label: '(Wait politely)', cb: () => {
+          setTimeout(() => {
+            showDialogue(CHARS.dealer,
+              '"Found it! Okay! This is a shoe. Professional casino equipment. Much better."',
+              [{ label: 'Let\'s see it.', cb: () => { storyPhase = 2; setupScriptedHand2(); hideDialogue(); } }]
+            );
+          }, 2200);
+        }}]
+      );
+    }}]
+  );
 }
 
 function runMoeEntrance() {
