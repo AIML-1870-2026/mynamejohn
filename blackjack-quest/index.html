@@ -591,14 +591,14 @@
   /* ── MOE ON TABLE ── */
   #moe-on-table {
     position: absolute;
-    height: 155px;
+    height: 280px;
     width: auto;
-    bottom: 30%;
+    bottom: 12%;
     left: 50%;
     transform: translateX(-50%);
     z-index: 25;
     display: none;
-    filter: drop-shadow(0 4px 10px rgba(0,0,0,0.6));
+    filter: drop-shadow(0 6px 14px rgba(0,0,0,0.7));
   }
 
   /* ── SHUFFLE DECK ── */
@@ -916,6 +916,35 @@
     .sidebar { display: none; }
     .title-main { font-size: 1.6rem; }
   }
+
+  /* ── DEV PANEL ── */
+  #dev-toggle {
+    position: fixed; bottom: 10px; right: 10px;
+    background: #111; border: 1px solid #555; color: #aaa;
+    font: 10px/1 monospace; padding: 4px 8px; cursor: pointer;
+    border-radius: 4px; z-index: 10000; opacity: 0.7;
+  }
+  #dev-toggle:hover { opacity: 1; }
+  #dev-panel {
+    position: fixed; bottom: 36px; right: 10px;
+    background: rgba(0,0,0,0.92); border: 1px solid #444;
+    border-radius: 6px; padding: 10px 12px;
+    font: 11px/1.6 'Courier New', monospace; color: #ccc;
+    z-index: 9999; min-width: 210px; display: none;
+  }
+  #dev-panel.open { display: block; }
+  #dev-panel .dev-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+  #dev-panel .dev-title { color: #ff9; font-weight: bold; }
+  #dev-panel .dev-state { margin-bottom: 8px; color: #9cf; }
+  #dev-panel .dev-row { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+  .dev-btn {
+    background: #1a3a1a; border: 1px solid #3a6a3a; color: #8f8;
+    font: 10px monospace; padding: 3px 7px; cursor: pointer; border-radius: 3px;
+  }
+  .dev-btn:hover { background: #2a5a2a; }
+  .dev-btn.wide { width: 100%; text-align: center; }
+  .dev-btn.red  { background: #3a1a1a; border-color: #6a3a3a; color: #f88; }
+  .dev-btn.red:hover { background: #5a2a2a; }
 </style>
 </head>
 <body>
@@ -1805,17 +1834,19 @@ function runShuffle(onDone) {
             hideDialogue();
             fly.classList.remove('animating', 'slow');
             deck.classList.remove('visible');
-            handOut();
             showDropPileWide();
             showDialogue(CHARS.dealer, '"Heh heh... user error..."',
               [{ label: '(The cards are everywhere.)', cb: () => {
                 setTimeout(() => {
-                  showDialogue(CHARS.pitBoss, '"Pubert."',
+                  showDialogue(CHARS.pitBoss, '"Pubert. A woid."',
                     [{ label: '(...)', cb: () => {
-                      hideDropPile(() => {
-                        storyPhase = 4;
-                        setButtons('BETTING');
-                      });
+                      handOut();
+                      setTimeout(() => {
+                        hideDropPile(() => {
+                          storyPhase = 4;
+                          setButtons('BETTING');
+                        });
+                      }, 700);
                     }}]
                   );
                 }, 1000);
@@ -2551,17 +2582,92 @@ setupScriptedHand1();
 updateHUD();
 setButtons('BETTING');
 
-// Process Moe's portrait from green-screen JPG (async, fine — Moe appears at phase 6)
+// Process Moe's on-table image from green-screen JPG — portrait stays as SVG (no Pubert)
 chromaKeyJpeg(MOE_RAW_B64).then(imgHtml => {
-  MOE_PORTRAIT = imgHtml;
-  CHARS.moe.portrait    = imgHtml;
-  CHARS.moe.portraitAlt = imgHtml;
+  const moeOnTable = document.getElementById('moe-on-table');
+  if (moeOnTable) moeOnTable.src = imgHtml.match(/src="([^"]+)"/)[1];
 });
 
 // Wire intro game buttons — avoids any inline-onclick timing edge cases
 document.querySelectorAll('.intro-game-btn').forEach(function(btn) {
   btn.addEventListener('click', selectIntroGame);
 });
+
+// ═══════════════════════════════════════════════════════════════
+//  DEV PANEL
+// ═══════════════════════════════════════════════════════════════
+(function() {
+  const toggle = document.getElementById('dev-toggle');
+  const panel  = document.getElementById('dev-panel');
+
+  const PHASE_LABELS = {
+    0:'pre-shoe hands', 1:'shoe offer', 2:'shoe deal', 3:'explosion',
+    4:'boss mild', 5:'overshare 1', 6:'divorce Q', 7:'last Gary', 8:'drop 2', 9:'Moe'
+  };
+
+  function refreshState() {
+    document.getElementById('dev-state').innerHTML =
+      `phase: <b>${storyPhase}</b> (${PHASE_LABELS[storyPhase] ?? '?'})<br>` +
+      `state: <b>${gameState}</b> | bal: $${balance}<br>` +
+      `phase1Dropped: ${phase1Dropped} | hand3: ${scriptedHand3Done}`;
+  }
+
+  function jumpToPhase(p) {
+    hideDialogue();
+    if (pendingReactTimeout) { clearTimeout(pendingReactTimeout); pendingReactTimeout = null; }
+    storyPhase = p;
+    if (p === 2) setupScriptedHand2();
+    if (p >= 9)  document.getElementById('moe-on-table').style.display = 'block';
+    else         document.getElementById('moe-on-table').style.display = 'none';
+    setButtons('BETTING');
+    refreshState();
+  }
+
+  toggle.addEventListener('click', () => {
+    panel.classList.add('open');
+    toggle.style.display = 'none';
+    refreshState();
+  });
+
+  document.getElementById('dev-close').addEventListener('click', () => {
+    panel.classList.remove('open');
+    toggle.style.display = '';
+  });
+
+  document.getElementById('dev-force-bet').addEventListener('click', () => {
+    hideDialogue();
+    setButtons('BETTING');
+    refreshState();
+  });
+
+  document.querySelectorAll('[data-phase]').forEach(btn => {
+    btn.addEventListener('click', () => jumpToPhase(parseInt(btn.dataset.phase)));
+  });
+})();
 </script>
+
+<!-- ── DEV PANEL ── -->
+<button id="dev-toggle">⚙ DEV</button>
+<div id="dev-panel">
+  <div class="dev-head">
+    <span class="dev-title">⚙ DEV TOOLS</span>
+    <button class="dev-btn red" id="dev-close">✕</button>
+  </div>
+  <div class="dev-state" id="dev-state"></div>
+  <div style="color:#666;margin-bottom:3px">Jump to phase:</div>
+  <div class="dev-row">
+    <button class="dev-btn" data-phase="0">0 pre-shoe</button>
+    <button class="dev-btn" data-phase="1">1 shoe offer</button>
+    <button class="dev-btn" data-phase="2">2 shoe deal</button>
+    <button class="dev-btn" data-phase="3">3 explosion</button>
+    <button class="dev-btn" data-phase="4">4 boss mild</button>
+    <button class="dev-btn" data-phase="5">5 overshare</button>
+    <button class="dev-btn" data-phase="6">6 divorce Q</button>
+    <button class="dev-btn" data-phase="7">7 last Gary</button>
+    <button class="dev-btn" data-phase="8">8 drop 2</button>
+    <button class="dev-btn" data-phase="9">9 Moe</button>
+  </div>
+  <button class="dev-btn wide" id="dev-force-bet">Force → BETTING state</button>
+</div>
 </body>
 </html>
