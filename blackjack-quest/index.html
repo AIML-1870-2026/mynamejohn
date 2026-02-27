@@ -2247,7 +2247,7 @@ function doDeal() {
     }, i * stagger);
   });
 
-  const totalDealTime = (sequence.length - 1) * stagger + 7200;
+  const totalDealTime = (sequence.length - 1) * stagger + (storyPhase >= 9 ? 250 : 7200);
   setTimeout(() => {
     handOut();
     setButtons('PLAYER_TURN');
