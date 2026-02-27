@@ -379,11 +379,11 @@ blackjack-quest/
 - **Drop beats 4 & 5** — Sharon lore after drop #3
 - **Game-over Gary monologue** — closing beat when balance hits $0
 - **Pit Boss extended** — more lines per phase (4–6); currently one line each
-- **Moe bust monologue** (phase 9+, player busts): fires 1.2s after result, 4-beat dialogue:
+- **Moe broke monologue** (phase 9+, balance hits $0): replaces Gary's broke dialogue. 4-beat:
   1. *"I am deeply sorry for your loss."*
   2. *"You know, when I was very young, I immigrated from Czekystan. I remember traveling through the Ural Mountains by train, watching the sun set."*
   3. *"That was the last Czechystanian sunset I ever saw. I didn't even know it. Loss borne of ignorance."*
-  4. *"That's kinda like what you just did."*
+  4. *"That's kinda like what you just did."* → `doShowGameOver()`
 - **Moe other lines** — win/push reactions while dealing fast (not yet written)
 - **Moe portrait art** — SVG placeholder still in use for dialogue box; needs green-screen photo cropped to Moe only
 - **Hand art** — `Untitled_Artwork 3.jpg`, green chroma key, 454×420px, embedded

@@ -2384,28 +2384,6 @@ function settleResult(outcome) {
   updateHUD();
   updateStreak();
   setButtons('RESULT');
-  if (storyPhase >= 9 && outcome === 'lose' && isBust(playerHand)) {
-    setTimeout(() => {
-      showDialogue(CHARS.moe, '"I am deeply sorry for your loss."',
-        [{ label: '...', cb: () => {
-          showDialogue(CHARS.moe,
-            '"You know, when I was very young, I immigrated from Czekystan. I remember traveling through the Ural Mountains by train, watching the sun set."',
-            [{ label: '...', cb: () => {
-              showDialogue(CHARS.moe,
-                '"That was the last Czechystanian sunset I ever saw. I didn\'t even know it. Loss borne of ignorance."',
-                [{ label: '...', cb: () => {
-                  showDialogue(CHARS.moe,
-                    '"That\'s kinda like what you just did."',
-                    [{ label: 'Okay.', cb: hideDialogue }]
-                  );
-                }}]
-              );
-            }}]
-          );
-        }}]
-      );
-    }, 1200);
-  }
   if (balance <= 0) setTimeout(showGameOver, 1400);
   else checkPostResultNarrative(outcome);
 }
@@ -2430,6 +2408,27 @@ function newHand() {
 }
 
 function showGameOver() {
+  if (storyPhase >= 9) {
+    showDialogue(CHARS.moe, '"I am deeply sorry for your loss."',
+      [{ label: '...', cb: () => {
+        showDialogue(CHARS.moe,
+          '"You know, when I was very young, I immigrated from Czekystan. I remember traveling through the Ural Mountains by train, watching the sun set."',
+          [{ label: '...', cb: () => {
+            showDialogue(CHARS.moe,
+              '"That was the last Czechystanian sunset I ever saw. I didn\'t even know it. Loss borne of ignorance."',
+              [{ label: '...', cb: () => {
+                showDialogue(CHARS.moe,
+                  '"That\'s kinda like what you just did."',
+                  [{ label: 'Okay.', cb: () => { hideDialogue(); doShowGameOver(); } }]
+                );
+              }}]
+            );
+          }}]
+        );
+      }}]
+    );
+    return;
+  }
   showDialogueAlt(CHARS.dealer,
     '"Oh. Oh no. You\'re... broke. That is on me. Well — not legally."',
     [{ label: '...', cb: () => {
