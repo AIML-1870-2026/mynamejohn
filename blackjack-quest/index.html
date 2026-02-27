@@ -1762,9 +1762,23 @@ function runShuffle(onDone) {
     return;
   }
   if (storyPhase === 2) {
-    // Shoe: brisk professional shuffle
-    showDialogue(CHARS.dealer, '"Okay — shoe, shoe, shoe—"');
-    setTimeout(() => { hideDialogue(); onDone(); }, 750);
+    handIn();
+    const deck2 = document.getElementById('shuffle-deck');
+    const fly2  = document.getElementById('shuffle-fly-card');
+    deck2.classList.add('visible');
+    fly2.classList.add('animating');
+    const finishShoe = () => {
+      fly2.classList.remove('animating');
+      deck2.classList.remove('visible');
+      hideDialogue();
+      onDone();
+    };
+    setTimeout(() => {
+      showDialogue(CHARS.dealer,
+        '"Anyone else at this table been divorced before? Heh heh..."',
+        [{ label: '...', cb: finishShoe }]
+      );
+    }, 2500);
     return;
   }
   // Hands mode: ~10 second card-shuffle animation
