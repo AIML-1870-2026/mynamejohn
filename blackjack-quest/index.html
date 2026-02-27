@@ -2554,10 +2554,19 @@ setupScriptedHand1();
 updateHUD();
 setButtons('BETTING');
 
-// Process Moe's on-table image from green-screen JPG — portrait stays as SVG (no Pubert)
+// Process Moe's on-table image: chroma-key then crop to right half (Moe only, no Pubert)
 chromaKeyJpeg(MOE_RAW_B64).then(imgHtml => {
-  const moeOnTable = document.getElementById('moe-on-table');
-  if (moeOnTable) moeOnTable.src = imgHtml.match(/src="([^"]+)"/)[1];
+  const fullSrc = imgHtml.match(/src="([^"]+)"/)[1];
+  const tmp = new Image();
+  tmp.onload = () => {
+    const half = Math.floor(tmp.width / 2);
+    const c = document.createElement('canvas');
+    c.width = half; c.height = tmp.height;
+    c.getContext('2d').drawImage(tmp, half, 0, half, tmp.height, 0, 0, half, tmp.height);
+    const moeOnTable = document.getElementById('moe-on-table');
+    if (moeOnTable) moeOnTable.src = c.toDataURL('image/png');
+  };
+  tmp.src = fullSrc;
 });
 
 // Wire intro game buttons — avoids any inline-onclick timing edge cases
