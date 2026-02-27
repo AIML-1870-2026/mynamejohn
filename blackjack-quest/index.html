@@ -1179,7 +1179,8 @@ let gameState  = 'BETTING';
 let stats = { w: 0, l: 0, p: 0, hands: 0 };
 let history = [];
 let dropCount   = 0; // tracks how many times dealer has dropped cards
-let introShown  = false;
+let introShown     = false;
+let phase1Dropped  = false;
 let scriptedHand3Done = false;
 let pendingReactTimeout = null;
 
@@ -1707,8 +1708,8 @@ function runSlowShuffleLoop() {
               '"Sorry. I-I dropped them. *stupid!*"',
               [{ label: '(Continue.)', cb: () => {
                 hideDropPile(() => {
+                  phase1Dropped = true;
                   setButtons('BETTING');
-                  runShoeOffer();
                 });
               }}]
             );
@@ -1719,6 +1720,26 @@ function runSlowShuffleLoop() {
   }, 5000);
 }
 
+
+function runShoeHintShuffle() {
+  handIn();
+  const deck = document.getElementById('shuffle-deck');
+  const fly  = document.getElementById('shuffle-fly-card');
+  deck.classList.add('visible');
+  fly.classList.add('animating', 'slow');
+  setTimeout(() => {
+    showDialogueAlt(CHARS.dealer, '"*heavy breathing*"', [{
+      label: 'Have you considered a shoe?',
+      cb: () => {
+        fly.classList.remove('animating', 'slow');
+        deck.classList.remove('visible');
+        hideDialogue();
+        setButtons('BETTING');
+        runShoeOffer();
+      }
+    }]);
+  }, 5000);
+}
 
 function runScriptedDrop2() {
   handIn();
@@ -1831,7 +1852,11 @@ function deal() {
 
   const proceed = () => checkPreDealNarrative(() => {
     if (storyPhase === 1) {
-      runSlowShuffleLoop();
+      if (!phase1Dropped) {
+        runSlowShuffleLoop();   // speed request → fast shuffle → drop
+      } else {
+        runShoeHintShuffle();   // slow shuffle → shoe suggestion
+      }
     } else if (storyPhase === 8) {
       runScriptedDrop2();
     } else if (storyPhase === 0) {
@@ -2363,7 +2388,7 @@ function doShowGameOver() {
 function restartGame() {
   document.querySelector('.game-over-overlay')?.remove();
   balance = 500; bet = 0; stats = { w:0,l:0,p:0,hands:0 }; history = []; dropCount = 0;
-  storyPhase = 0; scriptedHand3Done = false; pendingReactTimeout = null;
+  storyPhase = 0; scriptedHand3Done = false; pendingReactTimeout = null; phase1Dropped = false;
   playerHand = []; dealerHand = []; gameState = 'BETTING';
   shoe = shuffle(buildShoe(6));
   setupScriptedHand1();
