@@ -643,6 +643,7 @@
   }
   #shuffle-fly-card.animating { animation: overhandShuffle 2.6s ease-in-out infinite; }
   #shuffle-fly-card.slow    { animation-duration: 5s; }
+  #shuffle-fly-card.fast    { animation-duration: 0.45s; }
 
   /* ── DROP PILE ── */
   #drop-pile {
@@ -1683,6 +1684,7 @@ function runScriptedDrop1() {
 }
 
 function runSlowShuffleLoop() {
+  handIn();
   const deck = document.getElementById('shuffle-deck');
   const fly  = document.getElementById('shuffle-fly-card');
   deck.classList.add('visible');
@@ -1691,11 +1693,27 @@ function runSlowShuffleLoop() {
     showDialogueAlt(CHARS.dealer, '"*heavy breathing*"', [{
       label: 'Can you pick up the pace?',
       cb: () => {
-        fly.classList.remove('animating', 'slow');
-        deck.classList.remove('visible');
-        hideDialogue();
-        setButtons('BETTING');
-        runShoeOffer();
+        showDialogue(CHARS.dealer, '"Y-y-y-you got it!!"');
+        setTimeout(() => {
+          hideDialogue();
+          fly.classList.remove('slow');
+          fly.classList.add('fast');
+          setTimeout(() => {
+            fly.classList.remove('animating', 'fast');
+            deck.classList.remove('visible');
+            handOut();
+            showDropPile();
+            showDialogue(CHARS.dealer,
+              '"Sorry. I-I dropped them. *stupid!*"',
+              [{ label: '(Continue.)', cb: () => {
+                hideDropPile(() => {
+                  setButtons('BETTING');
+                  runShoeOffer();
+                });
+              }}]
+            );
+          }, 3000);
+        }, 1200);
       }
     }]);
   }, 5000);
@@ -1813,7 +1831,7 @@ function deal() {
 
   const proceed = () => checkPreDealNarrative(() => {
     if (storyPhase === 1) {
-      runScriptedDrop1();
+      runSlowShuffleLoop();
     } else if (storyPhase === 8) {
       runScriptedDrop2();
     } else if (storyPhase === 0) {
