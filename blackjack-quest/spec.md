@@ -66,9 +66,9 @@ Reads "GRE TEST" by default. When it flickers on briefly it completes: "GREATEST
 ## Characters
 
 All portraits are user-drawn PNGs (base64 embedded, green-screen chroma keyed).
-SVG placeholders have been replaced. Dialogue portrait slot is 100×120px.
+Dialogue portrait slot is 100×120px.
 
-### Gary (Dealer)
+### Gary (Dealer) — "Pubert"
 - Recently divorced. New to the job. Trying not to overshare. Failing.
 - Sharon is his ex-wife. Lawyer bills are a sore point.
 - Drops cards. Fumbles shuffles. Genuinely trying.
@@ -89,9 +89,10 @@ SVG placeholders have been replaced. Dialogue portrait slot is 100×120px.
 - Alt: `PITBOSS_ALT` — flushed, extreme brows, anger lines
 
 ### Moe
-- Small, scrungly. Stands on the table. Deals superhuman fast.
-- Portrait: `MOE_PORTRAIT` — white blob body, big round eyes, pencil mustache, sparse upright hair, belt/cummerbund
-- User-drawn PNG embedded; appears on table at phase 6
+- Small, scrungly. Climbs onto the table. Deals superhuman fast.
+- **Dialogue portrait**: SVG illustration only (no Pubert in frame). White blob body, big round eyes, pencil mustache, sparse upright hair, belt/cummerbund.
+- **On-table**: Right half of `MOE_RAW_B64` green-screen photo, chroma-keyed. Rendered at `height: 85vh`, `position: absolute`, `bottom: 0`, anchored to bottom of game area. `pointer-events: none`.
+- **Roaming**: After entrance, snaps to a random horizontal position (5 slots: 18%, 33%, 50%, 67%, 82%) every 6–30 seconds. Never repeats same slot consecutively.
 
 ---
 
@@ -153,9 +154,9 @@ floating deck, hovers, returns. Loops. Both Gary hands visible. Gary mutters a f
 // fly card: @keyframes overhandShuffle (2.6s ease-in-out infinite)
 ```
 
-**Shoe mode:** Instant. Gary says "Okay — shoe, shoe, shoe—". Resolves in 750ms.
+**Shoe mode:** Medium pace. Gary says a divorce-adjacent one-liner. Resolves via player dismiss.
 
-**Moe mode:** 120ms. No dialogue.
+**Moe mode:** 120ms. No dialogue. No animation.
 
 ---
 
@@ -178,23 +179,26 @@ hideDropPile(cb)     // adds .returning → @keyframes cardReturn, then calls cb
 ## Scripted Narrative Arc
 
 This is a **scripted game**. Hands are predetermined. The story drives the blackjack,
-not the other way around. `storyPhase` (0–6) tracks position in the arc.
+not the other way around. `storyPhase` (0–9) tracks position in the arc.
 
 ### Phase Table
 
-| Phase | Dealer mode | Deal stagger | Narrative |
+| Phase | Event | Deal stagger | Notes |
 |---|---|---|---|
-| 0 | Hands | 3750ms | Intro sequence. Scripted hand 1 (player wins). |
-| 1 | Hands | 3750ms | Post-win awkward silence. Shoe offer fires during next shuffle. |
-| 2 | Shoe | 380ms | One scripted round. Gary briefly professional. |
-| 3 | Hands | 3750ms | Shoe breaks. Pit Boss: *"Gary."* (pre-deal) |
-| 4 | Hands | 3750ms | Pit Boss: *"GARY. I'm watching you."* (pre-deal) |
-| 5 | Hands | 3750ms | Pit Boss: *"Gary, this is your last chance."* (pre-deal) |
-| 6 | Moe | 55ms | Pit Boss calls Moe. Moe appears on table. Fast forever. |
+| 0 | Hands — intro | 3750ms | Scripted hand 1 (player wins). Shoe offer fires in next shuffle. |
+| 1 | Hands — shoe offer | 3750ms | Shoe hint appears as choice during shuffle. |
+| 2 | Shoe — one deal | 380ms | Gary briefly professional. One scripted round. |
+| 3 | Shoe explosion | — | No hand dealt. Shoe smokes, explodes during shuffle. Pit Boss: *"Pubert. A woid."* Cards scatter. Advances to phase 4. |
+| 4 | Hands — pit boss mild | 3750ms | Pit Boss: *"..."* appears mid-shuffle. |
+| 5 | Hands — overshare 1 | 3750ms | Gary: *"Been working here about two weeks now."* (divorce/lawyer bills) |
+| 6 | Hands — divorce Q | 3750ms | Gary builds toward asking if player's been divorced. Pit Boss: *"Pubert. A woid."* cuts him off. |
+| 7 | Hands — last Gary hand | 3750ms | Scripted hand 3. Player wins. Gary's final hand. |
+| 8 | Second drop → Moe | — | `runScriptedDrop2()`. Cards scatter wide. Pit Boss snaps. |
+| 9+ | Moe — fast forever | 55ms | Moe on table. Instant deal. Roaming. |
 
 ### Scripted Hands
 
-**Hand 1** — `setupScriptedHand1()` pushes cards to shoe end (drawn via `shoe.pop()`):
+**Hand 1** — `setupScriptedHand1()`:
 
 | Draw | Card | Goes to |
 |---|---|---|
@@ -204,9 +208,20 @@ not the other way around. `storyPhase` (0–6) tracks position in the arc.
 | 4th | Q♠ | Player card 2 → **20** |
 | 5th | A♣ | Player hit → **21** |
 
-Dealer total: 17 (stands). Player wins at 20 (stand) or 21 (hit). Win guaranteed.
+Dealer total: 17 (stands). Player wins at 20 (stand) or 21 (hit).
 
-*Further scripted hands: TBD.*
+**Hand 2** — `setupScriptedHand2()` (shoe round, phase 2):
+
+| Draw | Card | Goes to |
+|---|---|---|
+| 1st | 9♣ | Dealer hole |
+| 2nd | 6♦ | Dealer face-up |
+| 3rd | K♥ | Player card 1 |
+| 4th | A♠ | Player card 2 → soft 21 (blackjack) |
+
+**Hand 3** — `setupScriptedHand3()` (phase 7, Gary's last):
+
+Player: A♦ + 8♣ = soft 19. Dealer: K♠ (up) + 5♥ (hole) = 15, draws 8♦ → busts at 23. Player wins.
 
 ### Intro Sequence (Phase 0, first deal only)
 
@@ -222,63 +237,59 @@ Gary enthusiasm (runGaryEnthusiasm):
   - 2.5s, then BETTING state begins
 ```
 
-Rules explanation is clean and professional. Gary holds it together.
-No oversharing yet. The cracks come later.
-
-### Post-Hand-1 (Phase 0 → 1)
-
-```
-Gary:    "Hey hey, there you go! First try!
-          ...Not everything goes well, on the first try."
-Player:  [break awkward silence] → hideDialogue
-```
-
 ### Shoe Offer (Phase 1, during hand-2 shuffle)
 
-The shoe option appears as a dialogue choice during Gary's 10-second shuffle:
-
 ```
-Gary:    [fumble line + overhand shuffle animation running]
+Gary:    [fumble line + overhand shuffle running]
 Player:  [Have you considered a shoe?]
-         → clearTimeout, cancel shuffle, setButtons('BETTING'), runShoeOffer()
+         → cancel shuffle → runShoeOffer()
+
+Gary:  "A shoe? Why, that's a GREAT idea!..."
+Gary:  (Pubert has gone to retrieve a shoe.)
+Player: [(Wait politely)]
+Gary:  "Found it! Okay! This is a shoe. Professional casino equipment."
+Player: [Let's see it.] → storyPhase = 2, setupScriptedHand2()
 ```
 
-If player ignores it, shuffle completes and deal proceeds normally.
+### Shoe Explosion (Phase 2 → 3 → 4)
 
-### Shoe Sequence (Phase 1 → 2)
+After shoe round result, `storyPhase` silently advances to 3. On the next shuffle:
 
 ```
-Gary:  "Found it! Okay! This is a shoe. Professional casino equipment. Much better."
-Player: [Let's see it.] → storyPhase = 2
+[Shuffle animation starts]
+(The shoe is smoking.)
+Player:  [Is it meant to do that?]
+Gary:    "NO!"
+[800ms pause — shoe explodes, cards scatter: showDropPileWide()]
+Gary:    "Heh heh... user error..."
+Player:  [(The cards are everywhere.)]
+[1000ms pause]
+Pit Boss: "Pubert. A woid."
+Player:  [(…)]
+[handOut() — 700ms pause — hideDropPile()]
+→ storyPhase = 4, setButtons('BETTING')
 ```
 
-### Post-Shoe (Phase 2 → 3)
+### Pit Boss Escalation (Phases 4–6, mid-shuffle)
 
-After shoe round result:
-```
-Gary:  "See? Smooth. That's called professionalism..."
-Player: [...what was that sound?]
-Gary:  "[CRACK] ...The shoe. It broke."
-Player: [Of course it did.] → hideDialogue, storyPhase = 3
-```
-
-### Pit Boss Escalation (Phases 3–5, pre-deal)
-
-| Phase | Line | Player response |
+| Phase | Shuffle line | Player response |
 |---|---|---|
-| 3 | *"Gary."* | (Gary shuffles) |
-| 4 | *"GARY. I'm watching you."* | (Silence) |
-| 5 | *"Gary, this is your last chance. Those cards had better move."* | (Gary shuffles. Slower than usual.) |
+| 4 | Pit Boss: *"..."* | (Pubert shuffles.) |
+| 5 | Gary: *"Been working here about two weeks now... since everything with the wife..."* | *(…Please just deal.)* |
+| 6 | Gary builds to: *"You know, I was just wondering if you've ever been divor—"* → Pit Boss: *"Pubert. A woid."* | (Pubert shuffles.) |
 
-### Moe Entrance (Phase 5 → 6)
+### Moe Entrance (Phase 8 → 9)
 
 ```
+[runScriptedDrop2 — cards scatter wide]
 Pit Boss: "THAT'S IT. MOE!!!"
 Player:   [(A distant clattering)]
-→ Moe PNG appears on table, hands retract
+→ 900ms delay → Moe PNG appears on table (85vh, bottom: 0), hands retract
 Moe:      "[Moe has climbed onto the table. He is already dealing.]"
-Player:   [Okay.] → hideDialogue
+Player:   [Okay.] → hideDialogue, setButtons('BETTING'), startMoeRoam()
 ```
+
+Moe then snaps to random horizontal positions every 6–30s indefinitely.
 
 ---
 
@@ -288,15 +299,16 @@ Player:   [Okay.] → hideDialogue
 |---|---|---|
 | First deal ever | `deal()` → `runIntroDialogue` | Gary asks if player knows the game |
 | Post-intro | `runGaryEnthusiasm` | DEAL flash, ticker, Gary's enthusiasm |
-| Deal button (phases 3–5) | `checkPreDealNarrative(proceed)` | Pit boss pre-deal lines |
+| Shuffle (hands, phase 1) | `runShuffle(onDone)` | Shoe offer as dialogue choice |
+| Shuffle (hands, phase 3) | `runShuffle(onDone)` | Shoe explosion sequence |
+| Shuffle (hands, phase 4) | `runShuffle(onDone)` | Pit Boss: "..." mid-shuffle |
+| Shuffle (hands, phase 5) | `runShuffle(onDone)` | Gary overshares (wife/lawyer bills) |
+| Shuffle (hands, phase 6) | `runShuffle(onDone)` | Gary → divorce Q → Pit Boss cuts him off |
+| Shuffle (Moe, phase 9+) | `runShuffle(onDone)` | Instant, 120ms, no dialogue |
 | Card drop (35%, hands mode) | `runDropSequence(count, onDone)` | Gary overshares (Sharon, lawyer bills) |
-| Shuffle (hands mode, phase 1) | `runShuffle(onDone)` | Shoe offer available as choice |
-| Shuffle (hands mode, others) | `runShuffle(onDone)` | Fumble line, auto-resolves 10s |
 | After result | `checkPostResultNarrative()` | Advances storyPhase |
-| Player wins | `settleResult('win')` | **No dialogue yet** |
-| Player busts | `settleResult('lose')` | **No dialogue yet** |
-| Blackjack | `settleResult('blackjack')` | **No dialogue yet** |
-| Balance hits $0 | `showGameOver()` | Static overlay — **no Gary line yet** |
+| Phase 8 pre-deal | `runScriptedDrop2()` | Second wide scatter → Moe entrance |
+| Balance hits $0 | `showGameOver()` | Static overlay |
 
 ---
 
@@ -307,28 +319,43 @@ Player:   [Okay.] → hideDialogue
 runIntroDialogue(proceed)       // fires on first deal only (stats.hands === 0)
 runRulesExplanation(proceed)    // 3-beat clean explanation
 runGaryEnthusiasm(proceed)      // DEAL flash + ticker swap + Gary line
-setupScriptedHand1()            // pushes scripted cards to shoe (called at init + restart)
-checkPreDealNarrative(proceed)  // pit boss lines phases 3–5
+setupScriptedHand1/2/3()        // push scripted cards to shoe
 checkPostResultNarrative()      // advances storyPhase after each result
 runShoeOffer()                  // Gary retrieves shoe → storyPhase = 2
-runMoeEntrance()                // Pit Boss snaps, Moe appears → storyPhase = 6
+runMoeEntrance()                // Pit Boss snaps, Moe appears → storyPhase = 9
+startMoeRoam()                  // begins random snap-to-position loop (6–30s intervals)
+stopMoeRoam()                   // clears roam timer (called on restartGame)
 
 // Dealing
-dealStagger()                   // 3750ms / 380ms / 55ms by phase
+dealStagger()                   // 3750ms (hands) / 380ms (shoe) / 55ms (Moe)
 handIn() / handOut()            // slide hands in/out; handOut resets transform
-slideCardFromDeck(wrapper)      // JS-driven card + hand slide from deck to slot
-runShuffle(onDone)              // overhand animation (hands) / instant (shoe/Moe)
+slideCardFromDeck(wrapper)      // JS RAF loop: card + left hand slide from deck to slot
+runShuffle(onDone)              // overhand animation (hands) / shoe dialogue / instant (Moe)
 
 // Drop
-showDropPile()                  // renders scattered card pile
+showDropPile()                  // 5 scattered face-down cards, staggered fall
+showDropPileWide()              // wider scatter (shoe explosion, second drop)
 hideDropPile(cb)                // cards float back, then calls cb
 runDropSequence(count, onDone)  // full drop sequence with escalating Gary dialogue
+runScriptedDrop2()              // phase 8 wide drop → Moe entrance
 
 // Dialogue
 showDialogue(char, speech, choices)
 showDialogueAlt(char, speech, choices)
 hideDialogue()
 ```
+
+---
+
+## Dev Panel
+
+A floating dev panel (`⚙ DEV`, top-right corner) is injected at runtime via JS.
+Fully bypasses the layout system — appended directly to `document.body`, `z-index: 2147483647`.
+
+**Features:**
+- Live state display: `storyPhase`, `gameState`, balance, `phase1Dropped`, `scriptedHand3Done`
+- Phase jump buttons (0–9): clear dialogue, cancel pending timeouts, set phase, restore Moe/BETTING
+- Force → BETTING button: unstick the UI at any point
 
 ---
 
@@ -348,15 +375,12 @@ blackjack-quest/
 
 ## What's Next
 
-- **Scripted hands 2+** — need sequence mapped out
-- **Gary win/bust/blackjack reactions** — hooks exist in `settleResult`, no lines written
+- **Gary win/bust/blackjack reactions** — hooks exist in `settleResult`, no lines written yet
 - **Drop beats 4 & 5** — Sharon lore after drop #3
 - **Game-over Gary monologue** — closing beat when balance hits $0
-- **Pit Boss extended** — more than one line per phase (3–5)
-- **Moe lines** — terse one-liners while dealing fast
-- **UI/HUD redesign** — pending mockup from user
-- **Hand art** — `Untitled_Artwork 3.jpg`, green chroma key, 454×420px, embedded. Clean.
-- **Gary portrait** — `Untitled_Artwork 4.jpg`, left half, green chroma key, embedded.
-- **Pit Boss portrait** — `Untitled_Artwork 3.jpg`, right half, green chroma key, embedded.
-- **Gary alt portrait** — same as normal for now (no distressed variant yet)
-- **Moe portrait** — SVG placeholder still in use; needs real art on green screen
+- **Pit Boss extended** — more lines per phase (4–6); currently one line each
+- **Moe lines** — terse one-liners while dealing fast (hooks not yet added)
+- **Moe portrait art** — SVG placeholder still in use for dialogue box; needs green-screen photo cropped to Moe only
+- **Hand art** — `Untitled_Artwork 3.jpg`, green chroma key, 454×420px, embedded
+- **Gary portrait** — `Untitled_Artwork 4.jpg`, left half, green chroma key, embedded
+- **Pit Boss portrait** — `Untitled_Artwork 3.jpg`, right half, green chroma key, embedded

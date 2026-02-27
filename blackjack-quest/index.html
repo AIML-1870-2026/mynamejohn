@@ -1185,6 +1185,8 @@ let introShown     = false;
 let phase1Dropped  = false;
 let scriptedHand3Done = false;
 let pendingReactTimeout = null;
+let _moeRoamTimer = null;
+let _moeRoamIdx   = 2; // current position index (start centred)
 
 // ── Story phase ──────────────────────────────────────────────
 // 0 = hands (slow, pre-shoe offer)
@@ -2435,6 +2437,7 @@ function doShowGameOver() {
 }
 
 function restartGame() {
+  stopMoeRoam();
   document.querySelector('.game-over-overlay')?.remove();
   balance = 500; bet = 0; stats = { w:0,l:0,p:0,hands:0 }; history = []; dropCount = 0;
   storyPhase = 0; scriptedHand3Done = false; pendingReactTimeout = null; phase1Dropped = false;
@@ -2505,6 +2508,25 @@ function runShoeOffer() {
   );
 }
 
+// ── Moe roaming ──────────────────────────────────────────────
+const MOE_ROAM_POS = ['18%', '33%', '50%', '67%', '82%'];
+
+function startMoeRoam() {
+  stopMoeRoam();
+  function snap() {
+    let idx;
+    do { idx = Math.floor(Math.random() * MOE_ROAM_POS.length); } while (idx === _moeRoamIdx);
+    _moeRoamIdx = idx;
+    document.getElementById('moe-on-table').style.left = MOE_ROAM_POS[idx];
+    _moeRoamTimer = setTimeout(snap, 6000 + Math.random() * 24000);
+  }
+  _moeRoamTimer = setTimeout(snap, 6000 + Math.random() * 24000);
+}
+
+function stopMoeRoam() {
+  if (_moeRoamTimer) { clearTimeout(_moeRoamTimer); _moeRoamTimer = null; }
+}
+
 function runMoeEntrance() {
   showDialogue(CHARS.pitBoss,
     '"THAT\'S IT.&nbsp; MOE!!!"',
@@ -2514,7 +2536,7 @@ function runMoeEntrance() {
         handOut();
         showDialogue(CHARS.moe,
           '"[Moe has climbed onto the table. He is already dealing.]"',
-          [{ label: 'Okay.', cb: () => { hideDialogue(); setButtons('BETTING'); } }]
+          [{ label: 'Okay.', cb: () => { hideDialogue(); setButtons('BETTING'); startMoeRoam(); } }]
         );
       }, 900);
     }}]
