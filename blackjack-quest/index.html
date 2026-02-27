@@ -1795,7 +1795,38 @@ function runShuffle(onDone) {
     onDone();
   };
 
-  if (storyPhase === 4) {
+  if (storyPhase === 3) {
+    // Shoe explosion — no deal follows, advances to phase 4
+    setTimeout(() => {
+      showDialogue(CHARS.dealer, '(The shoe is smoking.)',
+        [{ label: "Is it meant to do that?", cb: () => {
+          showDialogue(CHARS.dealer, '"NO!"');
+          setTimeout(() => {
+            hideDialogue();
+            fly.classList.remove('animating', 'slow');
+            deck.classList.remove('visible');
+            handOut();
+            showDropPileWide();
+            showDialogue(CHARS.dealer, '"Heh heh... user error..."',
+              [{ label: '(The cards are everywhere.)', cb: () => {
+                setTimeout(() => {
+                  showDialogue(CHARS.pitBoss, '"Pubert."',
+                    [{ label: '(...)', cb: () => {
+                      hideDropPile(() => {
+                        storyPhase = 4;
+                        setButtons('BETTING');
+                      });
+                    }}]
+                  );
+                }, 1000);
+              }}]
+            );
+          }, 800);
+        }}]
+      );
+    }, 3000);
+    // finishShuffle / onDone intentionally not called — no hand this round
+  } else if (storyPhase === 4) {
     // Pit Boss beat 1: "..." — appears mid-shuffle, player must dismiss
     setTimeout(() => {
       showDialogue(CHARS.pitBoss, '"..."',
@@ -2431,19 +2462,8 @@ function checkPostResultNarrative(outcome) {
   if (storyPhase === 0 && stats.hands >= 1) {
     storyPhase = 1;
   } else if (storyPhase === 2) {
-    // Shoe round done — it breaks
+    // Shoe round done — explosion happens during next shuffle
     storyPhase = 3;
-    setTimeout(() => {
-      showDialogue(CHARS.dealer,
-        '"See? Smooth. That\'s called professionalism. I am a professional. That went really—"',
-        [{ label: '...what was that sound?', cb: () => {
-          showDialogueAlt(CHARS.dealer,
-            '"[CRACK]<br>...The shoe.<br>It broke."',
-            [{ label: 'Of course it did.', cb: hideDialogue }]
-          );
-        }}]
-      );
-    }, 1400);
   } else if (storyPhase === 3) {
     // Free round post-shoe — garyReact fires, advance to pit boss phase
     storyPhase = 4;
