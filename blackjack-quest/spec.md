@@ -92,7 +92,7 @@ Dialogue portrait slot is 100×120px.
 - Small, scrungly. Climbs onto the table. Deals superhuman fast.
 - **Dialogue portrait**: SVG illustration only (no Pubert in frame). White blob body, big round eyes, pencil mustache, sparse upright hair, belt/cummerbund.
 - **On-table**: Right half of `MOE_RAW_B64` green-screen photo, chroma-keyed. Rendered at `height: 85vh`, `position: absolute`, `bottom: 0`, anchored to bottom of game area. `pointer-events: none`.
-- **Roaming**: After entrance, snaps to a random horizontal position (5 slots: 18%, 33%, 50%, 67%, 82%) every 6–30 seconds. Never repeats same slot consecutively.
+- **Roaming**: After entrance, snaps to a random horizontal position (5 slots: 18%, 33%, 50%, 67%, 82%) every 6–30 seconds. Never repeats same slot consecutively. On each snap, height randomises between 62vh–108vh, creating a depth/perspective illusion.
 
 ---
 
@@ -379,7 +379,12 @@ blackjack-quest/
 - **Drop beats 4 & 5** — Sharon lore after drop #3
 - **Game-over Gary monologue** — closing beat when balance hits $0
 - **Pit Boss extended** — more lines per phase (4–6); currently one line each
-- **Moe lines** — terse one-liners while dealing fast (hooks not yet added)
+- **Moe bust monologue** (phase 9+, player busts): fires 1.2s after result, 4-beat dialogue:
+  1. *"I am deeply sorry for your loss."*
+  2. *"You know, when I was very young, I immigrated from Czekystan. I remember traveling through the Ural Mountains by train, watching the sun set."*
+  3. *"That was the last Czechystanian sunset I ever saw. I didn't even know it. Loss borne of ignorance."*
+  4. *"That's kinda like what you just did."*
+- **Moe other lines** — win/push reactions while dealing fast (not yet written)
 - **Moe portrait art** — SVG placeholder still in use for dialogue box; needs green-screen photo cropped to Moe only
 - **Hand art** — `Untitled_Artwork 3.jpg`, green chroma key, 454×420px, embedded
 - **Gary portrait** — `Untitled_Artwork 4.jpg`, left half, green chroma key, embedded

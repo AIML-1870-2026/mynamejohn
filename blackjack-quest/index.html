@@ -2384,6 +2384,28 @@ function settleResult(outcome) {
   updateHUD();
   updateStreak();
   setButtons('RESULT');
+  if (storyPhase >= 9 && outcome === 'lose' && isBust(playerHand)) {
+    setTimeout(() => {
+      showDialogue(CHARS.moe, '"I am deeply sorry for your loss."',
+        [{ label: '...', cb: () => {
+          showDialogue(CHARS.moe,
+            '"You know, when I was very young, I immigrated from Czekystan. I remember traveling through the Ural Mountains by train, watching the sun set."',
+            [{ label: '...', cb: () => {
+              showDialogue(CHARS.moe,
+                '"That was the last Czechystanian sunset I ever saw. I didn\'t even know it. Loss borne of ignorance."',
+                [{ label: '...', cb: () => {
+                  showDialogue(CHARS.moe,
+                    '"That\'s kinda like what you just did."',
+                    [{ label: 'Okay.', cb: hideDialogue }]
+                  );
+                }}]
+              );
+            }}]
+          );
+        }}]
+      );
+    }, 1200);
+  }
   if (balance <= 0) setTimeout(showGameOver, 1400);
   else checkPostResultNarrative(outcome);
 }
@@ -2517,7 +2539,9 @@ function startMoeRoam() {
     let idx;
     do { idx = Math.floor(Math.random() * MOE_ROAM_POS.length); } while (idx === _moeRoamIdx);
     _moeRoamIdx = idx;
-    document.getElementById('moe-on-table').style.left = MOE_ROAM_POS[idx];
+    const moe = document.getElementById('moe-on-table');
+    moe.style.left   = MOE_ROAM_POS[idx];
+    moe.style.height = (62 + Math.random() * 46) + 'vh'; // 62–108vh: depth illusion
     _moeRoamTimer = setTimeout(snap, 6000 + Math.random() * 24000);
   }
   _moeRoamTimer = setTimeout(snap, 6000 + Math.random() * 24000);
