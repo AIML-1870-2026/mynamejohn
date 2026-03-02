@@ -12,15 +12,14 @@ A top-down stealth game set in a college dining hall. Your meal plan ran out. Yo
 
 ## Team Structure
 
-This game is built by 4–5 members. Each member owns one module and works on it independently using Claude. Modules communicate through a single shared global object (`window.GameState`). All modules must be built and tested in isolation first, then integrated into `index.html`.
+This game is built by 4 members. Each member owns one module and works on it independently using Claude. Modules communicate through a single shared global object (`window.GameState`). All modules must be built and tested in isolation first, then integrated into `index.html`.
 
 | # | Module | File |
 |---|--------|------|
-| 1 | Core Engine & Game Loop | `js/engine.js` + `js/state.js` |
+| 1 | Engine, UI & Screens | `js/engine.js` + `js/state.js` + `js/ui.js` |
 | 2 | Map & Dining Hall | `js/map.js` |
 | 3 | Player Character | `js/player.js` |
 | 4 | Worker AI & Detection | `js/workers.js` |
-| 5 | UI, HUD & Screens | `js/ui.js` |
 
 > **Prompt for Claude:** When starting your module, paste this entire spec into Claude and say: "I am building Module [N]: [name]. Build only this module. Use the GameState interface and the exposed window.[Module] API exactly as described in the spec."
 
@@ -35,10 +34,10 @@ meal-plan-zero/
 ├── js/
 │   ├── state.js        ← shared game state (Module 1 writes, all modules read/write)
 │   ├── engine.js       ← game loop, input handling, phase control (Module 1)
+│   ├── ui.js           ← HUD, start/gameover/win screens, sound (Module 1)
 │   ├── map.js          ← dining hall layout, food placement, rendering (Module 2)
 │   ├── player.js       ← player movement, collision, food pickup (Module 3)
-│   ├── workers.js      ← worker AI, patrol routes, detection logic (Module 4)
-│   └── ui.js           ← HUD, start/gameover/win screens, sound (Module 5)
+│   └── workers.js      ← worker AI, patrol routes, detection logic (Module 4)
 └── assets/
     └── sounds/         ← optional WAV/MP3 files for sound effects
 ```
@@ -49,8 +48,8 @@ meal-plan-zero/
 <script src="js/map.js"></script>
 <script src="js/player.js"></script>
 <script src="js/workers.js"></script>
-<script src="js/ui.js"></script>
-<script src="js/engine.js"></script>  <!-- always last -->
+<script src="js/ui.js"></script>    <!-- Module 1, must load before engine -->
+<script src="js/engine.js"></script> <!-- always last -->
 ```
 
 ---
@@ -101,9 +100,9 @@ window.GameState = {
 
 ---
 
-## Module 1 — Core Engine & Game Loop
+## Module 1 — Engine, UI & Screens
 
-**Files:** `js/state.js`, `js/engine.js`, `index.html`
+**Files:** `js/state.js`, `js/engine.js`, `js/ui.js`, `index.html`
 
 ### Responsibilities
 - Define `window.GameState` (the full object above)
@@ -112,6 +111,10 @@ window.GameState = {
 - Run the main game loop via `requestAnimationFrame`
 - Manage phase transitions: start → playing → gameover / win
 - Call other module functions in the correct order each frame (see loop order below)
+- Draw the in-game HUD (detection meter, score, inventory, round)
+- Render the Start, Game Over, and Win screens
+- Handle button clicks for start, retry, and next round
+- (Optional) Play sound effects at key moments
 
 ### Game Loop Order (each frame)
 
@@ -134,15 +137,6 @@ window.GameState = {
 - `'playing'` → `'win'`: triggered by Player module when player exits with food
 - `'gameover'` or `'win'` → `'playing'`: triggered by UI restart/next-round button
 
-### Exposed API
-
-```javascript
-window.Engine = {
-  init(),    // called once on page load — sets up canvas, listeners, starts loop
-  reset(),   // resets GameState values, calls Map.reset(), Player.reset(), Workers.reset()
-};
-```
-
 ### init() startup sequence
 ```
 Engine.init()
@@ -154,10 +148,114 @@ Engine.init()
   → requestAnimationFrame(loop)
 ```
 
-### Notes for Claude
+### Notes for Claude (Engine)
 - Use `delta time` if possible: `const dt = (timestamp - lastTime) / 1000` — pass dt to update functions or use it internally.
 - Canvas should be styled with `display: block; margin: 0 auto;` centered on the page.
 - The engine does not handle collision or detection — those belong to the Player and Workers modules.
+
+### HUD Elements (`js/ui.js`, drawn over gameplay each frame)
+
+| Element | Position | Details |
+|---------|----------|---------|
+| Detection meter | Top-right, x=580 y=12 w=200 h=18 | Background `#333`, fill color scaled by `detection/100`. Label "BUSTED" in white above bar |
+| Score | Top-left, x=20 y=24 | White, 16px, `"Score: " + GameState.score` |
+| Inventory | Top-center, x=340 y=24 | White, 14px, `GameState.player.inventory.length + " items"` |
+| Round | Top-left, x=20 y=44 | Gray `#aaa`, 12px, `"Round " + GameState.round` |
+
+Detection meter color transitions:
+- 0–49%: `#33cc33` (green)
+- 50–79%: `#ff9900` (orange)
+- 80–100%: `#cc3300` (red) — flash the "BUSTED" label when above 80
+
+### Start Screen
+
+Drawn as a centered 480×320 dark box (`rgba(0,0,0,0.88)`) at x=160, y=140:
+
+```
+MEAL PLAN ZERO               (white, 32px bold, centered)
+
+Your meal plan ran out.      (gray #aaa, 14px, centered)
+You're hungry.
+The dining hall is open.
+
+[ START GAME ]               (button — white text on #336699 bg)
+
+WASD — Move                  (gray #888, 11px)
+Shift — Crouch (less visible)
+E — Grab food
+Reach the EXIT to escape
+```
+
+### Game Over Screen
+
+Centered 420×260 dark box at x=190, y=170:
+
+```
+CAUGHT.                      (red #cc3300, 28px bold)
+
+Banned from the dining hall. (gray #aaa, 14px)
+Also still hungry.
+
+Food stolen: N items         (white, 14px)
+Score: N pts                 (white, 16px bold)
+
+[ TRY AGAIN ]                (button — white on #993300)
+```
+
+### Win Screen
+
+Centered 420×260 dark box at x=190, y=170:
+
+```
+ESCAPED.                     (green #33cc66, 28px bold)
+
+Round N complete.            (gray #aaa, 14px)
+
+Food stolen: N items         (white, 14px)
+Score: N pts                 (white, 16px bold)
+
+[ NEXT ROUND ]               (button — white on #336633)
+```
+
+### Button Interaction
+- Store button rects as `{ x, y, w, h }` when drawing them
+- Add a `'mousedown'` listener to the canvas on `UI.init()`
+- On click: check if `(mx, my)` falls within any active button rect
+  - Start button → `Engine.reset()` then `GameState.phase = 'playing'`
+  - Try Again button → `Engine.reset()` then `GameState.phase = 'playing'`
+  - Next Round button → `GameState.round++`, `Engine.reset()`, `GameState.phase = 'playing'`
+
+### Sound Effects (Optional)
+
+Use `new Audio(src)` for simplicity. Trigger only on threshold crossings, not every frame.
+
+| Event | File | Notes |
+|-------|------|-------|
+| Food grabbed | `assets/sounds/grab.wav` | Short click/rustle |
+| Detection spike (>50) | `assets/sounds/alert.wav` | Sting sound |
+| Game over | `assets/sounds/caught.wav` | Buzzer/stinger |
+| Win | `assets/sounds/escape.wav` | Positive chime |
+
+If no sound files are available, skip — do not let missing audio break the game.
+
+### Exposed API
+
+```javascript
+window.Engine = {
+  init(),    // sets up canvas, listeners, calls all module inits, starts loop
+  reset(),   // resets GameState values, calls Map/Player/Workers reset
+};
+
+window.UI = {
+  init(),      // attach canvas mousedown listener
+  draw(ctx),   // draw HUD during 'playing', or correct screen based on phase
+};
+```
+
+### Notes for Claude (UI)
+- All screens are drawn on canvas — no HTML `<div>` overlays.
+- Draw screens on top of the partially rendered game frame using semi-transparent backgrounds.
+- `UI.draw()` is called last in the game loop so it renders on top of everything.
 
 ---
 
@@ -431,120 +529,6 @@ window.Workers = {
 - Call `Player.detectionRadius()` if you want to also check whether the player is "hiding" behind something (stretch goal: wall occlusion). For the base game, skip occlusion — just use the cone check.
 - Detection should only run when `GameState.phase === 'playing'`. Guard at the top of `update()`.
 - Worker angle updates smoothly toward their patrol direction: `worker.angle = Math.atan2(dy, dx)` where dy/dx is the direction toward next waypoint.
-
----
-
-## Module 5 — UI, HUD & Screens
-
-**File:** `js/ui.js`
-
-### Responsibilities
-- Draw the in-game HUD during `'playing'` phase
-- Render the Start Screen when `phase === 'start'`
-- Render the Game Over screen when `phase === 'gameover'`
-- Render the Win screen when `phase === 'win'`
-- Handle button clicks (start, retry, next round) via canvas mouse events
-- (Optional) Play sound effects at key moments
-
-### HUD Elements (drawn over gameplay)
-
-| Element | Position | Details |
-|---------|----------|---------|
-| Detection meter | Top-right, x=580 y=12 w=200 h=18 | Background `#333`, fill `#cc3300` scaled by `detection/100`. Label "BUSTED" in white 10px above bar |
-| Score | Top-left, x=20 y=24 | White, 16px, `"Score: " + GameState.score` |
-| Inventory | Top-center, x=340 y=24 | White, 14px, `GameState.player.inventory.length + " items"` |
-| Round | Top-left, x=20 y=44 | Gray `#aaa`, 12px, `"Round " + GameState.round` |
-
-Detection meter color transitions:
-- 0–49%: `#33cc33` (green)
-- 50–79%: `#ff9900` (orange)
-- 80–100%: `#cc3300` (red)
-
-### Start Screen
-
-Drawn as a centered 480×320 dark box (`rgba(0,0,0,0.88)`) at x=160, y=140:
-
-```
-MEAL PLAN ZERO               (white, 32px bold, centered)
-
-Your meal plan ran out.      (gray #aaa, 14px, centered)
-You're hungry.
-The dining hall is open.
-
-[ START GAME ]               (button — white text on #336699 bg)
-
-WASD — Move                  (gray #888, 11px)
-Shift — Crouch (less visible)
-E — Grab food
-Reach the EXIT to escape
-```
-
-### Game Over Screen
-
-Centered 420×260 dark box at x=190, y=170:
-
-```
-CAUGHT.                      (red #cc3300, 28px bold)
-
-Banned from the dining hall. (gray #aaa, 14px)
-Also still hungry.
-
-Food stolen: N items         (white, 14px)
-Score: N pts                 (white, 16px bold)
-
-[ TRY AGAIN ]                (button — white on #993300)
-```
-
-### Win Screen
-
-Centered 420×260 dark box at x=190, y=170:
-
-```
-ESCAPED.                     (green #33cc66, 28px bold)
-
-Round N complete.            (gray #aaa, 14px)
-
-Food stolen: N items         (white, 14px)
-Score: N pts                 (white, 16px bold)
-
-[ NEXT ROUND ]               (button — white on #336633)
-```
-
-### Button Interaction
-- Store button rects as `{ x, y, w, h }` when drawing them
-- Add a `'mousedown'` listener to the canvas on `init()`
-- On click: check if `(mx, my)` falls within any active button rect
-  - Start button → `Engine.reset()` then `GameState.phase = 'playing'`
-  - Try Again button → `Engine.reset()` then `GameState.phase = 'playing'`
-  - Next Round button → `GameState.round++`, `Engine.reset()`, `GameState.phase = 'playing'`
-
-### Sound Effects (Optional)
-
-Use `new Audio(src)` for simplicity. Suggested cues:
-
-| Event | File | Notes |
-|-------|------|-------|
-| Food grabbed | `assets/sounds/grab.wav` | Short click/rustle |
-| Detection spike (>50) | `assets/sounds/alert.wav` | Sting sound |
-| Game over | `assets/sounds/caught.wav` | Buzzer/stinger |
-| Win | `assets/sounds/escape.wav` | Positive chime |
-
-If no sound files are available, skip — do not let missing audio break the game.
-
-### Exposed API
-
-```javascript
-window.UI = {
-  init(),      // attach canvas mousedown listener
-  draw(ctx),   // draw HUD during 'playing', or correct screen based on phase
-};
-```
-
-### Notes for Claude
-- All screens are drawn on the canvas — no HTML `<div>` overlays.
-- Draw screens on top of a partially rendered game frame (map still visible underneath) using semi-transparent backgrounds for depth.
-- The detection meter should feel urgent: flash the meter label when detection > 80.
-- Track a `lastDetectionLevel` variable to trigger sound only when crossing thresholds, not every frame.
 
 ---
 
