@@ -304,8 +304,10 @@ function spawnChunk() {
     chunks.push(makeHazard(type, nextChunkX + relX, w, h, yoff));
   });
   const span = chunk.reduce((m, c) => Math.max(m, c[1] + c[2]), 0);
-  nextChunkX += span + 180 + Math.random() * 120 - speed * 0.05;
-  nextChunkX = Math.max(nextChunkX, nextChunkX); // clamp handled by gap floor
+  // Gap is time-based: player's small hop takes ~0.76s, so minimum clear gap
+  // is 0.55s (land + react). Max 0.9s to avoid dead zones. Floor at 140px.
+  const gapSec = 0.55 + Math.random() * 0.35;
+  nextChunkX += span + Math.max(speed * gapSec, 140);
 }
 
 // ── Init / reset ──────────────────────────────────────────────
