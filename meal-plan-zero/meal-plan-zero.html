@@ -1,0 +1,2836 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meal Plan Zero</title>
+  <style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: #111;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+#game-container {
+  /* Canvas appended here by engine.js */
+}
+
+#game-canvas {
+  display: block;
+  border: 2px solid #333;
+}
+
+</style>
+</head>
+<body>
+  <div id="game-container"></div>
+
+  <script>
+// Module 1 — Shared Game State
+// All modules read from and write to window.GameState.
+// Do NOT store authoritative game data in module-local variables.
+
+window.GameState = {
+  // Game phase
+  phase: 'start',   // 'start' | 'playing' | 'gameover' | 'win'
+  score: 0,
+  round: 1,
+
+  // Canvas (set by engine.js on init)
+  canvas: null,
+  ctx: null,
+  width: 800,     // viewport / canvas size
+  height: 600,
+
+  // World dimensions (larger than viewport — camera scrolls to show a portion)
+  worldWidth:  800,
+  worldHeight: 1400,
+
+  // Camera — top-left corner of the viewport in world coordinates
+  // Updated each frame by engine.js based on player position.
+  cam: { x: 0, y: 0 },
+
+  // Player
+  player: {
+    x: 50,           // starting position — lobby, bottom-left
+    y: 1200,
+    width: 20,
+    height: 20,
+    speed: 3,        // pixels per frame at 60fps
+    crouching: false,
+    inventory: [],   // food items grabbed this round
+  },
+
+  // Detection meter 0–100 (hits 100 = game over)
+  detection: 0,
+
+  // Map data — populated by Map.init()
+  walls: [],         // [{ x, y, w, h }, ...]
+  foods: [],         // [{ id, x, y, w, h, label, points, grabbed }, ...]
+  exitZone: { x: 340, y: 1350, w: 120, h: 28 },  // front door, bottom of lobby
+
+  // Workers — populated by Workers.init()
+  workers: [],
+
+  // Input — written by engine.js keydown/keyup listeners
+  keys: {},          // { 'w': true, 'ArrowUp': true, 'Shift': true, ... }
+
+  // Hiding — true when player is inside a locker/cabinet hidespot
+  hiding: false,
+
+  // Hidespot objects — populated by Map.init(); each has { id, x, y, w, h, label, occupied }
+  hideSpots: [],
+
+  // Sprint resource — depleted by holding Space, regens when not sprinting
+  stamina: 100,      // 0–100
+
+  // Noise footprint — set by player.js each frame (radius in px, 0 = silent)
+  playerNoise: 0,
+
+  // Distraction throw — set by Q key; workers in radius walk toward it
+  distractions: 3,   // charges remaining
+  distraction: null, // { x, y, radius, timer } or null
+
+  // Lives system — 3 hearts; lose one when detection hits 100
+  lives: 3,
+  highScore: 0,
+
+  // Visual effects
+  shakeFrames: 0,    // screen shake countdown (frames)
+  shakeMag: 5,       // shake intensity (pixels)
+  grabFlash: 0,      // food-grab flash ring countdown (frames)
+  flashAlpha: 0,     // full-screen red flash (0–1, fades out on lose-life)
+  popups: [],        // floating score text: [{ text, x, y, alpha, color }, ...]
+};
+// =============================================================================
+// Module 2 — Map & Dining Hall
+// File: js/map.js
+// Exposes: window.Map = { init, draw, reset }
+// Reads/writes: GameState.walls, GameState.foods, GameState.exitZone
+//
+// World: 800 × 1400  (camera scrolls vertically; viewport is 800×600)
+//
+// Zone layout (y=0 is top):
+//   KITCHEN      y=20   – y=270  (food, 2 workers: Chef A + Gap Guard B)
+//   COUNTER      y=270  – y=298  (serving counter; gap x=320–480)
+//   UPPER DINING y=298  – y=620  (3 dining tables; Worker C patrols)
+//   DIVIDER 1    y=620  – y=642  (painted wall; gap x=360–440)
+//   LOWER DINING y=642  – y=980  (tables + post; Worker D patrols)
+//   DIVIDER 2    y=980  – y=1000 (lobby separator; gap x=280–520)
+//   LOBBY        y=1000 – y=1380 (benches, EXIT at y=1350 — player spawns here)
+// =============================================================================
+
+window.Map = (function () {
+
+  var _time       = 0;
+  var _particles  = [];
+  var _MAX_PARTICLES = 60;
+
+  // ── Wall definitions ────────────────────────────────────────────────────────
+  // Index groups:
+  //   0–3   outer walls (skipped by LOS check)
+  //   4–5   serving counter          (gap x=320–480)
+  //   6–7   zone divider 1           (gap x=360–440)
+  //   8–9   zone divider 2 / lobby   (gap x=280–520)
+  //   10–12 upper dining tables
+  //   13–15 lower dining tables + centre post
+  //   16–17 kitchen prep stations
+  //   18–19 lobby benches
+  //   20    kitchen central island
+  //   21–24 cover columns (upper + lower dining)
+  //   25–26 lobby inner security wall  (gap x=260–540)
+  //   27–30 dining zone wall stubs (partition cover, jut from side walls)
+  //   31–32 kitchen wall shelves
+
+  const WALL_DEFS = [
+    // Outer boundary
+    { x:0,   y:0,    w:800, h:20   },  // 0  top
+    { x:0,   y:1380, w:800, h:20   },  // 1  bottom
+    { x:0,   y:0,    w:20,  h:1400 },  // 2  left
+    { x:780, y:0,    w:20,  h:1400 },  // 3  right
+
+    // Serving counter (gap x=320–480 = 160px)
+    { x:20,  y:270,  w:300, h:28   },  // 4  counter-left   (x=20–320)
+    { x:480, y:270,  w:300, h:28   },  // 5  counter-right  (x=480–780)
+
+    // Zone divider 1 — upper/lower dining (gap x=360–440 = 80px)
+    { x:20,  y:620,  w:340, h:22   },  // 6  div1-left
+    { x:440, y:620,  w:340, h:22   },  // 7  div1-right
+
+    // Zone divider 2 — lobby separator (gap x=280–520 = 240px, wide and easy)
+    { x:20,  y:980,  w:260, h:20   },  // 8  div2-left
+    { x:520, y:980,  w:260, h:20   },  // 9  div2-right
+
+    // Upper dining tables
+    { x:90,  y:350,  w:110, h:55   },  // 10 table UL
+    { x:340, y:350,  w:120, h:55   },  // 11 table UM
+    { x:600, y:350,  w:110, h:55   },  // 12 table UR
+
+    // Lower dining tables + cover post
+    { x:120, y:710,  w:110, h:55   },  // 13 table LL
+    { x:370, y:730,  w:60,  h:55   },  // 14 centre post
+    { x:570, y:710,  w:110, h:55   },  // 15 table LR
+
+    // Kitchen prep stations (solid stainless-steel equipment)
+    { x:60,  y:80,   w:100, h:50   },  // 16 prep station left
+    { x:640, y:80,   w:100, h:50   },  // 17 prep station right
+
+    // Lobby benches
+    { x:60,  y:1070, w:80,  h:28   },  // 18 bench left
+    { x:660, y:1070, w:80,  h:28   },  // 19 bench right
+
+    // Kitchen central island — splits kitchen into left lane (x<310) and right lane (x>490)
+    // Forces player to choose a lane and creates tactical routing around Chef A
+    { x:310, y:50,   w:180, h:90   },  // 20 kitchen central island
+
+    // Cover columns in upper and lower dining — give player LOS-break spots mid-room
+    { x:200, y:530,  w:22,  h:55   },  // 21 column upper-left
+    { x:578, y:530,  w:22,  h:55   },  // 22 column upper-right
+    { x:200, y:870,  w:22,  h:55   },  // 23 column lower-left
+    { x:578, y:870,  w:22,  h:55   },  // 24 column lower-right
+
+    // Lobby inner security wall — second choke point before EXIT (gap x=260–540 = 280px)
+    // Worker E (lobby guard) patrols the zone south of this wall.
+    { x:20,  y:1140, w:240, h:22   },  // 25 lobby inner wall left
+    { x:540, y:1140, w:240, h:22   },  // 26 lobby inner wall right
+
+    // Dining zone wall stubs — partition walls jutting from side walls; create cover lanes
+    { x:20,  y:468,  w:55,  h:22   },  // 27 upper dining stub left
+    { x:725, y:468,  w:55,  h:22   },  // 28 upper dining stub right
+    { x:20,  y:790,  w:55,  h:22   },  // 29 lower dining stub left
+    { x:725, y:790,  w:55,  h:22   },  // 30 lower dining stub right
+
+    // Kitchen wall shelves — stainless steel storage units along back walls
+    { x:20,  y:155,  w:60,  h:22   },  // 31 kitchen shelf left
+    { x:720, y:155,  w:60,  h:22   },  // 32 kitchen shelf right
+  ];
+
+  // ── Food definitions ─────────────────────────────────────────────────────────
+  // All food is in the kitchen zone (y < 270).
+  // Counter food at y=240: player presses against counter from kitchen side
+  //   → player.center.y ≈ 260, food.center.y ≈ 252, distance ≈ 8px ✓
+  // Deep kitchen food: in the open kitchen area — higher risk/reward.
+
+  const FOOD_DEFS = [
+    // Left counter section (x=20–320, y=240)
+    { id:0,  x:50,  y:240, label:'Pizza',    points:50, color:'#ff5555', glow:'#ff2020', icon:'🍕' },
+    { id:1,  x:130, y:240, label:'Pasta',    points:45, color:'#f5c842', glow:'#e0a800', icon:'🍝' },
+    { id:2,  x:210, y:240, label:'Soup',     points:35, color:'#f09030', glow:'#cc6600', icon:'🍜' },
+    { id:3,  x:282, y:240, label:'Sandwich', points:30, color:'#d4a96a', glow:'#a07030', icon:'🥪' },
+    // Deep kitchen — two lanes created by the central island (x=310–490, y=50–140)
+    // Left-lane food: approach from x<310 (past left prep station)
+    { id:4,  x:168, y:130, label:'Pizza',    points:50, color:'#ff5555', glow:'#ff2020', icon:'🍕' },
+    // Below island — enter from either lane, requires both workers to be out of sight
+    { id:5,  x:372, y:168, label:'Pasta',    points:45, color:'#f5c842', glow:'#e0a800', icon:'🍝' },
+    // Right-lane food: approach from x>490 (past right prep station)
+    { id:6,  x:588, y:130, label:'Coffee',   points:20, color:'#7a5030', glow:'#4a2800', icon:'☕' },
+    // Right counter section (x=480–780, y=240)
+    { id:7,  x:490, y:240, label:'Muffin',   points:25, color:'#c4693a', glow:'#8b3010', icon:'🧁' },
+    { id:8,  x:570, y:240, label:'Coffee',   points:20, color:'#7a5030', glow:'#4a2800', icon:'☕' },
+    { id:9,  x:650, y:240, label:'Apple',    points:10, color:'#e83030', glow:'#aa0000', icon:'🍎' },
+    { id:10, x:727, y:240, label:'Cookies',  points:15, color:'#e0b060', glow:'#b07820', icon:'🍪' },
+    // Opportunistic items outside the kitchen — low points, no need to enter restricted area
+    { id:11, x:385, y:548, label:'Chips',    points:8,  color:'#e8d040', glow:'#c0a800', icon:'🍟' },  // upper dining, mid-room
+    { id:12, x:710, y:1105, label:'Soda',   points:5,  color:'#4488cc', glow:'#2255aa', icon:'🧃' },  // lobby vending machine
+  ];
+
+  const STEAMY_IDS = new Set([1, 2, 5, 8]);   // Pasta, Soup, deep-Pasta, Coffee
+
+  // ── Hiding spots — interactive lockers/cabinets on wall edges ───────────────
+  // Not collision walls. Player presses E when within 35px of center to hide.
+  // Indexed by id; occupied=true while player is inside.
+
+  const HIDE_SPOT_DEFS = [
+    { id:0, x:22,  y:370,  w:24, h:50, label:'Locker'  },  // upper dining, left wall
+    { id:1, x:754, y:370,  w:24, h:50, label:'Locker'  },  // upper dining, right wall
+    { id:2, x:22,  y:720,  w:24, h:50, label:'Cabinet' },  // lower dining, left wall
+    { id:3, x:754, y:720,  w:24, h:50, label:'Cabinet' },  // lower dining, right wall
+    { id:4, x:22,  y:1120, w:24, h:50, label:'Closet'  },  // lobby, left wall
+    { id:5, x:754, y:1165, w:24, h:50, label:'Closet'  },  // lobby exit corridor, right wall
+    { id:6, x:22,  y:1265, w:24, h:50, label:'Closet'  },  // lobby exit corridor, left wall
+    { id:7, x:754, y:200,  w:24, h:50, label:'Pantry'  },  // kitchen right wall (risky!)
+  ];
+
+  const LIGHT_FIXTURES = [
+    { x:200, y:35  }, { x:400, y:35  }, { x:600, y:35  },   // kitchen
+    { x:200, y:440 }, { x:400, y:440 }, { x:600, y:440 },   // upper dining
+    { x:200, y:790 }, { x:400, y:790 }, { x:600, y:790 },   // lower dining
+    { x:250, y:1090}, { x:550, y:1090},                     // lobby entrance
+    { x:400, y:1210},                                        // lobby exit corridor
+  ];
+
+  // ── Init ────────────────────────────────────────────────────────────────────
+
+  function init() {
+    GameState.walls = WALL_DEFS.map(function (r) {
+      return { x: r.x, y: r.y, w: r.w, h: r.h };
+    });
+    GameState.foods = FOOD_DEFS.map(function (f) {
+      return { id: f.id, x: f.x, y: f.y, w: 24, h: 24,
+               label: f.label, points: f.points,
+               color: f.color, glow: f.glow, icon: f.icon, grabbed: false };
+    });
+    GameState.exitZone = { x: 340, y: 1350, w: 120, h: 28 };
+    GameState.hideSpots = HIDE_SPOT_DEFS.map(function (s) {
+      return { id: s.id, x: s.x, y: s.y, w: s.w, h: s.h, label: s.label, occupied: false };
+    });
+    _particles = [];
+  }
+
+  function reset() {
+    GameState.foods.forEach(function (f) { f.grabbed = false; });
+    GameState.hideSpots.forEach(function (s) { s.occupied = false; });
+    _particles = [];
+  }
+
+  // ── Draw ────────────────────────────────────────────────────────────────────
+
+  function draw(ctx) {
+    _time++;
+    _tickParticles();
+    _spawnAmbientDust();
+    _drawFloor(ctx);
+    _drawWalls(ctx);
+    _drawLightPools(ctx);
+    _drawHeatLampGlow(ctx);
+    _drawCounters(ctx);
+    _drawDividers(ctx);
+    _drawLobbyInnerWall(ctx);
+    _drawTables(ctx);
+    _drawColumns(ctx);
+    _drawWallStubs(ctx);
+    _drawPrepStations(ctx);
+    _drawKitchenShelves(ctx);
+    _drawKitchenIsland(ctx);
+    _drawBenches(ctx);
+    _drawHideSpots(ctx);
+    _drawFoods(ctx);
+    _drawExit(ctx);
+    _drawParticles(ctx);
+    _drawVignette(ctx);
+  }
+
+  // ── Floor ───────────────────────────────────────────────────────────────────
+  // Viewport-culled tile drawing so we don't draw 600+ off-screen tiles.
+
+  function _drawFloor(ctx) {
+    var TW = 50, TH = 50;
+    var cam = GameState.cam;
+
+    // Only draw tiles currently on screen (+ one tile buffer)
+    var startY = Math.floor(cam.y / TH) * TH;
+    var endY   = startY + GameState.height + TH;
+
+    for (var ty = startY; ty < endY; ty += TH) {
+      for (var tx = 0; tx < 800; tx += TW) {
+        var alt = ((tx / TW) + (ty / TH)) % 2 === 0;
+        ctx.fillStyle = alt ? '#ddd0bc' : '#ccc0a8';
+        ctx.fillRect(tx + 1, ty + 1, TW - 2, TH - 2);
+        var g = ctx.createLinearGradient(tx, ty, tx + TW, ty + TH);
+        g.addColorStop(0,   'rgba(255,255,255,0.14)');
+        g.addColorStop(0.5, 'rgba(255,255,255,0.03)');
+        g.addColorStop(1,   'rgba(0,0,0,0.08)');
+        ctx.fillStyle = g;
+        ctx.fillRect(tx + 1, ty + 1, TW - 2, TH - 2);
+      }
+    }
+
+    // Tile grid lines — only in visible range
+    ctx.strokeStyle = '#9a8c7c'; ctx.lineWidth = 1;
+    for (var gx = 0; gx <= 800; gx += TW) {
+      ctx.beginPath(); ctx.moveTo(gx, startY); ctx.lineTo(gx, endY); ctx.stroke();
+    }
+    for (var gy = startY; gy <= endY; gy += TH) {
+      ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(800, gy); ctx.stroke();
+    }
+
+    // Kitchen zone — warm orange tint (back of house, restricted)
+    var kt = ctx.createLinearGradient(0, 20, 0, 270);
+    kt.addColorStop(0,   'rgba(255,190,80,0.13)');
+    kt.addColorStop(1,   'rgba(255,190,80,0.04)');
+    ctx.fillStyle = kt;
+    ctx.fillRect(20, 20, 760, 250);
+
+    // Lobby zone — cool institutional tint (entrance feel)
+    var lt = ctx.createLinearGradient(0, 1000, 0, 1380);
+    lt.addColorStop(0,   'rgba(100,130,200,0.08)');
+    lt.addColorStop(1,   'rgba(100,130,200,0.04)');
+    ctx.fillStyle = lt;
+    ctx.fillRect(20, 1000, 760, 380);
+  }
+
+  // ── Outer walls ─────────────────────────────────────────────────────────────
+
+  function _drawWalls(ctx) {
+    [WALL_DEFS[0], WALL_DEFS[1], WALL_DEFS[2], WALL_DEFS[3]].forEach(function (r) {
+      var g = ctx.createLinearGradient(r.x, r.y, r.x + r.w, r.y + r.h);
+      g.addColorStop(0, '#1e1208'); g.addColorStop(1, '#2e1e10');
+      ctx.fillStyle = g; ctx.fillRect(r.x, r.y, r.w, r.h);
+    });
+
+    // Inner trim lines along each wall
+    ctx.fillStyle = '#4a3220';
+    ctx.fillRect(20, 16, 760, 4);      // top inner trim
+    ctx.fillRect(20, 1380, 760, 4);    // bottom inner trim
+    ctx.fillRect(16, 20, 4, 1360);     // left inner trim
+    ctx.fillRect(780, 20, 4, 1360);    // right inner trim
+
+    // Top wall ceiling stripe
+    ctx.fillStyle = '#f0f0e0'; ctx.fillRect(22, 1, 756, 3);
+
+    // "DINING SERVICES" banner on the kitchen back wall (top)
+    _drawBanner(ctx, 400, 44, 'DINING  SERVICES');
+
+    // "ENTRANCE" banner on the lobby front wall (bottom)
+    _drawBanner(ctx, 400, 1364, 'ENTRANCE');
+  }
+
+  function _drawBanner(ctx, cx, cy, text) {
+    var w = 280, h = 18;
+    var g = ctx.createLinearGradient(cx - w/2, cy, cx + w/2, cy);
+    g.addColorStop(0, '#1a0a00'); g.addColorStop(0.1, '#3a2200');
+    g.addColorStop(0.5, '#4a3010'); g.addColorStop(0.9, '#3a2200'); g.addColorStop(1, '#1a0a00');
+    ctx.fillStyle = g; ctx.fillRect(cx - w/2, cy - h/2, w, h);
+    ctx.strokeStyle = '#c8a040'; ctx.lineWidth = 1; ctx.strokeRect(cx - w/2, cy - h/2, w, h);
+    ctx.fillStyle = '#f0c840'; ctx.font = 'bold 10px serif'; ctx.textAlign = 'center';
+    ctx.letterSpacing = '3px'; ctx.fillText(text, cx, cy + 4);
+    ctx.textAlign = 'left'; ctx.letterSpacing = '0px';
+  }
+
+  // ── Light pools ─────────────────────────────────────────────────────────────
+
+  function _drawLightPools(ctx) {
+    var cam = GameState.cam;
+    LIGHT_FIXTURES.forEach(function (lf) {
+      // Skip fixtures far off-screen for performance
+      if (lf.y + 180 < cam.y || lf.y - 60 > cam.y + 600) return;
+
+      ctx.fillStyle = '#e8e8d8'; ctx.fillRect(lf.x - 28, lf.y, 56, 8);
+      ctx.fillStyle = '#fffff0'; ctx.fillRect(lf.x - 22, lf.y + 2, 44, 4);
+      var poolY = lf.y + 100;
+      var pulse = 0.85 + 0.15 * Math.sin(_time * 0.02 + lf.x * 0.01);
+      var g = ctx.createRadialGradient(lf.x, poolY, 0, lf.x, poolY, 120);
+      g.addColorStop(0,   'rgba(255,245,200,' + (0.22 * pulse) + ')');
+      g.addColorStop(0.6, 'rgba(255,235,160,' + (0.06 * pulse) + ')');
+      g.addColorStop(1,   'rgba(255,220,120,0)');
+      ctx.fillStyle = g; ctx.fillRect(lf.x - 120, poolY - 100, 240, 220);
+    });
+  }
+
+  // ── Heat lamp glow (above serving counters) ───────────────────────────────
+
+  function _drawHeatLampGlow(ctx) {
+    [WALL_DEFS[4], WALL_DEFS[5]].forEach(function (r) {
+      var pulse = 0.7 + 0.3 * Math.sin(_time * 0.04);
+      var g = ctx.createLinearGradient(r.x, r.y - 30, r.x, r.y + r.h);
+      g.addColorStop(0, 'rgba(255,80,0,0)');
+      g.addColorStop(0.5, 'rgba(255,100,10,' + (0.09 * pulse) + ')');
+      g.addColorStop(1, 'rgba(255,60,0,0)');
+      ctx.fillStyle = g; ctx.fillRect(r.x, r.y - 30, r.w, r.h + 30);
+    });
+  }
+
+  // ── Serving counter ───────────────────────────────────────────────────────
+
+  function _drawCounters(ctx) {
+    [WALL_DEFS[4], WALL_DEFS[5]].forEach(function (r) {
+      ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(r.x+3, r.y+3, r.w, r.h);
+      var g = ctx.createLinearGradient(r.x, r.y, r.x, r.y + r.h);
+      g.addColorStop(0, '#c8d8e0'); g.addColorStop(0.15, '#e8f0f4');
+      g.addColorStop(0.4, '#b8c8d0'); g.addColorStop(0.7, '#a0b0b8'); g.addColorStop(1, '#889098');
+      ctx.fillStyle = g; ctx.fillRect(r.x, r.y, r.w, r.h);
+      ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1;
+      for (var sy = r.y + 4; sy < r.y + r.h - 4; sy += 5) {
+        ctx.beginPath(); ctx.moveTo(r.x+4, sy); ctx.lineTo(r.x+r.w-4, sy); ctx.stroke();
+      }
+      ctx.fillStyle = '#708090'; ctx.fillRect(r.x, r.y, r.w, 3);
+      ctx.fillStyle = '#506070'; ctx.fillRect(r.x, r.y+r.h-2, r.w, 2);
+      // Glass sneeze guard above counter
+      var glassH = 16;
+      var glassG = ctx.createLinearGradient(r.x, r.y-glassH, r.x, r.y);
+      glassG.addColorStop(0, 'rgba(160,210,240,0.06)'); glassG.addColorStop(1, 'rgba(160,210,240,0.20)');
+      ctx.fillStyle = glassG; ctx.fillRect(r.x, r.y-glassH, r.w, glassH);
+      ctx.strokeStyle = 'rgba(200,240,255,0.5)'; ctx.lineWidth = 1;
+      ctx.strokeRect(r.x, r.y-glassH, r.w, glassH);
+      ctx.fillStyle = '#607080'; ctx.fillRect(r.x, r.y+r.h, r.w, 4);
+    });
+    ctx.fillStyle = 'rgba(255,200,80,0.55)';
+    ctx.font = 'bold 9px monospace'; ctx.textAlign = 'center';
+    ctx.fillText('▼  PASS-THROUGH  ▼', 400, 266);
+    ctx.textAlign = 'left';
+  }
+
+  // ── Zone divider walls ───────────────────────────────────────────────────────
+
+  function _drawDividers(ctx) {
+    // Divider 1 — between upper and lower dining (gap x=360–440)
+    [WALL_DEFS[6], WALL_DEFS[7]].forEach(function (r) {
+      ctx.fillStyle = 'rgba(0,0,0,0.28)'; ctx.fillRect(r.x+3, r.y+3, r.w, r.h);
+      var g = ctx.createLinearGradient(r.x, r.y, r.x, r.y+r.h);
+      g.addColorStop(0, '#8a7a6a'); g.addColorStop(1, '#6a5a4a');
+      ctx.fillStyle = g; ctx.fillRect(r.x, r.y, r.w, r.h);
+      ctx.fillStyle = 'rgba(255,255,255,0.10)'; ctx.fillRect(r.x, r.y, r.w, 3);
+      ctx.fillStyle = '#3a2a1a'; ctx.fillRect(r.x, r.y+r.h-4, r.w, 4);
+    });
+    ctx.fillStyle = 'rgba(200,180,140,0.55)';
+    ctx.font = 'bold 9px monospace'; ctx.textAlign = 'center';
+    ctx.fillText('PASSAGE', 400, 616);
+    ctx.textAlign = 'left';
+
+    // Divider 2 — lobby separator (gap x=280–520, wide and easy to cross)
+    [WALL_DEFS[8], WALL_DEFS[9]].forEach(function (r) {
+      ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fillRect(r.x+3, r.y+3, r.w, r.h);
+      var g = ctx.createLinearGradient(r.x, r.y, r.x, r.y+r.h);
+      g.addColorStop(0, '#7a8a9a'); g.addColorStop(1, '#5a6a7a');
+      ctx.fillStyle = g; ctx.fillRect(r.x, r.y, r.w, r.h);
+      ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(r.x, r.y, r.w, 3);
+      ctx.fillStyle = '#2a3a4a'; ctx.fillRect(r.x, r.y+r.h-4, r.w, 4);
+    });
+    ctx.fillStyle = 'rgba(160,200,255,0.45)';
+    ctx.font = 'bold 9px monospace'; ctx.textAlign = 'center';
+    ctx.fillText('LOBBY ENTRANCE  ▼', 400, 975);
+    ctx.textAlign = 'left';
+  }
+
+  // ── Lobby inner security wall ─────────────────────────────────────────────────
+
+  function _drawLobbyInnerWall(ctx) {
+    var cam = GameState.cam;
+    [WALL_DEFS[25], WALL_DEFS[26]].forEach(function (r) {
+      if (r.y + r.h < cam.y || r.y > cam.y + 600) return;
+      ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(r.x+3, r.y+3, r.w, r.h);
+      var g = ctx.createLinearGradient(r.x, r.y, r.x, r.y+r.h);
+      g.addColorStop(0, '#6a7a8a'); g.addColorStop(1, '#4a5a6a');
+      ctx.fillStyle = g; ctx.fillRect(r.x, r.y, r.w, r.h);
+      ctx.fillStyle = 'rgba(255,255,255,0.10)'; ctx.fillRect(r.x, r.y, r.w, 3);
+      ctx.fillStyle = '#2a3a4a'; ctx.fillRect(r.x, r.y+r.h-3, r.w, 3);
+      // Yellow security stripe
+      ctx.setLineDash([8, 5]);
+      ctx.strokeStyle = 'rgba(255,220,50,0.40)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(r.x+4, r.y+r.h/2); ctx.lineTo(r.x+r.w-4, r.y+r.h/2); ctx.stroke();
+      ctx.setLineDash([]);
+    });
+    if (WALL_DEFS[25].y + WALL_DEFS[25].h >= cam.y && WALL_DEFS[25].y <= cam.y + 600) {
+      ctx.fillStyle = 'rgba(255,220,80,0.55)';
+      ctx.font = 'bold 9px monospace'; ctx.textAlign = 'center';
+      ctx.fillText('SECURITY  CHECKPOINT  ▼', 400, WALL_DEFS[25].y - 6);
+      ctx.textAlign = 'left';
+    }
+  }
+
+  // ── Dining tables ────────────────────────────────────────────────────────────
+
+  function _drawTables(ctx) {
+    // Upper dining tables [10–12], lower dining tables + centre post [13–15]
+    WALL_DEFS.slice(10, 16).forEach(function (r) {
+      ctx.fillStyle = 'rgba(0,0,0,0.3)'; _rr(ctx, r.x+5, r.y+5, r.w, r.h, 6); ctx.fill();
+      var g = ctx.createLinearGradient(r.x, r.y, r.x, r.y+r.h);
+      g.addColorStop(0, '#5c3820'); g.addColorStop(0.3, '#3e2210'); g.addColorStop(1, '#281508');
+      ctx.fillStyle = g; _rr(ctx, r.x, r.y, r.w, r.h, 6); ctx.fill();
+      // Wood grain
+      ctx.save(); ctx.beginPath(); _rr(ctx, r.x, r.y, r.w, r.h, 6); ctx.clip();
+      ctx.strokeStyle = 'rgba(255,200,100,0.06)'; ctx.lineWidth = 2;
+      for (var gl = r.x - 10; gl < r.x + r.w + 10; gl += 14) {
+        ctx.beginPath();
+        ctx.moveTo(gl, r.y);
+        ctx.bezierCurveTo(gl+3, r.y+r.h*0.3, gl-2, r.y+r.h*0.7, gl+1, r.y+r.h);
+        ctx.stroke();
+      }
+      ctx.restore();
+      ctx.strokeStyle = 'rgba(180,120,60,0.45)'; ctx.lineWidth = 1.5;
+      _rr(ctx, r.x+1, r.y+1, r.w-2, r.h-2, 5); ctx.stroke();
+      // Chairs (skip narrow centre post)
+      if (r.w >= 60 && r.h >= 50) {
+        [[r.x+10, r.y-12, 28, 10], [r.x+r.w-38, r.y-12, 28, 10],
+         [r.x+10, r.y+r.h+2, 28, 10], [r.x+r.w-38, r.y+r.h+2, 28, 10]
+        ].forEach(function (c) {
+          _rr(ctx, c[0], c[1], c[2], c[3], 3);
+          ctx.fillStyle = '#3a2010'; ctx.fill();
+          ctx.strokeStyle = 'rgba(255,180,80,0.2)'; ctx.lineWidth = 1; ctx.stroke();
+        });
+      }
+      var gloss = ctx.createLinearGradient(r.x, r.y, r.x, r.y+r.h*0.4);
+      gloss.addColorStop(0, 'rgba(255,255,255,0.10)'); gloss.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = gloss; _rr(ctx, r.x, r.y, r.w, r.h*0.4, 6); ctx.fill();
+    });
+  }
+
+  // ── Kitchen prep stations ────────────────────────────────────────────────────
+
+  function _drawPrepStations(ctx) {
+    [WALL_DEFS[16], WALL_DEFS[17]].forEach(function (r) {
+      ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(r.x+3, r.y+3, r.w, r.h);
+      var g = ctx.createLinearGradient(r.x, r.y, r.x, r.y+r.h);
+      g.addColorStop(0, '#d0dde0'); g.addColorStop(0.4, '#b0bfc5'); g.addColorStop(1, '#8090a0');
+      ctx.fillStyle = g; ctx.fillRect(r.x, r.y, r.w, r.h);
+      // Horizontal brushed lines
+      ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1;
+      for (var sy = r.y + 5; sy < r.y + r.h - 4; sy += 6) {
+        ctx.beginPath(); ctx.moveTo(r.x+4, sy); ctx.lineTo(r.x+r.w-4, sy); ctx.stroke();
+      }
+      ctx.fillStyle = '#607080'; ctx.fillRect(r.x, r.y, r.w, 4);
+      ctx.fillStyle = '#405060'; ctx.fillRect(r.x, r.y+r.h-3, r.w, 3);
+      ctx.strokeStyle = 'rgba(200,220,255,0.3)'; ctx.lineWidth = 1;
+      ctx.strokeRect(r.x+1, r.y+1, r.w-2, r.h-2);
+    });
+    // Labels
+    ctx.fillStyle = 'rgba(180,210,240,0.5)';
+    ctx.font = 'bold 8px monospace'; ctx.textAlign = 'center';
+    ctx.fillText('PREP', WALL_DEFS[16].x + WALL_DEFS[16].w/2, WALL_DEFS[16].y + WALL_DEFS[16].h/2 + 4);
+    ctx.fillText('PREP', WALL_DEFS[17].x + WALL_DEFS[17].w/2, WALL_DEFS[17].y + WALL_DEFS[17].h/2 + 4);
+    ctx.textAlign = 'left';
+  }
+
+  // ── Lobby benches ────────────────────────────────────────────────────────────
+
+  function _drawBenches(ctx) {
+    [WALL_DEFS[18], WALL_DEFS[19]].forEach(function (r) {
+      ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(r.x+3, r.y+3, r.w, r.h);
+      // Metal frame
+      ctx.fillStyle = '#888888'; ctx.fillRect(r.x, r.y, r.w, r.h);
+      // Seat upholstery
+      _rr(ctx, r.x+4, r.y+3, r.w-8, r.h-6, 4);
+      var ug = ctx.createLinearGradient(r.x, r.y, r.x, r.y+r.h);
+      ug.addColorStop(0, '#7a6a9a'); ug.addColorStop(1, '#4a4060');
+      ctx.fillStyle = ug; ctx.fill();
+      // Seat highlight
+      ctx.fillStyle = 'rgba(255,255,255,0.12)'; _rr(ctx, r.x+4, r.y+3, r.w-8, (r.h-6)*0.4, 4); ctx.fill();
+    });
+  }
+
+  // ── Kitchen central island ───────────────────────────────────────────────────
+
+  function _drawKitchenIsland(ctx) {
+    var r = WALL_DEFS[20];
+    ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(r.x+4, r.y+4, r.w, r.h);
+    var g = ctx.createLinearGradient(r.x, r.y, r.x, r.y+r.h);
+    g.addColorStop(0, '#c8d8e0'); g.addColorStop(0.4, '#a8b8c0'); g.addColorStop(1, '#889098');
+    ctx.fillStyle = g; ctx.fillRect(r.x, r.y, r.w, r.h);
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1;
+    for (var sy = r.y+5; sy < r.y+r.h-4; sy += 6) {
+      ctx.beginPath(); ctx.moveTo(r.x+4, sy); ctx.lineTo(r.x+r.w-4, sy); ctx.stroke();
+    }
+    ctx.fillStyle = '#607080'; ctx.fillRect(r.x, r.y, r.w, 4);
+    ctx.fillStyle = '#405060'; ctx.fillRect(r.x, r.y+r.h-3, r.w, 3);
+    ctx.strokeStyle = 'rgba(200,240,255,0.28)'; ctx.lineWidth = 1;
+    ctx.strokeRect(r.x+1, r.y+1, r.w-2, r.h-2);
+    ctx.fillStyle = 'rgba(180,220,250,0.5)';
+    ctx.font = 'bold 8px monospace'; ctx.textAlign = 'center';
+    ctx.fillText('PREP ISLAND', r.x + r.w/2, r.y + r.h/2 + 4);
+    ctx.textAlign = 'left';
+  }
+
+  // ── Tactical cover columns ────────────────────────────────────────────────────
+
+  function _drawColumns(ctx) {
+    [WALL_DEFS[21], WALL_DEFS[22], WALL_DEFS[23], WALL_DEFS[24]].forEach(function (r) {
+      // Drop shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(r.x+4, r.y+4, r.w, r.h);
+      // Concrete body
+      var g = ctx.createLinearGradient(r.x, r.y, r.x+r.w, r.y);
+      g.addColorStop(0, '#9a9080'); g.addColorStop(0.5, '#b0a898'); g.addColorStop(1, '#7a7068');
+      ctx.fillStyle = g; ctx.fillRect(r.x, r.y, r.w, r.h);
+      // Top cap
+      ctx.fillStyle = '#c0b8a8'; ctx.fillRect(r.x-2, r.y, r.w+4, 5);
+      ctx.fillStyle = '#c0b8a8'; ctx.fillRect(r.x-2, r.y+r.h-5, r.w+4, 5);
+      // Vertical seam
+      ctx.strokeStyle = 'rgba(80,70,60,0.4)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(r.x+r.w/2, r.y+5); ctx.lineTo(r.x+r.w/2, r.y+r.h-5); ctx.stroke();
+    });
+  }
+
+  // ── Dining zone wall stubs (partition walls creating cover lanes) ─────────────
+
+  function _drawWallStubs(ctx) {
+    var cam = GameState.cam;
+    [WALL_DEFS[27], WALL_DEFS[28], WALL_DEFS[29], WALL_DEFS[30]].forEach(function (r) {
+      if (r.y + r.h < cam.y || r.y > cam.y + 600) return;
+      var isLeft = r.x < 400;
+      // Drop shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.28)'; ctx.fillRect(r.x+3, r.y+3, r.w, r.h);
+      // Body gradient
+      var g = ctx.createLinearGradient(r.x, r.y, r.x, r.y+r.h);
+      g.addColorStop(0, '#8a8070'); g.addColorStop(1, '#5a5040');
+      ctx.fillStyle = g; ctx.fillRect(r.x, r.y, r.w, r.h);
+      // Top highlight
+      ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(r.x, r.y, r.w, 2);
+      // Outline
+      ctx.strokeStyle = 'rgba(120,110,90,0.5)'; ctx.lineWidth = 1;
+      ctx.strokeRect(r.x, r.y, r.w, r.h);
+      // End cap (darker edge on the open side)
+      ctx.fillStyle = '#6a5a40';
+      if (isLeft) ctx.fillRect(r.x + r.w - 4, r.y, 4, r.h);
+      else        ctx.fillRect(r.x, r.y, 4, r.h);
+    });
+  }
+
+  // ── Kitchen wall shelves ──────────────────────────────────────────────────────
+
+  function _drawKitchenShelves(ctx) {
+    var cam = GameState.cam;
+    [WALL_DEFS[31], WALL_DEFS[32]].forEach(function (r) {
+      if (r.y + r.h < cam.y || r.y > cam.y + 600) return;
+      ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(r.x+3, r.y+3, r.w, r.h);
+      var g = ctx.createLinearGradient(r.x, r.y, r.x, r.y+r.h);
+      g.addColorStop(0, '#b0c0c8'); g.addColorStop(0.5, '#909aa0'); g.addColorStop(1, '#606870');
+      ctx.fillStyle = g; ctx.fillRect(r.x, r.y, r.w, r.h);
+      // Vertical shelf dividers
+      ctx.strokeStyle = 'rgba(255,255,255,0.20)'; ctx.lineWidth = 1;
+      for (var sx = r.x + 14; sx < r.x + r.w - 4; sx += 14) {
+        ctx.beginPath(); ctx.moveTo(sx, r.y + 2); ctx.lineTo(sx, r.y + r.h - 2); ctx.stroke();
+      }
+      ctx.fillStyle = '#506070'; ctx.fillRect(r.x, r.y, r.w, 3);
+      ctx.fillStyle = '#405060'; ctx.fillRect(r.x, r.y + r.h - 2, r.w, 2);
+      ctx.strokeStyle = 'rgba(180,210,240,0.3)'; ctx.lineWidth = 1;
+      ctx.strokeRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2);
+    });
+  }
+
+  // ── Hiding spots (lockers / cabinets / closets) ───────────────────────────────
+
+  function _drawHideSpots(ctx) {
+    if (!GameState.hideSpots) return;
+    var cam = GameState.cam;
+    GameState.hideSpots.forEach(function (spot) {
+      // Viewport cull
+      if (spot.y + spot.h < cam.y || spot.y > cam.y + 600) return;
+
+      var isLeft = spot.x < 400;
+      var ox     = isLeft ? 20 : 756;  // draw flush with inner wall edge
+      var oy     = spot.y;
+      var ow     = spot.w;
+      var oh     = spot.h;
+      var occ    = spot.occupied;
+
+      // Frame / body
+      ctx.fillStyle = occ ? '#1a2a1a' : '#222232';
+      ctx.fillRect(ox, oy, ow, oh);
+
+      // Inset door panel
+      ctx.fillStyle = occ ? 'rgba(60,180,60,0.18)' : 'rgba(80,110,150,0.20)';
+      ctx.fillRect(ox+3, oy+5, ow-6, oh-10);
+
+      // Door outline
+      ctx.strokeStyle = occ ? '#44aa44' : '#445566';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(ox+3, oy+5, ow-6, oh-10);
+
+      // Handle knob
+      var hx = isLeft ? ox+ow-5 : ox+4;
+      var hy = oy + oh/2;
+      ctx.beginPath(); ctx.arc(hx, hy, 2.5, 0, Math.PI*2);
+      ctx.fillStyle = '#aaaaaa'; ctx.fill();
+
+      // Outer border
+      ctx.strokeStyle = occ ? '#336633' : '#334455';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(ox, oy, ow, oh);
+
+      // Pulse glow when unoccupied (invites player to interact)
+      if (!occ) {
+        var pulse = 0.3 + 0.25 * Math.sin(_time * 0.05 + spot.id * 1.2);
+        ctx.strokeStyle = 'rgba(100,160,230,' + pulse + ')';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(ox-2, oy-2, ow+4, oh+4);
+      } else {
+        // Occupied glow
+        var gpulse = 0.4 + 0.3 * Math.sin(_time * 0.08);
+        ctx.strokeStyle = 'rgba(60,220,60,' + gpulse + ')';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(ox-2, oy-2, ow+4, oh+4);
+      }
+
+      // Label (tiny sideways text on the door)
+      ctx.fillStyle = occ ? '#55cc55' : '#667788';
+      ctx.font = '7px monospace';
+      ctx.textAlign = 'center';
+      ctx.save();
+      ctx.translate(ox + ow/2, oy + oh/2);
+      ctx.rotate(Math.PI / 2);
+      ctx.fillText(spot.label.toUpperCase(), 0, 0);
+      ctx.restore();
+      ctx.textAlign = 'left';
+
+      // "E" prompt near unoccupied spots (only when visible — don't track player here)
+      if (!occ) {
+        ctx.fillStyle = 'rgba(200,230,255,0.55)';
+        ctx.font = 'bold 8px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('[E]', ox + ow/2 + (isLeft ? 18 : -18), oy + oh/2 + 4);
+        ctx.textAlign = 'left';
+      }
+    });
+  }
+
+  // ── Food items ───────────────────────────────────────────────────────────────
+
+  function _drawFoods(ctx) {
+    GameState.foods.forEach(function (food) {
+      if (food.grabbed) return;
+      var bob = Math.sin(_time * 0.05 + food.id * 0.9) * 2.5;
+      var fy  = food.y + bob;
+      var cx  = food.x + food.w / 2;
+      var cy  = fy + food.h / 2;
+      var pulse = 0.7 + 0.3 * Math.sin(_time * 0.06 + food.id * 0.7);
+      // Halo
+      var halo = ctx.createRadialGradient(cx, cy, 2, cx, cy, 26);
+      halo.addColorStop(0,   hexAlpha(food.glow, 0.5 * pulse));
+      halo.addColorStop(0.6, hexAlpha(food.glow, 0.15 * pulse));
+      halo.addColorStop(1,   hexAlpha(food.glow, 0));
+      ctx.fillStyle = halo; ctx.fillRect(cx-26, cy-26, 52, 52);
+      // Floor reflection
+      ctx.beginPath(); ctx.ellipse(cx, fy+food.h+4, 18, 5, 0, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.fill();
+      ctx.strokeStyle = 'rgba(200,200,200,0.5)'; ctx.lineWidth = 1; ctx.stroke();
+      // Body
+      _rr(ctx, food.x, fy, food.w, food.h, 6);
+      var bg = ctx.createLinearGradient(food.x, fy, food.x, fy+food.h);
+      bg.addColorStop(0, _lighten(food.color, 40)); bg.addColorStop(1, food.color);
+      ctx.fillStyle = bg; ctx.fill();
+      // Gloss
+      _rr(ctx, food.x+2, fy+2, food.w-4, food.h*0.45, 4);
+      ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fill();
+      // Outline
+      _rr(ctx, food.x, fy, food.w, food.h, 6);
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1; ctx.stroke();
+      // Icon
+      ctx.font = '15px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(food.icon, cx, cy+1); ctx.textBaseline = 'alphabetic';
+      // Label
+      ctx.fillStyle = '#ffffff'; ctx.font = 'bold 8px sans-serif'; ctx.textAlign = 'center';
+      ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 3;
+      ctx.fillText(food.label, cx, fy+food.h+12); ctx.shadowBlur = 0;
+      // Points badge
+      _drawPointsBadge(ctx, food.x+food.w-1, fy-1, food.points);
+      ctx.textAlign = 'left';
+      // Steam
+      if (STEAMY_IDS.has(food.id)) _spawnSteam(food.x+12, fy);
+    });
+  }
+
+  function _drawPointsBadge(ctx, x, y, points) {
+    var bw = 20, bh = 11;
+    _rr(ctx, x-bw, y, bw, bh, 3);
+    ctx.fillStyle = '#ffcc00'; ctx.fill();
+    ctx.fillStyle = '#3a1a00'; ctx.font = 'bold 7px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(points + 'pt', x-bw/2, y+8); ctx.textAlign = 'left';
+  }
+
+  // ── Exit zone ────────────────────────────────────────────────────────────────
+
+  function _drawExit(ctx) {
+    var ez = GameState.exitZone;
+    var pulse = 0.6 + 0.4 * Math.sin(_time * 0.07);
+    var cx = ez.x + ez.w/2, cy = ez.y + ez.h/2;
+    var floorGlow = ctx.createRadialGradient(cx, cy-30, 0, cx, cy-30, 90);
+    floorGlow.addColorStop(0, 'rgba(0,255,120,' + (0.25*pulse) + ')');
+    floorGlow.addColorStop(1, 'rgba(0,255,120,0)');
+    ctx.fillStyle = floorGlow; ctx.fillRect(cx-90, cy-100, 180, 120);
+    ctx.shadowColor = '#00ff88'; ctx.shadowBlur = 20 + 10*pulse;
+    _rr(ctx, ez.x-2, ez.y-2, ez.w+4, ez.h+4, 6);
+    ctx.fillStyle = 'rgba(0,30,15,0.9)'; ctx.fill();
+    ctx.strokeStyle = '#00cc66'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.shadowBlur = 0;
+    _rr(ctx, ez.x, ez.y, ez.w, ez.h, 5);
+    var neon = ctx.createLinearGradient(ez.x, ez.y, ez.x, ez.y+ez.h);
+    neon.addColorStop(0, 'rgba(0,255,120,' + (0.18*pulse) + ')');
+    neon.addColorStop(1, 'rgba(0,180,80,'  + (0.10*pulse) + ')');
+    ctx.fillStyle = neon; ctx.fill();
+    ctx.strokeStyle = 'rgba(0,255,140,' + (0.6+0.4*pulse) + ')';
+    ctx.lineWidth = 1.5; ctx.setLineDash([5,4]); ctx.lineDashOffset = -(_time*0.6 % 9);
+    _rr(ctx, ez.x, ez.y, ez.w, ez.h, 5); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(0,255,140,' + (0.5+0.5*Math.sin(_time*0.12)) + ')';
+    ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('▼ EXIT ▼', cx, cy+5);
+    // Sign above exit
+    ctx.fillStyle = 'rgba(160,255,200,0.6)';
+    ctx.font = 'bold 9px monospace';
+    ctx.fillText('← FRONT DOOR →', cx, ez.y - 10);
+    ctx.textAlign = 'left';
+  }
+
+  // ── Particles ────────────────────────────────────────────────────────────────
+
+  function _spawnAmbientDust() {
+    if (_particles.length >= _MAX_PARTICLES || Math.random() > 0.25) return;
+    var cam = GameState.cam;
+    // Only spawn near on-screen light fixtures
+    var visible = LIGHT_FIXTURES.filter(function (lf) {
+      return lf.y > cam.y - 60 && lf.y < cam.y + 660;
+    });
+    if (!visible.length) return;
+    var lf = visible[Math.floor(Math.random() * visible.length)];
+    _particles.push({ type:'dust', x:lf.x+(Math.random()-0.5)*70, y:lf.y+10+Math.random()*40,
+      vx:(Math.random()-0.5)*0.25, vy:-0.15-Math.random()*0.35,
+      life:1.0, fade:0.004+Math.random()*0.006, r:0.8+Math.random()*1.5 });
+  }
+
+  function _spawnSteam(x, y) {
+    if (_particles.length >= _MAX_PARTICLES || Math.random() > 0.15) return;
+    _particles.push({ type:'steam', x:x+(Math.random()-0.5)*8, y:y,
+      vx:(Math.random()-0.5)*0.4, vy:-0.5-Math.random()*0.6,
+      life:1.0, fade:0.015+Math.random()*0.015, r:1.5+Math.random()*2 });
+  }
+
+  function _tickParticles() {
+    for (var i = _particles.length-1; i >= 0; i--) {
+      var p = _particles[i]; p.x += p.vx; p.y += p.vy; p.vx *= 0.99; p.life -= p.fade;
+      if (p.life <= 0) _particles.splice(i, 1);
+    }
+  }
+
+  function _drawParticles(ctx) {
+    _particles.forEach(function (p) {
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+      ctx.fillStyle = p.type === 'dust'
+        ? 'rgba(255,240,200,' + (p.life*0.55) + ')'
+        : 'rgba(220,220,220,' + (p.life*0.35) + ')';
+      ctx.fill();
+    });
+  }
+
+  // ── Vignette — camera-aware so it always covers the viewport ─────────────────
+
+  function _drawVignette(ctx) {
+    var cam = GameState.cam;
+    var vcx = cam.x + 400;   // viewport centre in world coords
+    var vcy = cam.y + 300;
+    var g = ctx.createRadialGradient(vcx, vcy, 180, vcx, vcy, 520);
+    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.52)');
+    ctx.fillStyle = g; ctx.fillRect(cam.x, cam.y, 800, 600);
+  }
+
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+
+  function _rr(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x+r, y); ctx.lineTo(x+w-r, y);
+    ctx.quadraticCurveTo(x+w, y, x+w, y+r); ctx.lineTo(x+w, y+h-r);
+    ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h); ctx.lineTo(x+r, y+h);
+    ctx.quadraticCurveTo(x, y+h, x, y+h-r); ctx.lineTo(x, y+r);
+    ctx.quadraticCurveTo(x, y, x+r, y); ctx.closePath();
+  }
+
+  function hexAlpha(hex, a) {
+    return 'rgba(' + parseInt(hex.slice(1,3),16) + ',' + parseInt(hex.slice(3,5),16) + ',' + parseInt(hex.slice(5,7),16) + ',' + a + ')';
+  }
+
+  function _lighten(hex, amt) {
+    return 'rgb(' + Math.min(255,parseInt(hex.slice(1,3),16)+amt) + ',' + Math.min(255,parseInt(hex.slice(3,5),16)+amt) + ',' + Math.min(255,parseInt(hex.slice(5,7),16)+amt) + ')';
+  }
+
+  return { init: init, draw: draw, reset: reset };
+
+})();
+// =============================================================================
+// Module 4 — Worker AI & Detection
+// File: js/workers.js
+// Exposes: window.Workers = { init, update, draw, reset }
+// Reads/writes: GameState.workers, GameState.detection, GameState.phase
+// =============================================================================
+
+window.Workers = (function () {
+
+  // ---------------------------------------------------------------------------
+  // Worker factory
+  // ---------------------------------------------------------------------------
+
+  function makeWorker(x, y, patrolPath, angle, color) {
+    return {
+      x,
+      y,
+      radius: 14,
+      angle,                          // facing direction in radians (0=right, PI/2=down)
+      color: color || '#cc3300',      // body color — default red, security guard is blue
+      speed: 1.2,
+      state: 'patrol',                // 'patrol' | 'suspicious' | 'alert' | 'chase'
+      visionRange: 150,
+      visionAngle: Math.PI / 3,       // 60° cone
+      patrolPath,
+      pathIndex: 0,
+      pathDir: 1,                     // 1=forward, -1=reverse along patrolPath
+      suspicionTimer: 0,              // 0–80; fills while player is visible in patrol
+      lastKnownX: null,               // player position when last seen
+      lastKnownY: null,
+      _distractTarget: null,          // { x, y } — distraction throw destination or null
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Angle helpers
+  // ---------------------------------------------------------------------------
+
+  /** Wrap an angle into the range (-PI, PI]. */
+  function wrapAngle(a) {
+    while (a >  Math.PI) a -= 2 * Math.PI;
+    while (a < -Math.PI) a += 2 * Math.PI;
+    return a;
+  }
+
+  /** Move `current` angle toward `target` by at most `step` radians. */
+  function rotateToward(current, target, step) {
+    const diff = wrapAngle(target - current);
+    if (Math.abs(diff) <= step) return target;
+    return current + Math.sign(diff) * step;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Line-of-sight helpers
+  // ---------------------------------------------------------------------------
+
+  /** Returns true if segment (x1,y1)→(x2,y2) intersects AABB r. */
+  function lineBlockedByRect(x1, y1, x2, y2, r) {
+    const dx = x2 - x1, dy = y2 - y1;
+    let tmin = 0, tmax = 1;
+
+    const rMaxX = r.x + r.w, rMaxY = r.y + r.h;
+
+    if (dx === 0) { if (x1 < r.x || x1 > rMaxX) return false; }
+    else {
+      let t1 = (r.x  - x1) / dx, t2 = (rMaxX - x1) / dx;
+      if (t1 > t2) { const tmp = t1; t1 = t2; t2 = tmp; }
+      tmin = Math.max(tmin, t1); tmax = Math.min(tmax, t2);
+      if (tmin > tmax) return false;
+    }
+
+    if (dy === 0) { if (y1 < r.y || y1 > rMaxY) return false; }
+    else {
+      let t1 = (r.y  - y1) / dy, t2 = (rMaxY - y1) / dy;
+      if (t1 > t2) { const tmp = t1; t1 = t2; t2 = tmp; }
+      tmin = Math.max(tmin, t1); tmax = Math.min(tmax, t2);
+      if (tmin > tmax) return false;
+    }
+
+    return true;
+  }
+
+  /** Returns false if any interior wall blocks the ray worker→player. */
+  function hasLineOfSight(wx, wy, px, py) {
+    const WW = GameState.worldWidth  || GameState.width;
+    const WH = GameState.worldHeight || GameState.height;
+    for (const wall of GameState.walls) {
+      // Skip outer boundary walls (they touch the world edges)
+      if (wall.x <= 0 || wall.y <= 0 ||
+          wall.x + wall.w >= WW ||
+          wall.y + wall.h >= WH) continue;
+      if (lineBlockedByRect(wx, wy, px, py, wall)) return false;
+    }
+    return true;
+  }
+
+  // ---------------------------------------------------------------------------
+  // init
+  // ---------------------------------------------------------------------------
+
+  function init() {
+    const workers = [
+      // A — kitchen chef: full-width horizontal sweep of the kitchen zone.
+      //     Starts centre-left, faces right. Player must time this to grab counter food.
+      makeWorker(200, 180,
+        [{ x: 40, y: 180 }, { x: 680, y: 180 }],
+        0),
+
+      // B — gap guard: vertical patrol through the serving counter gap (x=400).
+      //     Alternates watching the kitchen (facing up) and the dining approach
+      //     (facing down). The most dangerous worker — blocks the only pass-through.
+      makeWorker(400, 220,
+        [{ x: 400, y: 40 }, { x: 400, y: 260 }],
+        -Math.PI / 2),
+
+      // C — upper dining: full-width horizontal patrol between counter and divider.
+      //     Starts left side, faces right.
+      makeWorker(80, 460,
+        [{ x: 60, y: 460 }, { x: 720, y: 460 }],
+        0),
+
+      // D — lower dining: starts far-right heading left (away from player spawn at y=1200).
+      //     Distance to player spawn ≈ 500px, well beyond 150px vision range — safe start.
+      makeWorker(720, 800,
+        [{ x: 60, y: 800 }, { x: 720, y: 800 }],
+        Math.PI),
+
+      // E — lobby security guard: patrols the escape corridor south of the security checkpoint.
+      //     Player must time this guard to reach the EXIT. Starts far-right, faces left —
+      //     moving AWAY from player spawn (x=50) at game start; distance ≈ 590px → safe.
+      makeWorker(640, 1220,
+        [{ x: 80, y: 1220 }, { x: 640, y: 1220 }],
+        Math.PI, '#225599'),
+    ];
+    GameState.workers = workers;
+  }
+
+  // ---------------------------------------------------------------------------
+  // reset  (called between rounds — receives round number for difficulty scaling)
+  // ---------------------------------------------------------------------------
+
+  function reset(round) {
+    round = round || GameState.round || 1;
+    const r = Math.min(round, 4);
+
+    // Per-round scaling (index 0 = round 1)
+    const speedTable  = [1.2, 1.5, 1.8, 2.1];  // chase speed
+    const rangeTable  = [150, 165, 182, 200];   // vision range
+    const patrolTable = [1.0, 1.3, 1.6, 1.9];  // patrol speed
+
+    const workerSpeed = speedTable[r - 1];
+    const visionRange = rangeTable[r - 1];
+    const patrolSpeed = patrolTable[r - 1];
+
+    init();
+
+    GameState.workers.forEach(w => {
+      w.speed        = patrolSpeed;
+      w.visionRange  = visionRange;
+      w._baseSpeed   = workerSpeed;
+      w._patrolSpeed = patrolSpeed;
+    });
+
+    GameState.detection = 0;
+  }
+
+  // ---------------------------------------------------------------------------
+  // update  (called every frame by the engine when phase === 'playing')
+  // ---------------------------------------------------------------------------
+
+  function update() {
+    if (GameState.phase !== 'playing') return;
+
+    const workers   = GameState.workers;
+    const player    = GameState.player;
+    const px        = player.x + player.width  / 2;
+    const py        = player.y + player.height / 2;
+    const crouching = player.crouching;
+
+    // --- 0. Tick distraction timer --------------------------------------
+    const distr = GameState.distraction;
+    if (distr) {
+      distr.timer--;
+      if (distr.timer <= 0) {
+        GameState.distraction = null;
+        workers.forEach(w => { w._distractTarget = null; });
+      }
+    }
+
+    // --- 1. Vision cone + line-of-sight check ---------------------------
+    workers.forEach(w => {
+      const dx            = px - w.x;
+      const dy            = py - w.y;
+      const dist          = Math.sqrt(dx * dx + dy * dy);
+      const angleToPlayer = Math.atan2(dy, dx);
+      const angleDiff     = Math.abs(wrapAngle(angleToPlayer - w.angle));
+      const inCone        = (dist <= w.visionRange) && (angleDiff <= w.visionAngle / 2);
+      // Counters and tables block sight — must have clear line to detect
+      w._seesPlayer = !GameState.hiding && inCone && (dist < 10 || hasLineOfSight(w.x, w.y, px, py));
+      if (w._seesPlayer) { w.lastKnownX = px; w.lastKnownY = py; }
+
+      // Hearing — workers detect running footsteps without LOS
+      const noiseRadius = GameState.playerNoise || 0;
+      if (noiseRadius > 0 && dist <= noiseRadius && w.state === 'patrol') {
+        w.lastKnownX = px;
+        w.lastKnownY = py;
+        w.suspicionTimer = Math.min(80, w.suspicionTimer + 1.5);
+      }
+
+      // Distraction throw — lure patrol workers toward the noise source
+      const d = GameState.distraction;
+      if (d && d.timer > 0 && w.state === 'patrol' && !w._distractTarget) {
+        const dDist = Math.hypot(d.x - w.x, d.y - w.y);
+        if (dDist <= d.radius) {
+          w._distractTarget = { x: d.x, y: d.y };
+        }
+      }
+    });
+
+    // --- 2. Suspicion timers + detection meter --------------------------
+    let detectionGain = 0;
+
+    workers.forEach(w => {
+      if (w._seesPlayer) {
+        w.suspicionTimer = Math.min(80, w.suspicionTimer + 3);
+      } else {
+        w.suspicionTimer = Math.max(0, w.suspicionTimer - 2);
+      }
+
+      if (w.state === 'chase') {
+        detectionGain += crouching ? 2 : 3;
+      } else if (w.state === 'alert') {
+        detectionGain += crouching ? 1.5 : 2.5;
+      } else if (w._seesPlayer && w.state === 'patrol') {
+        // Suspicion ramp — full contribution only after ~1.3s of unbroken sight
+        detectionGain += (crouching ? 0.8 : 1.6) * (w.suspicionTimer / 80);
+      } else if (w.state === 'suspicious') {
+        // Stopped and scanning — slow drain if player hides
+        if (w._seesPlayer) detectionGain += crouching ? 0.8 : 1.6;
+      }
+    });
+
+    if (detectionGain > 0) {
+      GameState.detection += detectionGain;
+    } else {
+      GameState.detection -= 0.5;
+    }
+    GameState.detection = Math.max(0, Math.min(100, GameState.detection));
+
+    // NOTE: detection >= 100 is now handled by engine.js (lives system).
+
+    // --- 4. State transitions -------------------------------------------
+    const det = GameState.detection;
+
+    // Find nearest worker to player (used for alert/chase promotion)
+    let nearestWorker = null;
+    let nearestDist   = Infinity;
+    workers.forEach(w => {
+      const d = Math.hypot(px - w.x, py - w.y);
+      if (d < nearestDist) { nearestDist = d; nearestWorker = w; }
+    });
+
+    workers.forEach(w => {
+      // Drop distraction target when detection escalates — real threats take priority
+      if (det >= 40) w._distractTarget = null;
+
+      if (det >= 80) {
+        // High alert — chase nearest, all others alert
+        if (w === nearestWorker) {
+          w.state       = 'chase';
+          w.visionRange = 220;
+          w.visionAngle = Math.PI / 2;
+          w.speed       = w._baseSpeed || 2.5;
+        } else {
+          w.state       = 'alert';
+          w.visionRange = 220;
+          w.visionAngle = Math.PI / 2;
+        }
+      } else if (det >= 40) {
+        // Alert threshold
+        if (w === nearestWorker && w.state !== 'chase') {
+          w.state       = 'alert';
+          w.visionRange = 220;
+          w.visionAngle = Math.PI / 2;
+        }
+      } else {
+        // Low detection
+        if (w.suspicionTimer >= 80) {
+          // Full suspicion — this worker goes alert on their own
+          w.state       = 'alert';
+          w.visionRange = 200;
+          w.visionAngle = Math.PI / 2;
+        } else if (w.suspicionTimer > 0 && w.state === 'patrol') {
+          // Building suspicion — stop and scan (Bob the Robber "?" moment)
+          w.state       = 'suspicious';
+          w.visionAngle = Math.PI / 2.5;
+        } else if (w.suspicionTimer === 0 && (w.state === 'suspicious' || w.state === 'alert')) {
+          // Suspicion drained — return to patrol
+          w.state       = 'patrol';
+          w.visionRange = w._patrolSpeed ? [150, 170, 190, 210][Math.min(GameState.round, 4) - 1] : 150;
+          w.visionAngle = Math.PI / 3;
+          w.speed       = w._patrolSpeed || 1.2;
+        } else if (w.state === 'patrol') {
+          w.visionRange = w._patrolSpeed ? [150, 170, 190, 210][Math.min(GameState.round, 4) - 1] : 150;
+          w.visionAngle = Math.PI / 3;
+          w.speed       = w._patrolSpeed || 1.2;
+        }
+      }
+    });
+
+    // --- 5. Move workers ------------------------------------------------
+    workers.forEach(w => {
+      if (w.state === 'chase') {
+        // Move directly toward player
+        const dx   = px - w.x;
+        const dy   = py - w.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist > 1) {
+          w.x    += (dx / dist) * w.speed;
+          w.y    += (dy / dist) * w.speed;
+          w.angle = Math.atan2(dy, dx);
+        }
+
+      } else if (w.state === 'suspicious') {
+        // Stop moving — slowly scan toward last known player position
+        const tx = w.lastKnownX !== null ? w.lastKnownX : px;
+        const ty = w.lastKnownY !== null ? w.lastKnownY : py;
+        const targetAngle = Math.atan2(ty - w.y, tx - w.x);
+        w.angle = rotateToward(w.angle, targetAngle, 0.03);
+
+      } else if (w.state === 'alert') {
+        // Stop patrolling; slowly rotate toward player
+        const dx          = px - w.x;
+        const dy          = py - w.y;
+        const targetAngle = Math.atan2(dy, dx);
+        w.angle = rotateToward(w.angle, targetAngle, 0.05);
+
+      } else {
+        // 'patrol' — check distraction target first, then normal waypoints
+        if (w._distractTarget) {
+          const dx   = w._distractTarget.x - w.x;
+          const dy   = w._distractTarget.y - w.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 5) {
+            w._distractTarget = null;  // reached it — resume patrol
+          } else {
+            const speed = w._patrolSpeed || w.speed;
+            w.x    += (dx / dist) * speed;
+            w.y    += (dy / dist) * speed;
+            w.angle = Math.atan2(dy, dx);
+          }
+        } else {
+        // Normal waypoint patrol
+        const target = w.patrolPath[w.pathIndex];
+        const dx     = target.x - w.x;
+        const dy     = target.y - w.y;
+        const dist   = Math.sqrt(dx * dx + dy * dy);
+        const speed  = w._patrolSpeed || w.speed;
+
+        if (dist < speed) {
+          // Reached waypoint — advance or reverse
+          w.x = target.x;
+          w.y = target.y;
+          w.pathIndex += w.pathDir;
+          if (w.pathIndex >= w.patrolPath.length) {
+            w.pathIndex = w.patrolPath.length - 2;
+            w.pathDir   = -1;
+          } else if (w.pathIndex < 0) {
+            w.pathIndex = 1;
+            w.pathDir   = 1;
+          }
+        } else {
+          w.x    += (dx / dist) * speed;
+          w.y    += (dy / dist) * speed;
+          w.angle = Math.atan2(dy, dx);
+        }
+        } // end else (_distractTarget not set)
+      }
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // draw  (called every frame regardless of phase)
+  // ---------------------------------------------------------------------------
+
+  function draw(ctx) {
+    if (GameState.phase !== 'playing') return;
+
+    const workers = GameState.workers;
+    if (!workers || workers.length === 0) return;
+
+    workers.forEach(w => {
+
+      // --- Vision cone ---------------------------------------------------
+      let coneColor;
+      if      (w.state === 'chase') coneColor = 'rgba(255, 0,   0,   0.38)';
+      else if (w.state === 'alert') coneColor = 'rgba(255, 100, 0,   0.28)';
+      else                          coneColor = 'rgba(255, 220, 100, 0.18)';
+
+      ctx.beginPath();
+      ctx.moveTo(w.x, w.y);
+      ctx.arc(w.x, w.y, w.visionRange,
+              w.angle - w.visionAngle / 2,
+              w.angle + w.visionAngle / 2);
+      ctx.closePath();
+      ctx.fillStyle = coneColor;
+      ctx.fill();
+
+      // --- Worker pixel-art sprite ---------------------------------------
+      // w.x, w.y = worker center position
+      const isGuard  = (w.color === '#225599');
+      const bodyColor = isGuard ? '#1a3a66' : '#883300';
+      const uniformColor = isGuard ? '#2a5599' : '#cc4400';
+      const apronColor   = isGuard ? '#4488cc' : '#ffffff';
+
+      // Walking animation: leg swing based on movement (patrol/chase move, alert/sus don't)
+      const moving = (w.state === 'patrol' || w.state === 'chase');
+      if (moving) w._walkT = (w._walkT || 0) + (w.state === 'chase' ? 0.22 : 0.14);
+      const walk  = moving ? Math.sin((w._walkT || 0) * Math.PI * 2) * 3.5 : 0;
+      const facing = w.angle; // radians; 0=right, PI/2=down, PI=left
+      const fx = Math.cos(facing), fy = Math.sin(facing);
+      // Side axis (perpendicular to facing for leg offset)
+      const sx2 = -fy, sy2 = fx;
+
+      const cx2 = w.x, cy2 = w.y;
+
+      // Shadow
+      ctx.beginPath(); ctx.arc(cx2 + 2, cy2 + 2, 9, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fill();
+
+      // Legs — two small rects offset perpendicular to facing
+      const legColors = ['#1a1a1a', '#2a2a2a'];
+      for (let li = 0; li < 2; li++) {
+        const side  = li === 0 ? 1 : -1;
+        const swing = li === 0 ? walk : -walk;
+        const legX  = cx2 + sx2 * side * 3.5 - fy * swing;
+        const legY  = cy2 + sy2 * side * 3.5 + fx * swing;
+        ctx.beginPath(); ctx.arc(legX, legY, 3, 0, Math.PI * 2);
+        ctx.fillStyle = legColors[li]; ctx.fill();
+      }
+
+      // Body (uniform)
+      ctx.beginPath(); ctx.arc(cx2, cy2, 8, 0, Math.PI * 2);
+      ctx.fillStyle = uniformColor; ctx.fill();
+      ctx.strokeStyle = bodyColor; ctx.lineWidth = 1.5; ctx.stroke();
+
+      // Apron strip (vertical rect in facing direction)
+      ctx.beginPath();
+      ctx.arc(cx2 + fx * 2, cy2 + fy * 2, 4.5, 0, Math.PI * 2);
+      ctx.fillStyle = apronColor; ctx.fill();
+
+      // Head
+      const hx = cx2 + fx * 8, hy = cy2 + fy * 8;
+      ctx.beginPath(); ctx.arc(hx, hy, 5, 0, Math.PI * 2);
+      ctx.fillStyle = '#c8906a'; ctx.fill();
+      ctx.strokeStyle = '#8a5a3a'; ctx.lineWidth = 1; ctx.stroke();
+
+      // Eyes — two dots facing same direction
+      const ex1 = hx + sx2 * 1.8, ey1 = hy + sy2 * 1.8;
+      const ex2 = hx - sx2 * 1.8, ey2 = hy - sy2 * 1.8;
+      ctx.beginPath(); ctx.arc(ex1, ey1, 1.2, 0, Math.PI * 2);
+      ctx.fillStyle = '#111'; ctx.fill();
+      ctx.beginPath(); ctx.arc(ex2, ey2, 1.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      // --- State label above worker -------------------------------------
+      ctx.textAlign = 'center';
+      if (w.state === 'suspicious') {
+        // Pulsing "?" — intensity tracks suspicion build-up
+        const alpha = 0.5 + 0.5 * Math.sin(Date.now() / 120);
+        const fill  = Math.floor(w.suspicionTimer / 80 * 255);
+        ctx.font      = 'bold 15px Arial';
+        ctx.fillStyle = `rgba(255, ${255 - fill}, 50, ${alpha})`;
+        ctx.fillText('?', w.x, w.y - w.radius - 4);
+      } else if (w.state === 'alert') {
+        ctx.font      = 'bold 14px Arial';
+        ctx.fillStyle = '#ff6600';
+        ctx.fillText('!', w.x, w.y - w.radius - 4);
+      } else if (w.state === 'chase') {
+        ctx.font      = 'bold 16px Arial';
+        ctx.fillStyle = '#ff0000';
+        ctx.fillText('!!', w.x, w.y - w.radius - 4);
+      } else if (w.suspicionTimer > 0) {
+        // Patrol worker with partial suspicion — faint "?"
+        ctx.font      = 'bold 13px Arial';
+        ctx.fillStyle = `rgba(255, 200, 50, ${w.suspicionTimer / 80 * 0.7})`;
+        ctx.fillText('?', w.x, w.y - w.radius - 4);
+      }
+    });
+
+    // Reset text align so other modules aren't affected
+    ctx.textAlign = 'left';
+  }
+
+  // ---------------------------------------------------------------------------
+  // Public API
+  // ---------------------------------------------------------------------------
+
+  return { init, update, draw, reset };
+
+})();
+// Module 3 — Player Character
+// Owns: movement, AABB collision, food pickup, hiding, win detection, rendering.
+
+window.Player = (function () {
+
+  // Facing direction — updated whenever player moves
+  let facingX = 0;
+  let facingY = 1;   // default: facing down toward the dining hall
+
+  // Previous key states for edge-detection (keydown, not held)
+  let prevE = false;
+  let prevQ = false;
+
+  // Sprint state — shared between update() and draw()
+  let sprinting = false;
+
+  // Walk animation state — used by draw()
+  let _walkT    = 0;
+  let _isMoving = false;
+
+  // Hiding state — reference to the occupied GameState.hideSpots entry, or null
+  let hidingAt = null;
+
+  // ─── Init / Reset ─────────────────────────────────────────────────────────
+
+  function init() {
+    const p = GameState.player;
+    p.x = 50;
+    p.y = 1200;   // entrance lobby — bottom-left
+    p.crouching = false;
+    p.inventory = [];
+    facingX   = 0;
+    facingY   = 1;
+    prevE     = false;
+    prevQ     = false;
+    sprinting = false;
+    _walkT    = 0;
+    _isMoving = false;
+    // Exit any hiding carried over from previous round
+    if (hidingAt) { hidingAt.occupied = false; hidingAt = null; }
+    GameState.hiding      = false;
+    GameState.playerNoise = 0;
+  }
+
+  function reset() { init(); }
+
+  // ─── Update ───────────────────────────────────────────────────────────────
+
+  function update(dt) {
+    if (GameState.phase !== 'playing') return;
+
+    const p    = GameState.player;
+    const keys = GameState.keys;
+
+    // ── Crouch ──
+    p.crouching = !!(keys['Shift'] || keys['ShiftLeft'] || keys['ShiftRight']);
+
+    // ── Sprint (Space) — can't sprint while crouching; burns stamina ──
+    const wantSprint = !!(keys[' ']) && !p.crouching;
+    sprinting = wantSprint && GameState.stamina > 0;
+    if (sprinting) {
+      GameState.stamina = Math.max(0, GameState.stamina - 80 * dt);
+    } else {
+      GameState.stamina = Math.min(100, GameState.stamina + 25 * dt);
+    }
+
+    // ── Input vector ──
+    let dx = 0, dy = 0;
+    if (keys['w'] || keys['W'] || keys['ArrowUp'])    dy -= 1;
+    if (keys['s'] || keys['S'] || keys['ArrowDown'])  dy += 1;
+    if (keys['a'] || keys['A'] || keys['ArrowLeft'])  dx -= 1;
+    if (keys['d'] || keys['D'] || keys['ArrowRight']) dx += 1;
+    if (dx !== 0 && dy !== 0) { dx *= 0.7071; dy *= 0.7071; }
+
+    // ── Hiding — movement or E exits; no movement or noise while hiding ──
+    if (GameState.hiding) {
+      GameState.playerNoise = 0;
+
+      if (dx !== 0 || dy !== 0) {
+        // Any movement key exits hiding (but no movement this frame)
+        _exitHiding();
+        prevE = !!(keys['e'] || keys['E']);
+        prevQ = !!(keys['q'] || keys['Q']);
+        return;
+      }
+
+      const eNow = !!(keys['e'] || keys['E']);
+      if (eNow && !prevE) _exitHiding();
+      prevE = eNow;
+      prevQ = !!(keys['q'] || keys['Q']);
+      return;
+    }
+
+    // ── Facing direction (for distraction throw direction) ──
+    const moving = dx !== 0 || dy !== 0;
+    _isMoving = moving;
+    if (moving) { facingX = dx; facingY = dy; }
+
+    // ── Noise footprint — workers hear running; crouching is silent ──
+    GameState.playerNoise = (_isMoving && !p.crouching) ? (sprinting ? 130 : 55) : 0;
+
+    // ── Move X + collisions ──
+    const speedMult = sprinting ? 2.0 : (p.crouching ? 0.5 : 1.0);
+    const spd       = p.speed * 60 * speedMult * dt;
+
+    p.x += dx * spd;
+    for (const wall of GameState.walls) {
+      if (overlap(p, wall)) {
+        if (dx > 0) p.x = wall.x - p.width;
+        else if (dx < 0) p.x = wall.x + wall.w;
+      }
+    }
+
+    // ── Move Y + collisions ──
+    p.y += dy * spd;
+    for (const wall of GameState.walls) {
+      if (overlap(p, wall)) {
+        if (dy > 0) p.y = wall.y - p.height;
+        else if (dy < 0) p.y = wall.y + wall.h;
+      }
+    }
+
+    // ── Clamp to world bounds ──
+    const WW = GameState.worldWidth  || GameState.width;
+    const WH = GameState.worldHeight || GameState.height;
+    p.x = Math.max(20, Math.min(WW - p.width  - 20, p.x));
+    p.y = Math.max(20, Math.min(WH - p.height - 20, p.y));
+
+    // ── E key — enter hidespot OR grab food (hidespot takes priority) ──
+    const eNow = !!(keys['e'] || keys['E']);
+    if (eNow && !prevE) {
+      const spot = _findNearHidespot();
+      if (spot) {
+        GameState.hiding = true;
+        hidingAt         = spot;
+        spot.occupied    = true;
+      } else {
+        grabNearestFood();
+      }
+    }
+    prevE = eNow;
+
+    // ── Q key — throw distraction ──
+    const qNow = !!(keys['q'] || keys['Q']);
+    if (qNow && !prevQ && GameState.distractions > 0) {
+      const pcx  = p.x + p.width  / 2;
+      const pcy  = p.y + p.height / 2;
+      const flen = Math.hypot(facingX, facingY) || 1;
+      GameState.distraction = {
+        x:      pcx + (facingX / flen) * 160,
+        y:      pcy + (facingY / flen) * 160,
+        radius: 100,
+        timer:  180,
+      };
+      GameState.distractions--;
+    }
+    prevQ = qNow;
+
+    // ── Win condition ──
+    const ez = GameState.exitZone;
+    if (overlap(p, ez) && p.inventory.length > 0) {
+      GameState.phase = 'win';
+    }
+  }
+
+  // ─── AABB helpers ─────────────────────────────────────────────────────────
+
+  function overlap(a, b) {
+    const aw = a.width  ?? a.w;
+    const ah = a.height ?? a.h;
+    return a.x < b.x + b.w  &&
+           a.x + aw > b.x   &&
+           a.y < b.y + b.h  &&
+           a.y + ah > b.y;
+  }
+
+  // ─── Hidespot helpers ─────────────────────────────────────────────────────
+
+  function _findNearHidespot() {
+    const p   = GameState.player;
+    const pcx = p.x + p.width  / 2;
+    const pcy = p.y + p.height / 2;
+    for (const spot of (GameState.hideSpots || [])) {
+      if (spot.occupied) continue;
+      const scx = spot.x + spot.w / 2;
+      const scy = spot.y + spot.h / 2;
+      if (Math.hypot(pcx - scx, pcy - scy) < 38) return spot;
+    }
+    return null;
+  }
+
+  function _exitHiding() {
+    GameState.hiding = false;
+    if (hidingAt) { hidingAt.occupied = false; hidingAt = null; }
+  }
+
+  // ─── Food pickup ──────────────────────────────────────────────────────────
+
+  function grabNearestFood() {
+    const p   = GameState.player;
+    const pcx = p.x + p.width  / 2;
+    const pcy = p.y + p.height / 2;
+
+    let nearest = null, nearestDist = Infinity;
+
+    for (const food of GameState.foods) {
+      if (food.grabbed) continue;
+      const fcx  = food.x + food.w / 2;
+      const fcy  = food.y + food.h / 2;
+      const dist = Math.hypot(pcx - fcx, pcy - fcy);
+      if (dist <= 40 && dist < nearestDist) { nearest = food; nearestDist = dist; }
+    }
+
+    if (nearest) {
+      nearest.grabbed     = true;
+      p.inventory.push(nearest);
+      GameState.score    += nearest.points;
+      GameState.grabFlash = 12;
+      // Floating score popup in world space
+      if (!GameState.popups) GameState.popups = [];
+      GameState.popups.push({
+        text:  '+' + nearest.points + ' ' + nearest.label,
+        x:     nearest.x + nearest.w / 2,
+        y:     nearest.y - 4,
+        alpha: 1,
+        color: nearest.color || '#ffdd00',
+      });
+    }
+  }
+
+  // ─── Draw ─────────────────────────────────────────────────────────────────
+
+  function draw(ctx) {
+    if (GameState.phase !== 'playing') return;
+
+    const p  = GameState.player;
+    const cx = p.x + p.width  / 2;
+    const cy = p.y + p.height / 2;
+
+    // Distraction indicator (drawn regardless of hiding state)
+    const distr = GameState.distraction;
+    if (distr && distr.timer > 0) {
+      const fade = distr.timer / 180;
+      ctx.beginPath();
+      ctx.arc(distr.x, distr.y, distr.radius, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255,220,80,${fade * 0.28})`;
+      ctx.lineWidth = 2; ctx.setLineDash([6, 4]); ctx.stroke(); ctx.setLineDash([]);
+      const pR = 3 + Math.sin(Date.now() * 0.012) * 2;
+      ctx.beginPath(); ctx.arc(distr.x, distr.y, pR, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255,220,80,${fade * 0.9})`; ctx.fill();
+    }
+
+    // ── While hiding: draw a faint ghost dot inside the locker ──
+    if (GameState.hiding && hidingAt) {
+      const hcx = hidingAt.x + hidingAt.w / 2;
+      const hcy = hidingAt.y + hidingAt.h / 2;
+      ctx.beginPath(); ctx.arc(hcx, hcy, 5, 0, Math.PI * 2);
+      ctx.fillStyle   = 'rgba(51,153,255,0.28)'; ctx.fill();
+      ctx.strokeStyle = 'rgba(80,220,80,0.75)'; ctx.lineWidth = 1.5; ctx.stroke();
+      return;
+    }
+
+    // ── Walk animation ──
+    if (_isMoving) _walkT += sprinting ? 0.22 : (p.crouching ? 0.08 : 0.15);
+    const walk      = Math.sin(_walkT * Math.PI * 2);
+    const walkSwing = p.crouching ? walk * 1.8 : walk * 3.5;
+
+    const flen = Math.hypot(facingX, facingY) || 1;
+    const fx   = facingX / flen;
+    const fy   = facingY / flen;
+    // Perpendicular axis for leg offset
+    const sx2 = -fy, sy2 = fx;
+
+    // Noise footprint ring
+    const nr = GameState.playerNoise || 0;
+    if (nr > 0) {
+      ctx.beginPath(); ctx.arc(cx, cy, nr, 0, Math.PI * 2);
+      ctx.strokeStyle = sprinting ? 'rgba(255,140,40,0.22)' : 'rgba(255,255,80,0.15)';
+      ctx.lineWidth   = sprinting ? 2 : 1;
+      ctx.setLineDash([4, 6]); ctx.stroke(); ctx.setLineDash([]);
+    }
+
+    // Crouch detection radius ring
+    if (p.crouching) {
+      ctx.beginPath(); ctx.arc(cx, cy, detectionRadius(), 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(100,180,255,0.18)'; ctx.lineWidth = 1; ctx.stroke();
+    }
+
+    // Grab flash ring
+    const gf = GameState.grabFlash || 0;
+    if (gf > 0) {
+      const expandR = 14 + (12 - gf) * 2.5;
+      ctx.beginPath(); ctx.arc(cx, cy, expandR, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255,220,0,${gf/12})`; ctx.lineWidth = 3; ctx.stroke();
+      GameState.grabFlash--;
+    }
+
+    // Shadow
+    ctx.beginPath(); ctx.arc(cx + 2, cy + 3, 8, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fill();
+
+    if (p.crouching) {
+      // ── Crouching: compact form ──────────────────────────────────────
+      // Body blob (lower, wider)
+      ctx.beginPath(); ctx.arc(cx, cy + 2, 7, 0, Math.PI * 2);
+      ctx.fillStyle = '#1a55cc'; ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1.5; ctx.stroke();
+
+      // Head (tucked in)
+      ctx.beginPath(); ctx.arc(cx + fx * 5, cy + fy * 5 - 2, 4.5, 0, Math.PI * 2);
+      ctx.fillStyle = '#c8906a'; ctx.fill();
+      ctx.strokeStyle = '#8a5a3a'; ctx.lineWidth = 1; ctx.stroke();
+
+    } else {
+      // ── Standing: full pixel-art person ─────────────────────────────
+      // Legs (two dots swinging opposite)
+      for (let li = 0; li < 2; li++) {
+        const side  = li === 0 ? 1 : -1;
+        const swing = li === 0 ? walkSwing : -walkSwing;
+        const lx    = cx + sx2 * side * 3.5 - fy * swing;
+        const ly    = cy + sy2 * side * 3.5 + fx * swing + 5;
+        ctx.beginPath(); ctx.arc(lx, ly, 2.8, 0, Math.PI * 2);
+        ctx.fillStyle = '#1a2255'; ctx.fill();
+        // Shoe
+        ctx.beginPath(); ctx.arc(lx + fx * 1.5, ly + fy * 1.5, 2.2, 0, Math.PI * 2);
+        ctx.fillStyle = '#111111'; ctx.fill();
+      }
+
+      // Torso
+      ctx.beginPath(); ctx.arc(cx, cy + 1, 7, 0, Math.PI * 2);
+      ctx.fillStyle = '#2266bb'; ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1.5; ctx.stroke();
+
+      // Backpack / detail strip
+      ctx.beginPath(); ctx.arc(cx - fx * 3.5, cy + 1 - fy * 3.5, 3.5, 0, Math.PI * 2);
+      ctx.fillStyle = '#335588'; ctx.fill();
+
+      // Arms (small dots on sides)
+      for (let ai = 0; ai < 2; ai++) {
+        const side  = ai === 0 ? 1 : -1;
+        const swing = ai === 0 ? -walkSwing * 0.6 : walkSwing * 0.6;
+        const ax    = cx + sx2 * side * 7 - fy * swing * 0.5;
+        const ay    = cy + sy2 * side * 7 + fx * swing * 0.5;
+        ctx.beginPath(); ctx.arc(ax, ay, 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#1a4488'; ctx.fill();
+      }
+
+      // Head
+      const hx = cx + fx * 7, hy = cy + fy * 7 - 4;
+      ctx.beginPath(); ctx.arc(hx, hy, 5.5, 0, Math.PI * 2);
+      ctx.fillStyle = '#c8906a'; ctx.fill();
+      ctx.strokeStyle = '#8a5a3a'; ctx.lineWidth = 1; ctx.stroke();
+
+      // Eyes (two small dots in facing direction)
+      const ex1 = hx + sx2 * 2,  ey1 = hy + sy2 * 2;
+      const ex2 = hx - sx2 * 2,  ey2 = hy - sy2 * 2;
+      ctx.beginPath(); ctx.arc(ex1, ey1, 1.3, 0, Math.PI * 2);
+      ctx.fillStyle = '#111'; ctx.fill();
+      ctx.beginPath(); ctx.arc(ex2, ey2, 1.3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Inventory badge
+    if (p.inventory.length > 0) {
+      ctx.fillStyle = '#ffdd00'; ctx.font = 'bold 10px monospace'; ctx.textAlign = 'center';
+      ctx.fillText(p.inventory.length, cx + 11, cy - 12);
+      ctx.textAlign = 'left';
+    }
+  }
+
+  // ─── Exposed helpers ──────────────────────────────────────────────────────
+
+  function getHitbox() {
+    const p = GameState.player;
+    return { x: p.x, y: p.y, w: p.width, h: p.height };
+  }
+
+  function detectionRadius() {
+    return GameState.player.crouching ? 35 : 60;
+  }
+
+  return { init, update, draw, reset, getHitbox, detectionRadius };
+})();
+// Module 1 — UI, HUD & Screens
+// Owns: HUD overlay, start/gameover/win screens, button clicks, sound cues.
+
+window.UI = (function () {
+  const btns = {};
+  let frame = 0;
+  let lastDetection = 0;
+  let lastPhase = 'start';
+  let prevGrabFlash = 0;
+
+  // ─── Web Audio Sound Engine ───────────────────────────────────────────────
+  let _ac = null;
+  function getAC() {
+    if (!_ac) _ac = new (window.AudioContext || window.webkitAudioContext)();
+    return _ac;
+  }
+
+  function playNotes(notes) {
+    try {
+      const ac = getAC();
+      let t = ac.currentTime;
+      notes.forEach(({ f, d, v, type }) => {
+        const osc  = ac.createOscillator();
+        const gain = ac.createGain();
+        osc.connect(gain);
+        gain.connect(ac.destination);
+        osc.type = type || 'square';
+        osc.frequency.value = f;
+        gain.gain.setValueAtTime(v || 0.12, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + d);
+        osc.start(t);
+        osc.stop(t + d + 0.01);
+        t += d;
+      });
+    } catch (_) {}
+  }
+
+  const SOUNDS = {
+    grab:     () => playNotes([{ f: 880,  d: 0.05 }, { f: 1320, d: 0.07 }]),
+    alert:    () => playNotes([{ f: 330,  d: 0.13, type: 'sawtooth' }, { f: 495,  d: 0.15, type: 'sawtooth' }]),
+    chase:    () => playNotes([{ f: 520,  d: 0.06 }, { f: 520, d: 0.06 }, { f: 520, d: 0.10 }]),
+    gameover: () => playNotes([{ f: 400,  d: 0.18 }, { f: 300, d: 0.18 }, { f: 180, d: 0.35 }]),
+    win:      () => playNotes([{ f: 523,  d: 0.09 }, { f: 659, d: 0.09 }, { f: 784, d: 0.15 }]),
+  };
+
+  function checkSoundCues() {
+    const d   = GameState.detection;
+    const phase = GameState.phase;
+    const gf  = GameState.grabFlash || 0;
+
+    if (phase === 'playing') {
+      if (d >= 50 && lastDetection < 50) { SOUNDS.alert(); GameState.shakeFrames = 6;  GameState.shakeMag = 3; }
+      if (d >= 80 && lastDetection < 80) { SOUNDS.chase(); GameState.shakeFrames = 12; GameState.shakeMag = 5; }
+    }
+
+    if (gf > 0 && prevGrabFlash === 0) SOUNDS.grab();
+
+    if (phase === 'gameover' && lastPhase === 'playing') { SOUNDS.gameover(); GameState.shakeFrames = 20; GameState.shakeMag = 8; }
+    if (phase === 'win'      && lastPhase === 'playing')   SOUNDS.win();
+
+    lastDetection = d;
+    lastPhase     = phase;
+    prevGrabFlash = gf;
+  }
+
+  // ─── Init ─────────────────────────────────────────────────────────────────
+
+  function init() {
+    GameState.canvas.addEventListener('mousedown', (e) => {
+      const rect = GameState.canvas.getBoundingClientRect();
+      handleClick(e.clientX - rect.left, e.clientY - rect.top);
+      // Resume AudioContext on first interaction (browser autoplay policy)
+      try { getAC().resume(); } catch (_) {}
+    });
+  }
+
+  function handleClick(mx, my) {
+    const phase = GameState.phase;
+    if (phase === 'start'    && hit(mx, my, btns.start)) {
+      GameState.score = 0; GameState.round = 1;
+      Engine.reset(); GameState.phase = 'playing';
+    }
+    if (phase === 'start'    && hit(mx, my, btns.help))  { GameState.phase = 'help'; }
+    if (phase === 'help'     && hit(mx, my, btns.back))  { GameState.phase = 'start'; }
+    if (phase === 'gameover' && hit(mx, my, btns.retry)) {
+      GameState.score = 0; GameState.round = 1;
+      Engine.reset(); GameState.phase = 'playing';
+    }
+    if (phase === 'win'      && hit(mx, my, btns.next))  { GameState.round++; Engine.reset(); GameState.phase = 'playing'; }
+  }
+
+  function hit(mx, my, r) {
+    return r && mx >= r.x && mx <= r.x + r.w && my >= r.y && my <= r.y + r.h;
+  }
+
+  // ─── Draw ─────────────────────────────────────────────────────────────────
+
+  function draw(ctx) {
+    frame++;
+    const phase = GameState.phase;
+    checkSoundCues();
+
+    if (phase === 'playing') {
+      drawHUD(ctx);
+    } else if (phase === 'start') {
+      drawStartScreen(ctx);
+    } else if (phase === 'help') {
+      drawHelpScreen(ctx);
+    } else if (phase === 'gameover') {
+      drawGameOverScreen(ctx);
+    } else if (phase === 'win') {
+      drawWinScreen(ctx);
+    }
+  }
+
+  // ─── HUD ──────────────────────────────────────────────────────────────────
+
+  function drawHUD(ctx) {
+    const gs = GameState;
+
+    // Score
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '16px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('Score: ' + gs.score, 20, 24);
+
+    // Round
+    ctx.fillStyle = '#aaaaaa';
+    ctx.font = '12px monospace';
+    ctx.fillText('Round ' + gs.round, 20, 44);
+
+    // Inventory count (center)
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '14px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(gs.player.inventory.length + ' item' + (gs.player.inventory.length !== 1 ? 's' : ''), 400, 24);
+
+    // Detection meter
+    const mx = 578, my = 28, mw = 202, mh = 18;
+    const pct = gs.detection / 100;
+
+    // "BUSTED" label — flashes red in danger zone
+    const flash = gs.detection > 80 && (frame % 30) < 15;
+    ctx.fillStyle = flash ? '#ff4444' : '#cccccc';
+    ctx.font = 'bold 10px monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText('BUSTED', 780, my - 4);
+
+    // Meter background
+    ctx.fillStyle = '#333333';
+    ctx.fillRect(mx, my, mw, mh);
+
+    // Meter fill
+    ctx.fillStyle = pct < 0.5 ? '#33cc33' : pct < 0.8 ? '#ff9900' : '#cc3300';
+    ctx.fillRect(mx, my, mw * pct, mh);
+
+    // Meter border
+    ctx.strokeStyle = '#555555';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(mx, my, mw, mh);
+
+    // Lives (hearts) — center-top beside item count
+    const lives = gs.lives !== undefined ? gs.lives : 3;
+    ctx.font = '16px monospace';
+    ctx.textAlign = 'center';
+    const heartsStr = '♥'.repeat(Math.max(0, lives)) + '♡'.repeat(Math.max(0, 3 - lives));
+    ctx.fillStyle = lives > 1 ? '#ff4466' : (frame % 30 < 15 ? '#ff0000' : '#880000');
+    ctx.fillText(heartsStr, 400, 44);
+
+    // Hiding indicator
+    if (gs.hiding) {
+      const hpulse = 0.7 + 0.3 * Math.sin(frame * 0.12);
+      ctx.fillStyle = `rgba(60,220,80,${hpulse})`;
+      ctx.font = 'bold 12px monospace'; ctx.textAlign = 'center';
+      ctx.fillText('● HIDING — press E or move to exit', 400, 580);
+      ctx.textAlign = 'left';
+    }
+
+    // Stamina bar (Sprint resource — Space key)
+    const stx = 578, sty = 54, stw = 202, sth = 10;
+    const stPct = (gs.stamina || 0) / 100;
+    ctx.fillStyle = '#888888'; ctx.font = 'bold 8px monospace'; ctx.textAlign = 'right';
+    ctx.fillText('SPRINT', 575, sty + 9);
+    ctx.fillStyle = '#333333'; ctx.fillRect(stx, sty, stw, sth);
+    ctx.fillStyle = stPct > 0.3 ? '#4488ff' : '#ff4444';
+    ctx.fillRect(stx, sty, stw * stPct, sth);
+    ctx.strokeStyle = '#555555'; ctx.lineWidth = 1; ctx.strokeRect(stx, sty, stw, sth);
+
+    // Distraction charges (Q key) — 3 dots, yellow=available grey=spent
+    const charges = gs.distractions !== undefined ? gs.distractions : 3;
+    ctx.fillStyle = '#888888'; ctx.font = 'bold 8px monospace'; ctx.textAlign = 'right';
+    ctx.fillText('THROW  Q', 575, sty + 25);
+    for (let i = 0; i < 3; i++) {
+      const bx = stx + i * 16 + 6, by = sty + 18;
+      ctx.beginPath(); ctx.arc(bx, by, 5, 0, Math.PI * 2);
+      ctx.fillStyle = i < charges ? '#ffcc00' : '#333333'; ctx.fill();
+      ctx.strokeStyle = '#666666'; ctx.lineWidth = 1; ctx.stroke();
+    }
+
+    ctx.textAlign = 'left'; // reset
+  }
+
+  // ─── Shared helpers ───────────────────────────────────────────────────────
+
+  function panel(ctx, x, y, w, h) {
+    ctx.fillStyle = 'rgba(0,0,0,0.90)';
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = '#444444';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, y, w, h);
+  }
+
+  function button(ctx, label, x, y, w, h, bg, key) {
+    ctx.fillStyle = bg;
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, y, w, h);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 14px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, x + w / 2, y + h / 2 + 5);
+    btns[key] = { x, y, w, h };
+  }
+
+  // ─── Start Screen (3-column layout) ───────────────────────────────────────
+
+  function _sectionHeader(ctx, label, x, y, w) {
+    ctx.fillStyle = '#2255aa';
+    ctx.fillRect(x, y, w, 22);
+    ctx.strokeStyle = '#3366cc';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, y, w, 22);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 11px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, x + w / 2, y + 15);
+  }
+
+  function drawStartScreen(ctx) {
+    // Full backdrop
+    ctx.fillStyle = 'rgba(0,0,0,0.88)';
+    ctx.fillRect(0, 0, GameState.width, GameState.height);
+
+    const pulse = 0.7 + 0.3 * Math.sin(frame * 0.06);
+
+    // Title
+    ctx.textAlign = 'center';
+    ctx.shadowColor = `rgba(60,160,255,${pulse * 0.9})`;
+    ctx.shadowBlur  = 20;
+    ctx.fillStyle   = '#ffffff';
+    ctx.font        = 'bold 42px monospace';
+    ctx.fillText('MEAL PLAN ZERO', 400, 70);
+    ctx.shadowBlur  = 0;
+
+    // Tagline
+    ctx.fillStyle = `rgba(80,220,140,${0.6 + 0.4 * pulse})`;
+    ctx.font      = '13px monospace';
+    ctx.fillText('sneak in.  grab food.  get out.', 400, 96);
+
+    // High score (if set)
+    const hs = GameState.highScore || 0;
+    if (hs > 0) {
+      ctx.fillStyle = '#666666';
+      ctx.font = '11px monospace';
+      ctx.fillText('Best: ' + hs + ' pts', 400, 114);
+    }
+
+    // ── 3 columns ─────────────────────────────────────────────────────
+    const colY  = 126, colH = 320, colPad = 12;
+    const col1x = 20,  col1w = 228;
+    const col2x = 260, col2w = 228;
+    const col3x = 500, col3w = 280;
+
+    // Column 1: Objective
+    ctx.fillStyle = 'rgba(15,20,35,0.92)';
+    ctx.fillRect(col1x, colY, col1w, colH);
+    ctx.strokeStyle = '#2244aa'; ctx.lineWidth = 1;
+    ctx.strokeRect(col1x, colY, col1w, colH);
+    _sectionHeader(ctx, 'OBJECTIVE', col1x, colY, col1w);
+
+    const objLines = [
+      'Your meal plan ran out.',
+      "You're hungry.",
+      'The dining hall is open.',
+      '',
+      '① Sneak past workers',
+      '② Grab food (E key)',
+      '③ Reach the green EXIT',
+      '   in the lobby.',
+      '',
+      '3 lives per run.',
+      'Detection hits 100% =',
+      '  lose a life.',
+      'Lose all 3 = CAUGHT.',
+    ];
+    ctx.textAlign = 'left';
+    ctx.font = '11px monospace';
+    let oy = colY + 36;
+    objLines.forEach(line => {
+      ctx.fillStyle = line.startsWith('①') || line.startsWith('②') || line.startsWith('③')
+        ? '#aaddff' : '#cccccc';
+      ctx.fillText(line, col1x + colPad, oy);
+      oy += 17;
+    });
+
+    // Column 2: Controls
+    ctx.fillStyle = 'rgba(15,20,35,0.92)';
+    ctx.fillRect(col2x, colY, col2w, colH);
+    ctx.strokeStyle = '#2244aa'; ctx.lineWidth = 1;
+    ctx.strokeRect(col2x, colY, col2w, colH);
+    _sectionHeader(ctx, 'CONTROLS', col2x, colY, col2w);
+
+    const controls = [
+      ['WASD',     'Move'],
+      ['Shift',    'Crouch (quiet)'],
+      ['Space',    'Sprint (2×, loud)'],
+      ['E',        'Grab food / Hide'],
+      ['Q',        'Throw distraction'],
+    ];
+    let cy2 = colY + 38;
+    controls.forEach(([key, desc]) => {
+      ctx.fillStyle = '#ffdd88';
+      ctx.font = 'bold 11px monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(key, col2x + colPad, cy2);
+      ctx.fillStyle = '#bbbbbb';
+      ctx.font = '11px monospace';
+      ctx.fillText('→ ' + desc, col2x + colPad + 52, cy2);
+      cy2 += 20;
+    });
+
+    cy2 += 8;
+    ctx.fillStyle = '#555555'; ctx.font = '11px monospace'; ctx.textAlign = 'left';
+    ctx.fillText('──────────────────', col2x + colPad, cy2); cy2 += 16;
+    ctx.fillStyle = '#aaaaaa'; ctx.font = 'bold 11px monospace';
+    ctx.fillText('TIPS', col2x + colPad, cy2); cy2 += 16;
+    const tips2 = [
+      '? = suspicious',
+      '! = alert — hide!',
+      '!! = chase — run!',
+      'Walls block vision',
+      'Q buys you time',
+    ];
+    ctx.font = '10px monospace';
+    tips2.forEach(t => {
+      ctx.fillStyle = '#999999';
+      ctx.fillText(t, col2x + colPad, cy2);
+      cy2 += 15;
+    });
+
+    // Column 3: Detection legend
+    ctx.fillStyle = 'rgba(15,20,35,0.92)';
+    ctx.fillRect(col3x, colY, col3w, colH);
+    ctx.strokeStyle = '#2244aa'; ctx.lineWidth = 1;
+    ctx.strokeRect(col3x, colY, col3w, colH);
+    _sectionHeader(ctx, 'DETECTION', col3x, colY, col3w);
+
+    const levels = [
+      ['#33cc33', '0–49%',   'Safe'],
+      ['#ff9900', '50–79%',  'Suspicious'],
+      ['#cc3300', '80–99%',  'DANGER'],
+      ['#ff0000', '100%',    'Lose a life!'],
+    ];
+    let ly = colY + 38;
+    levels.forEach(([color, pct, label]) => {
+      ctx.fillStyle = color;
+      ctx.fillRect(col3x + colPad, ly - 10, 12, 12);
+      ctx.fillStyle = '#dddddd';
+      ctx.font = '11px monospace'; ctx.textAlign = 'left';
+      ctx.fillText(pct + '  ' + label, col3x + colPad + 18, ly);
+      ly += 22;
+    });
+
+    ly += 6;
+    ctx.fillStyle = '#555555'; ctx.font = '11px monospace';
+    ctx.fillText('─────────────────', col3x + colPad, ly); ly += 14;
+    ctx.fillStyle = '#aaaaaa'; ctx.font = 'bold 11px monospace';
+    ctx.fillText('WORKERS', col3x + colPad, ly); ly += 16;
+    const winfo = [
+      ['#cc4400', 'Kitchen chef'],
+      ['#cc4400', 'Gap guard (hardest)'],
+      ['#cc4400', 'Upper dining patrol'],
+      ['#cc4400', 'Lower dining patrol'],
+      ['#225599', 'Lobby security'],
+    ];
+    winfo.forEach(([c, name]) => {
+      ctx.fillStyle = c;
+      ctx.beginPath(); ctx.arc(col3x + colPad + 6, ly - 4, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#cccccc'; ctx.font = '10px monospace';
+      ctx.fillText(name, col3x + colPad + 18, ly);
+      ly += 16;
+    });
+
+    // ── Buttons ────────────────────────────────────────────────────────
+    // Start
+    const btnY = colY + colH + 18;
+    ctx.shadowColor = `rgba(60,160,255,${pulse * 0.6})`;
+    ctx.shadowBlur = 12;
+    button(ctx, '▶  START GAME', 264, btnY, 180, 40, '#1a4488', 'start');
+    ctx.shadowBlur = 0;
+    button(ctx, '? HOW TO PLAY', 456, btnY, 140, 40, '#2a2a2a', 'help');
+
+    ctx.textAlign = 'left';
+  }
+
+  // ─── Help / Controls Screen ───────────────────────────────────────────────
+
+  function drawHelpScreen(ctx) {
+    const px = 140, py = 60, pw = 520, ph = 480;
+    panel(ctx, px, py, pw, ph);
+    const cx = px + pw / 2;
+    ctx.textAlign = 'center';
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 20px monospace';
+    ctx.fillText('HOW TO PLAY', cx, py + 36);
+
+    ctx.fillStyle = '#444444';
+    ctx.fillText('────────────────────────────────', cx, py + 56);
+
+    // Controls
+    ctx.fillStyle = '#aaaaaa';
+    ctx.font = 'bold 12px monospace';
+    ctx.fillText('CONTROLS', cx, py + 78);
+
+    const controls = [
+      ['WASD / Arrows', 'Move'],
+      ['Shift (hold)',  'Crouch — silent, slower, harder to detect'],
+      ['Space (hold)',  'Sprint — 2× speed, loud, drains stamina'],
+      ['E',            'Grab food when close to a counter'],
+      ['Q',            'Throw distraction — lures nearby workers'],
+    ];
+    let y = py + 100;
+    controls.forEach(([key, desc]) => {
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#ffdd88';
+      ctx.font = 'bold 12px monospace';
+      ctx.fillText(key, cx - 8, y);
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#cccccc';
+      ctx.font = '12px monospace';
+      ctx.fillText('→  ' + desc, cx + 8, y);
+      y += 20;
+    });
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#444444';
+    ctx.fillText('────────────────────────────────', cx, y + 6);
+    y += 22;
+
+    // Objective
+    ctx.fillStyle = '#aaaaaa';
+    ctx.font = 'bold 12px monospace';
+    ctx.fillText('OBJECTIVE', cx, y);
+    y += 20;
+
+    const steps = ['① Sneak past the cafeteria workers', '② Grab food from the kitchen counters (E key)', '③ Return to the lobby — reach the green EXIT'];
+    steps.forEach(s => {
+      ctx.fillStyle = '#cccccc';
+      ctx.font = '12px monospace';
+      ctx.fillText(s, cx, y);
+      y += 18;
+    });
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#444444';
+    ctx.fillText('────────────────────────────────', cx, y + 4);
+    y += 20;
+
+    // Detection meter guide
+    ctx.fillStyle = '#aaaaaa';
+    ctx.font = 'bold 12px monospace';
+    ctx.fillText('DETECTION METER', cx, y);
+    y += 20;
+
+    const levels = [
+      ['#33cc33', '0–49%   Safe — keep moving'],
+      ['#ff9900', '50–79%  Suspicious — hide behind cover'],
+      ['#cc3300', '80–100% DANGER — you will be caught'],
+    ];
+    levels.forEach(([color, text]) => {
+      ctx.fillStyle = color;
+      ctx.fillRect(cx - 160, y - 10, 12, 12);
+      ctx.fillStyle = '#cccccc';
+      ctx.font = '11px monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(text, cx - 143, y);
+      ctx.textAlign = 'center';
+      y += 18;
+    });
+
+    ctx.fillStyle = '#444444';
+    ctx.fillText('────────────────────────────────', cx, y + 4);
+    y += 20;
+
+    // Tips
+    ctx.fillStyle = '#aaaaaa';
+    ctx.font = 'bold 12px monospace';
+    ctx.fillText('TIPS', cx, y);
+    y += 18;
+
+    const tips = [
+      '?  = worker spotted something — duck behind cover',
+      '!  = worker is alert — stay out of their cone',
+      '!! = worker is chasing — run!',
+      'Counters and tables BLOCK worker vision',
+      'Food glows yellow when you\'re close enough to grab',
+      'Workers HEAR running — the dashed ring = your noise',
+      'Q throw sends workers to wrong location — use it wisely',
+      'Blue guard patrols the lobby — time your dash to the EXIT',
+      'Low-risk snacks hide in the dining hall & lobby vending',
+      'Kitchen pantry (right wall, E) = risky hide near workers',
+    ];
+    tips.forEach(t => {
+      ctx.fillStyle = '#999999';
+      ctx.font = '11px monospace';
+      ctx.fillText(t, cx, y);
+      y += 17;
+    });
+
+    button(ctx, '[ BACK TO MENU ]', cx - 80, py + ph - 44, 160, 32, '#222233', 'back');
+    ctx.textAlign = 'left';
+  }
+
+  // ─── Game Over Screen ─────────────────────────────────────────────────────
+
+  function drawGameOverScreen(ctx) {
+    const gs = GameState;
+
+    // Dark + red vignette
+    ctx.fillStyle = 'rgba(0,0,0,0.75)';
+    ctx.fillRect(0, 0, gs.width, gs.height);
+    ctx.fillStyle = 'rgba(160,0,0,0.18)';
+    ctx.fillRect(0, 0, gs.width, gs.height);
+
+    const px = 180, py = 130, pw = 440, ph = 340;
+    panel(ctx, px, py, pw, ph);
+    const cx = px + pw / 2;
+
+    ctx.textAlign = 'center';
+
+    // "CAUGHT." with red glow
+    const flash = (frame % 40) < 20;
+    ctx.shadowColor = flash ? 'rgba(255,0,0,0.9)' : 'rgba(180,0,0,0.5)';
+    ctx.shadowBlur  = flash ? 28 : 14;
+    ctx.fillStyle   = flash ? '#ff2200' : '#cc1100';
+    ctx.font        = 'bold 48px monospace';
+    ctx.fillText('CAUGHT.', cx, py + 70);
+    ctx.shadowBlur  = 0;
+
+    ctx.fillStyle = '#888888';
+    ctx.font = '12px monospace';
+    ctx.fillText('Banned from the dining hall. Also still hungry.', cx, py + 104);
+
+    // Stats panel
+    ctx.fillStyle = 'rgba(40,0,0,0.6)';
+    ctx.fillRect(px + 30, py + 120, pw - 60, 120);
+
+    const stolen = gs.player.inventory.length;
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '13px monospace';
+    ctx.fillText(
+      stolen > 0
+        ? 'Grabbed ' + stolen + ' item' + (stolen !== 1 ? 's' : '') + ' before getting caught.'
+        : "Didn't even get anything.",
+      cx, py + 148
+    );
+    ctx.font = 'bold 18px monospace';
+    ctx.fillText('Score: ' + gs.score + ' pts', cx, py + 176);
+
+    ctx.fillStyle = '#666666';
+    ctx.font = '11px monospace';
+    ctx.fillText('Round ' + gs.round, cx, py + 198);
+
+    const hs = gs.highScore || 0;
+    if (hs > 0) {
+      ctx.fillStyle = hs === gs.score ? '#ffdd00' : '#555555';
+      ctx.fillText('Best: ' + hs + ' pts' + (hs === gs.score ? '  ★ NEW!' : ''), cx, py + 214);
+    }
+
+    button(ctx, '[ TRY AGAIN ]', cx - 85, py + 272, 170, 40, '#881100', 'retry');
+
+    ctx.textAlign = 'left';
+  }
+
+  // ─── Win Screen ───────────────────────────────────────────────────────────
+
+  function drawWinScreen(ctx) {
+    const gs  = GameState;
+    const inv = gs.player.inventory;
+    const px = 160, py = 110, pw = 480, ph = 380;
+    panel(ctx, px, py, pw, ph);
+    const cx = px + pw / 2;
+
+    ctx.textAlign = 'center';
+
+    ctx.fillStyle = '#33cc66';
+    ctx.font = 'bold 28px monospace';
+    ctx.fillText('ESCAPED.', cx, py + 52);
+
+    ctx.fillStyle = '#888888';
+    ctx.font = '13px monospace';
+    ctx.fillText('Round ' + gs.round + ' complete.', cx, py + 78);
+
+    // Food haul list
+    ctx.fillStyle = '#555555';
+    ctx.font = '11px monospace';
+    ctx.fillText('──────────  STOLEN  ──────────', cx, py + 106);
+
+    const shown = inv.slice(0, 6);
+    let yy = py + 128;
+
+    if (shown.length === 0) {
+      ctx.fillStyle = '#888888';
+      ctx.font = '12px monospace';
+      ctx.fillText('(nothing stolen)', cx, yy);
+      yy += 20;
+    } else {
+      shown.forEach(food => {
+        ctx.fillStyle = food.color || '#cccccc';
+        ctx.font = '12px monospace';
+        ctx.fillText('+ ' + food.label + '   (' + food.points + ' pts)', cx, yy);
+        yy += 20;
+      });
+      if (inv.length > 6) {
+        ctx.fillStyle = '#666666';
+        ctx.font = '11px monospace';
+        ctx.fillText('...and ' + (inv.length - 6) + ' more', cx, yy);
+        yy += 18;
+      }
+    }
+
+    ctx.fillStyle = '#555555';
+    ctx.font = '11px monospace';
+    ctx.fillText('──────────────────────────────', cx, yy + 4);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 16px monospace';
+    ctx.fillText('Score: ' + gs.score + ' pts', cx, yy + 28);
+
+    button(ctx, '[ NEXT ROUND ]', cx - 85, yy + 46, 170, 36, '#336633', 'next');
+
+    ctx.textAlign = 'left';
+  }
+
+  return { init, draw };
+})();
+// =============================================================================
+// Module 1 — Core Engine & Game Loop
+// File: js/engine.js
+// Exposes: window.Engine = { init, reset }
+// Orchestrates all modules. Owns canvas, input, RAF loop, camera, phase
+// transitions, Web Audio music, round intro overlay, lives system.
+// =============================================================================
+
+window.Engine = (function () {
+
+  let _lastTime = null; // null = first frame sentinel
+
+  // ─── Audio ────────────────────────────────────────────────────────────────
+  // 140-BPM trap beat: kick808, bass808, snare, hihat.
+  // Started on first keydown/click (browser autoplay policy).
+
+  let _ac = null, _masterGain = null, _bgStarted = false;
+
+  function _ensureAudio() {
+    if (_ac) return;
+    try {
+      _ac = new (window.AudioContext || window.webkitAudioContext)();
+      _masterGain = _ac.createGain();
+      _masterGain.gain.value = 0.22;
+      _masterGain.connect(_ac.destination);
+    } catch (_) {}
+  }
+
+  function _startBgMusic() {
+    if (_bgStarted || !_ac) return;
+    _bgStarted = true;
+
+    const BPM  = 140;
+    const STEP = (60 / BPM / 4) * 1000; // 16th-note duration in ms
+
+    const kickPat  = [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,0,0];
+    const snarePat = [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0];
+    const hihatPat = [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,1];
+    const bassPat  = [1,0,0,1, 0,0,1,0, 0,0,1,0, 0,1,0,0];
+    const bassFreqs= [55,55,55,41, 41,41,55,55, 55,55,41,41, 55,55,46,46];
+
+    let step = 0;
+
+    function _kick() {
+      try {
+        const osc = _ac.createOscillator();
+        const g   = _ac.createGain();
+        osc.connect(g); g.connect(_masterGain);
+        const t = _ac.currentTime;
+        osc.frequency.setValueAtTime(185, t);
+        osc.frequency.exponentialRampToValueAtTime(40, t + 0.12);
+        g.gain.setValueAtTime(1.1, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+        osc.start(t); osc.stop(t + 0.32);
+      } catch (_) {}
+    }
+
+    function _snare() {
+      try {
+        const len  = Math.ceil(_ac.sampleRate * 0.14);
+        const buf  = _ac.createBuffer(1, len, _ac.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+        const src = _ac.createBufferSource();
+        const bpf = _ac.createBiquadFilter();
+        const g   = _ac.createGain();
+        src.buffer = buf;
+        bpf.type = 'bandpass'; bpf.frequency.value = 1400; bpf.Q.value = 0.8;
+        src.connect(bpf); bpf.connect(g); g.connect(_masterGain);
+        const t = _ac.currentTime;
+        g.gain.setValueAtTime(0.65, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+        src.start(t);
+      } catch (_) {}
+    }
+
+    function _hihat() {
+      try {
+        const len  = Math.ceil(_ac.sampleRate * 0.04);
+        const buf  = _ac.createBuffer(1, len, _ac.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+        const src = _ac.createBufferSource();
+        const hpf = _ac.createBiquadFilter();
+        const g   = _ac.createGain();
+        src.buffer = buf;
+        hpf.type = 'highpass'; hpf.frequency.value = 8000;
+        src.connect(hpf); hpf.connect(g); g.connect(_masterGain);
+        const t = _ac.currentTime;
+        g.gain.setValueAtTime(0.25, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+        src.start(t);
+      } catch (_) {}
+    }
+
+    function _bass(freq) {
+      try {
+        const osc = _ac.createOscillator();
+        const lpf = _ac.createBiquadFilter();
+        const g   = _ac.createGain();
+        osc.connect(lpf); lpf.connect(g); g.connect(_masterGain);
+        osc.type = 'sawtooth';
+        lpf.type = 'lowpass'; lpf.frequency.value = 220;
+        const t = _ac.currentTime;
+        osc.frequency.setValueAtTime(freq, t);
+        g.gain.setValueAtTime(0.8, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.10);
+        osc.start(t); osc.stop(t + 0.12);
+      } catch (_) {}
+    }
+
+    function _tick() {
+      if (kickPat[step])  _kick();
+      if (snarePat[step]) _snare();
+      if (hihatPat[step]) _hihat();
+      if (bassPat[step])  _bass(bassFreqs[step]);
+      step = (step + 1) % 16;
+      setTimeout(_tick, STEP);
+    }
+    _tick();
+  }
+
+  // ─── Round Intro Overlay ──────────────────────────────────────────────────
+  // A countdown (3-2-1-GO!) shown at the start of each round.
+  // Gameplay is frozen while it plays.
+
+  let _introTime   = 0;   // 0 = not active; >0 = frames since intro started
+  let _introActive = false;
+
+  function _startIntro() {
+    _introTime   = 0;
+    _introActive = true;
+  }
+
+  function _tickIntro() {
+    if (!_introActive) return;
+    _introTime++;
+    if (_introTime >= 130) _introActive = false;
+  }
+
+  function _drawIntro(ctx) {
+    if (!_introActive) return;
+    const t    = _introTime;
+    const fade = t < 20 ? t / 20 : t > 110 ? (130 - t) / 20 : 1;
+    const gs   = window.GameState;
+
+    // dark band
+    ctx.fillStyle = `rgba(0,0,0,${0.78 * fade})`;
+    ctx.fillRect(0, 180, gs.width, 220);
+
+    ctx.textAlign = 'center';
+
+    // "ROUND X"
+    ctx.fillStyle = `rgba(255,255,255,${fade})`;
+    ctx.font      = 'bold 52px monospace';
+    ctx.shadowColor = `rgba(80,180,255,${fade * 0.8})`;
+    ctx.shadowBlur  = 18;
+    ctx.fillText('ROUND ' + gs.round, gs.width / 2, 280);
+    ctx.shadowBlur = 0;
+
+    // Countdown number / GO!
+    let label, color;
+    if      (t < 35)  { label = '3'; color = `rgba(255,200,50,${fade})`; }
+    else if (t < 70)  { label = '2'; color = `rgba(255,200,50,${fade})`; }
+    else if (t < 105) { label = '1'; color = `rgba(255,200,50,${fade})`; }
+    else              { label = 'GO!'; color = `rgba(80,255,120,${fade})`; }
+
+    ctx.fillStyle = color;
+    ctx.font      = 'bold 40px monospace';
+    ctx.fillText(label, gs.width / 2, 352);
+    ctx.textAlign = 'left';
+  }
+
+  // ─── Floating Score Popups (drawn in world space) ─────────────────────────
+
+  function _drawPopups(ctx) {
+    const gs = window.GameState;
+    if (!gs.popups || gs.popups.length === 0) return;
+    gs.popups = gs.popups.filter(p => p.alpha > 0);
+    gs.popups.forEach(p => {
+      ctx.globalAlpha = Math.min(1, p.alpha);
+      ctx.fillStyle   = p.color || '#ffdd00';
+      ctx.font        = 'bold 13px monospace';
+      ctx.textAlign   = 'center';
+      ctx.fillText(p.text, p.x, p.y);
+      p.y     -= 1.1;
+      p.alpha -= 0.016;
+    });
+    ctx.globalAlpha = 1;
+    ctx.textAlign   = 'left';
+  }
+
+  // ─── Camera ───────────────────────────────────────────────────────────────
+
+  function _updateCamera() {
+    const gs = window.GameState;
+    const p  = gs.player;
+    const WW = gs.worldWidth;
+    const WH = gs.worldHeight;
+    gs.cam.x = Math.max(0, Math.min(WW - gs.width,  p.x + p.width  / 2 - gs.width  / 2));
+    gs.cam.y = Math.max(0, Math.min(WH - gs.height, p.y + p.height / 2 - gs.height / 2));
+  }
+
+  // ─── Main Loop ────────────────────────────────────────────────────────────
+
+  function loop(timestamp) {
+    if (_lastTime === null) _lastTime = timestamp;
+    const dt = Math.min((timestamp - _lastTime) / 1000, 0.05);
+    _lastTime = timestamp;
+
+    const gs  = window.GameState;
+    const ctx = gs.ctx;
+
+    ctx.clearRect(0, 0, gs.width, gs.height);
+
+    // ── Game logic update ───────────────────────────────────────────────────
+    if (gs.phase === 'playing') {
+      if (!_introActive) {
+        Workers.update(dt);
+        Player.update(dt);
+
+        // ── Lives system: detection maxed → lose a life ──────────────────
+        if (gs.detection >= 100) {
+          gs.lives = Math.max(0, (gs.lives !== undefined ? gs.lives : 3) - 1);
+          if (gs.lives <= 0) {
+            gs.phase     = 'gameover';
+            gs.highScore = Math.max(gs.highScore || 0, gs.score);
+          } else {
+            // Lose a life — partial reset (keeps round, score, inventory)
+            gs.detection  = 0;
+            gs.flashAlpha = 0.85;
+            gs.shakeFrames = 22;
+            gs.shakeMag    = 9;
+            gs.player.x   = 50;
+            gs.player.y   = 1200;
+            gs.hiding      = false;
+            gs.cam.x       = 0;
+            gs.cam.y       = 0;
+            gs.workers.forEach(w => {
+              w.state          = 'patrol';
+              w.suspicionTimer = 0;
+            });
+          }
+        }
+      }
+      _tickIntro();
+      _updateCamera();
+    }
+
+    // ── World layer — camera + optional shake ──────────────────────────────
+    const shaking = gs.phase === 'playing' && gs.shakeFrames > 0;
+    const sx = shaking ? (Math.random() - 0.5) * (gs.shakeMag || 5) : 0;
+    const sy = shaking ? (Math.random() - 0.5) * (gs.shakeMag || 5) : 0;
+    if (shaking) gs.shakeFrames--;
+
+    ctx.save();
+    ctx.translate(-gs.cam.x + sx, -gs.cam.y + sy);
+
+    Map.draw(ctx);
+
+    if (gs.phase === 'playing') {
+      Workers.draw(ctx);
+      Player.draw(ctx);
+      _drawPopups(ctx);   // world-space floating score text
+    }
+
+    ctx.restore(); // ← back to canvas space before HUD / overlays
+
+    // ── Red flash on lose-life ─────────────────────────────────────────────
+    if (gs.flashAlpha > 0) {
+      ctx.fillStyle = `rgba(200,0,0,${gs.flashAlpha})`;
+      ctx.fillRect(0, 0, gs.width, gs.height);
+      gs.flashAlpha = Math.max(0, gs.flashAlpha - 0.028);
+    }
+
+    // ── Round intro overlay ────────────────────────────────────────────────
+    _drawIntro(ctx);
+
+    // ── UI layer ───────────────────────────────────────────────────────────
+    UI.draw(ctx);
+
+    requestAnimationFrame(loop);
+  }
+
+  // ─── Init ─────────────────────────────────────────────────────────────────
+
+  function init() {
+    const gs = window.GameState;
+
+    const canvas = document.createElement('canvas');
+    canvas.id = 'game-canvas';
+    canvas.width  = gs.width;
+    canvas.height = gs.height;
+    document.getElementById('game-container').appendChild(canvas);
+    gs.canvas = canvas;
+    gs.ctx    = canvas.getContext('2d');
+
+    window.addEventListener('keydown', (e) => {
+      gs.keys[e.key] = true;
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
+        e.preventDefault();
+      }
+      // Trigger audio on first user interaction
+      _ensureAudio();
+      if (_ac && gs.phase === 'playing') {
+        _ac.resume().catch(() => {});
+        _startBgMusic();
+      }
+    });
+    window.addEventListener('keyup', (e) => {
+      gs.keys[e.key] = false;
+    });
+
+    // Also trigger audio on canvas click (start-screen button)
+    canvas.addEventListener('mousedown', () => {
+      _ensureAudio();
+      if (_ac) _ac.resume().catch(() => {});
+    });
+
+    Map.init();
+    Player.init();
+    Workers.init();
+    UI.init();
+
+    requestAnimationFrame(loop);
+  }
+
+  // ─── Reset ────────────────────────────────────────────────────────────────
+  // Called on retry / new round. Does NOT set phase — UI does that.
+
+  function reset() {
+    const gs = window.GameState;
+
+    gs.lives        = 3;
+    gs.detection    = 0;
+    gs.keys         = {};
+    gs.shakeFrames  = 0;
+    gs.grabFlash    = 0;
+    gs.flashAlpha   = 0;
+    gs.popups       = [];
+    gs.cam.x        = 0;
+    gs.cam.y        = 0;
+    gs.hiding       = false;
+    gs.stamina      = 100;
+    gs.playerNoise  = 0;
+    gs.distractions = 3;
+    gs.distraction  = null;
+    gs.player.inventory = [];
+    gs.player.x         = 50;
+    gs.player.y         = 1200;
+    gs.player.crouching = false;
+
+    Map.reset();
+    Player.reset();
+    Workers.reset(gs.round);
+
+    // Show round intro countdown
+    _startIntro();
+
+    // Start music (first time only)
+    if (_ac) _startBgMusic();
+  }
+
+  return { init, reset };
+
+})();
+
+window.addEventListener('load', () => Engine.init());
+</script>
+</body>
+</html>

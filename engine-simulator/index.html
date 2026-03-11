@@ -1,0 +1,1912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Internal Combustion Engine Simulator</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #1a1a2e;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            overflow: hidden;
+            color: #e0e0e0;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            grid-template-rows: 1fr 200px;
+            height: 100vh;
+            gap: 0;
+        }
+
+        #canvas-container {
+            position: relative;
+            background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%);
+            border-right: 1px solid #333;
+            border-bottom: 1px solid #333;
+        }
+
+        #three-canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        .view-toggle {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            display: flex;
+            gap: 8px;
+            z-index: 10;
+        }
+
+        .view-btn {
+            padding: 8px 16px;
+            background: rgba(40, 40, 60, 0.9);
+            border: 1px solid #4a9eff;
+            color: #4a9eff;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .view-btn:hover { background: rgba(74, 158, 255, 0.2); }
+        .view-btn.active {
+            background: #4a9eff;
+            color: #0f0f1a;
+            font-weight: 600;
+        }
+
+        .controls {
+            background: rgba(20, 20, 35, 0.98);
+            padding: 15px;
+            overflow-y: auto;
+            border-bottom: 1px solid #333;
+        }
+
+        .controls h2 {
+            font-size: 1.1rem;
+            color: #4a9eff;
+            margin-bottom: 12px;
+            text-align: center;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #333;
+        }
+
+        .engine-status {
+            text-align: center;
+            padding: 12px;
+            margin-bottom: 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+        }
+
+        .rpm-display {
+            font-size: 2.2rem;
+            font-weight: bold;
+            color: #4a9eff;
+            text-shadow: 0 0 20px rgba(74, 158, 255, 0.5);
+        }
+
+        .rpm-label {
+            font-size: 0.75rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .engine-state {
+            margin-top: 6px;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            display: inline-block;
+        }
+
+        .engine-state.off { background: #444; color: #888; }
+        .engine-state.cranking { background: #f39c12; color: #000; }
+        .engine-state.running { background: #27ae60; color: #fff; }
+        .engine-state.redline { background: #e74c3c; color: #fff; animation: pulse 0.3s infinite; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .control-section {
+            margin-bottom: 15px;
+        }
+
+        .section-title {
+            font-size: 0.7rem;
+            color: #4a9eff;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            padding-top: 8px;
+            border-top: 1px solid #333;
+        }
+
+        .control-group {
+            margin-bottom: 10px;
+        }
+
+        .control-group label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            margin-bottom: 4px;
+            color: #aaa;
+        }
+
+        .control-group label span {
+            color: #4a9eff;
+            font-weight: 600;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 5px;
+            -webkit-appearance: none;
+            background: #333;
+            border-radius: 3px;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: linear-gradient(135deg, #4a9eff, #2980b9);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+
+        input[type="range"]:disabled {
+            opacity: 0.4;
+        }
+
+        .button-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .engine-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .start-btn {
+            background: linear-gradient(135deg, #27ae60, #1e8449);
+            color: white;
+        }
+
+        .start-btn:hover { transform: scale(1.02); box-shadow: 0 4px 15px rgba(39, 174, 96, 0.4); }
+        .start-btn:active { transform: scale(0.98); }
+
+        .stop-btn {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            color: white;
+        }
+
+        .stop-btn:hover { transform: scale(1.02); box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4); }
+
+        select {
+            width: 100%;
+            padding: 6px 10px;
+            background: #2a2a40;
+            border: 1px solid #444;
+            color: #e0e0e0;
+            border-radius: 6px;
+            font-size: 0.8rem;
+        }
+
+        .toggle-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .toggle-row input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: #4a9eff;
+        }
+
+        .toggle-row label {
+            font-size: 0.75rem;
+            color: #aaa;
+            flex: 1;
+        }
+
+        .boost-badge {
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.65rem;
+            font-weight: bold;
+        }
+
+        .boost-badge.turbo { background: #0af; color: #000; }
+        .boost-badge.super { background: #f80; color: #000; }
+
+        .schematic-panel {
+            grid-column: 1 / -1;
+            background: #0f0f1a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-top: 1px solid #333;
+        }
+
+        #schematic-canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        .dashboard {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            display: flex;
+            gap: 12px;
+            z-index: 10;
+            flex-wrap: wrap;
+            max-width: 550px;
+        }
+
+        .gauge {
+            width: 100px;
+            height: 100px;
+            background: radial-gradient(circle at 50% 50%, #2a2a40 0%, #1a1a2e 100%);
+            border-radius: 50%;
+            border: 2px solid #333;
+            position: relative;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5), inset 0 2px 10px rgba(0,0,0,0.3);
+        }
+
+        .gauge-label {
+            position: absolute;
+            bottom: 22px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.55rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .gauge-value {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.75rem;
+            color: #4a9eff;
+            font-weight: bold;
+        }
+
+        .gauge-needle {
+            position: absolute;
+            bottom: 50%;
+            left: 50%;
+            width: 2px;
+            height: 35px;
+            background: linear-gradient(to top, #e74c3c, #ff6b6b);
+            transform-origin: bottom center;
+            transform: translateX(-50%) rotate(-135deg);
+            border-radius: 2px;
+            transition: transform 0.1s ease-out;
+        }
+
+        .gauge-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 10px;
+            height: 10px;
+            background: #444;
+            border-radius: 50%;
+            border: 2px solid #666;
+        }
+
+        .gauge-marks {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .cycle-indicator {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(20, 20, 35, 0.95);
+            padding: 10px 15px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            z-index: 10;
+        }
+
+        .cycle-name {
+            font-size: 1rem;
+            color: #4a9eff;
+            font-weight: 600;
+        }
+
+        .cycle-phase {
+            font-size: 0.7rem;
+            color: #888;
+            margin-top: 3px;
+        }
+
+        .stroke-dots {
+            display: flex;
+            gap: 5px;
+            margin-top: 6px;
+        }
+
+        .stroke-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #333;
+            transition: all 0.2s;
+        }
+
+        .stroke-dot.intake { background: #3498db; box-shadow: 0 0 10px #3498db; }
+        .stroke-dot.compression { background: #9b59b6; box-shadow: 0 0 10px #9b59b6; }
+        .stroke-dot.power { background: #e74c3c; box-shadow: 0 0 10px #e74c3c; }
+        .stroke-dot.exhaust { background: #f39c12; box-shadow: 0 0 10px #f39c12; }
+
+        .performance-stats {
+            position: absolute;
+            top: 100px;
+            right: 15px;
+            background: rgba(20, 20, 35, 0.95);
+            padding: 12px 15px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            z-index: 10;
+            font-size: 0.75rem;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            color: #888;
+        }
+
+        .stat-row span {
+            color: #4a9eff;
+            font-weight: 600;
+            margin-left: 15px;
+        }
+
+        .stat-row.highlight {
+            color: #27ae60;
+        }
+
+        .stat-row.highlight span {
+            color: #2ecc71;
+        }
+
+        .optimization-mode {
+            display: flex;
+            gap: 5px;
+            margin-top: 8px;
+        }
+
+        .opt-btn {
+            flex: 1;
+            padding: 5px;
+            border: 1px solid #444;
+            background: #2a2a40;
+            color: #888;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.65rem;
+            transition: all 0.2s;
+        }
+
+        .opt-btn:hover {
+            border-color: #4a9eff;
+            color: #4a9eff;
+        }
+
+        .opt-btn.active {
+            background: #4a9eff;
+            color: #000;
+            border-color: #4a9eff;
+        }
+
+        .boost-meter {
+            height: 4px;
+            background: #333;
+            border-radius: 2px;
+            margin-top: 5px;
+            overflow: hidden;
+        }
+
+        .boost-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4a9eff, #00ff88);
+            transition: width 0.1s;
+        }
+
+        .turbo-spool {
+            height: 3px;
+            background: #333;
+            border-radius: 2px;
+            margin-top: 4px;
+            overflow: hidden;
+        }
+
+        .turbo-spool-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #0af, #0ff);
+            width: 0%;
+            transition: width 0.1s;
+        }
+
+        .two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="canvas-container">
+            <canvas id="three-canvas"></canvas>
+
+            <div class="view-toggle">
+                <button class="view-btn active" data-view="3d">3D View</button>
+                <button class="view-btn" data-view="cutaway">Cutaway</button>
+                <button class="view-btn" data-view="exploded">Exploded</button>
+            </div>
+
+            <div class="cycle-indicator">
+                <div class="cycle-name" id="cycle-name">4-Stroke Cycle</div>
+                <div class="cycle-phase" id="cycle-phase">Engine Off</div>
+                <div class="stroke-dots">
+                    <div class="stroke-dot" id="dot-intake" title="Intake"></div>
+                    <div class="stroke-dot" id="dot-compression" title="Compression"></div>
+                    <div class="stroke-dot" id="dot-power" title="Power"></div>
+                    <div class="stroke-dot" id="dot-exhaust" title="Exhaust"></div>
+                </div>
+            </div>
+
+            <div class="performance-stats">
+                <div class="stat-row"><span id="stat-hp">0</span> HP</div>
+                <div class="stat-row"><span id="stat-torque">0</span> lb-ft</div>
+                <div class="stat-row"><span id="stat-efficiency">0</span>% Efficiency</div>
+                <div class="stat-row"><span id="stat-boost">0</span> PSI Boost</div>
+                <div class="stat-row"><span id="stat-afr">14.7</span>:1 AFR</div>
+                <div class="stat-row"><span id="stat-fuel-rate">0</span> gal/hr</div>
+            </div>
+
+            <div class="dashboard">
+                <div class="gauge" id="gauge-rpm">
+                    <svg class="gauge-marks" viewBox="0 0 100 100">
+                        <g stroke="#555" stroke-width="1">
+                            <line x1="50" y1="10" x2="50" y2="14" transform="rotate(-135, 50, 50)"/>
+                            <line x1="50" y1="10" x2="50" y2="14" transform="rotate(-108, 50, 50)"/>
+                            <line x1="50" y1="10" x2="50" y2="14" transform="rotate(-81, 50, 50)"/>
+                            <line x1="50" y1="10" x2="50" y2="14" transform="rotate(-54, 50, 50)"/>
+                            <line x1="50" y1="10" x2="50" y2="14" transform="rotate(-27, 50, 50)"/>
+                            <line x1="50" y1="10" x2="50" y2="14" transform="rotate(0, 50, 50)"/>
+                            <line x1="50" y1="10" x2="50" y2="14" transform="rotate(27, 50, 50)" stroke="#e74c3c"/>
+                            <line x1="50" y1="10" x2="50" y2="14" transform="rotate(54, 50, 50)" stroke="#e74c3c"/>
+                        </g>
+                    </svg>
+                    <div class="gauge-needle" id="rpm-needle"></div>
+                    <div class="gauge-center"></div>
+                    <div class="gauge-label">RPM</div>
+                    <div class="gauge-value" id="rpm-value">0</div>
+                </div>
+
+                <div class="gauge" id="gauge-boost">
+                    <svg class="gauge-marks" viewBox="0 0 100 100">
+                        <g stroke="#555" stroke-width="1">
+                            <line x1="50" y1="10" x2="50" y2="14" transform="rotate(-135, 50, 50)"/>
+                            <line x1="50" y1="10" x2="50" y2="14" transform="rotate(-90, 50, 50)"/>
+                            <line x1="50" y1="10" x2="50" y2="14" transform="rotate(-45, 50, 50)"/>
+                            <line x1="50" y1="10" x2="50" y2="14" transform="rotate(0, 50, 50)"/>
+                            <line x1="50" y1="10" x2="50" y2="14" transform="rotate(45, 50, 50)" stroke="#27ae60"/>
+                        </g>
+                    </svg>
+                    <div class="gauge-needle" id="boost-needle"></div>
+                    <div class="gauge-center"></div>
+                    <div class="gauge-label">Boost</div>
+                    <div class="gauge-value" id="boost-value">0 PSI</div>
+                </div>
+
+                <div class="gauge" id="gauge-temp">
+                    <svg class="gauge-marks" viewBox="0 0 100 100">
+                        <g stroke="#555" stroke-width="1">
+                            <line x1="50" y1="10" x2="50" y2="14" transform="rotate(-135, 50, 50)"/>
+                            <line x1="50" y1="10" x2="50" y2="14" transform="rotate(-90, 50, 50)"/>
+                            <line x1="50" y1="10" x2="50" y2="14" transform="rotate(-45, 50, 50)"/>
+                            <line x1="50" y1="10" x2="50" y2="14" transform="rotate(0, 50, 50)"/>
+                            <line x1="50" y1="10" x2="50" y2="14" transform="rotate(45, 50, 50)" stroke="#e74c3c"/>
+                        </g>
+                    </svg>
+                    <div class="gauge-needle" id="temp-needle"></div>
+                    <div class="gauge-center"></div>
+                    <div class="gauge-label">Temp</div>
+                    <div class="gauge-value" id="temp-value">70°F</div>
+                </div>
+
+                <div class="gauge" id="gauge-oil">
+                    <svg class="gauge-marks" viewBox="0 0 100 100">
+                        <g stroke="#555" stroke-width="1">
+                            <line x1="50" y1="10" x2="50" y2="14" transform="rotate(-135, 50, 50)" stroke="#e74c3c"/>
+                            <line x1="50" y1="10" x2="50" y2="14" transform="rotate(-90, 50, 50)"/>
+                            <line x1="50" y1="10" x2="50" y2="14" transform="rotate(-45, 50, 50)"/>
+                            <line x1="50" y1="10" x2="50" y2="14" transform="rotate(0, 50, 50)"/>
+                            <line x1="50" y1="10" x2="50" y2="14" transform="rotate(45, 50, 50)"/>
+                        </g>
+                    </svg>
+                    <div class="gauge-needle" id="oil-needle"></div>
+                    <div class="gauge-center"></div>
+                    <div class="gauge-label">Oil PSI</div>
+                    <div class="gauge-value" id="oil-value">0</div>
+                </div>
+
+                <div class="gauge" id="gauge-fuel">
+                    <svg class="gauge-marks" viewBox="0 0 100 100">
+                        <g stroke="#555" stroke-width="1">
+                            <line x1="50" y1="10" x2="50" y2="14" transform="rotate(-135, 50, 50)" stroke="#e74c3c"/>
+                            <line x1="50" y1="10" x2="50" y2="14" transform="rotate(-67, 50, 50)"/>
+                            <line x1="50" y1="10" x2="50" y2="14" transform="rotate(0, 50, 50)"/>
+                            <line x1="50" y1="10" x2="50" y2="14" transform="rotate(45, 50, 50)"/>
+                        </g>
+                        <text x="18" y="28" fill="#e74c3c" font-size="7">E</text>
+                        <text x="75" y="28" fill="#27ae60" font-size="7">F</text>
+                    </svg>
+                    <div class="gauge-needle" id="fuel-needle"></div>
+                    <div class="gauge-center"></div>
+                    <div class="gauge-label">Fuel</div>
+                    <div class="gauge-value" id="fuel-value">100%</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <h2>Engine Simulator</h2>
+
+            <div class="engine-status">
+                <div class="rpm-display" id="rpm-display">0</div>
+                <div class="rpm-label">RPM</div>
+                <div class="engine-state off" id="engine-state">OFF</div>
+            </div>
+
+            <div class="button-row">
+                <button class="engine-btn start-btn" id="start-btn">START</button>
+                <button class="engine-btn stop-btn" id="stop-btn">STOP</button>
+            </div>
+
+            <div class="control-section">
+                <div class="section-title">Optimization Target</div>
+                <div class="optimization-mode">
+                    <button class="opt-btn active" data-mode="balanced">Balanced</button>
+                    <button class="opt-btn" data-mode="power">Max Power</button>
+                    <button class="opt-btn" data-mode="efficiency">Efficiency</button>
+                    <button class="opt-btn" data-mode="rpm">Max RPM</button>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <div class="section-title">Throttle</div>
+                <div class="control-group">
+                    <label>Throttle Position <span id="v-throttle">0</span>%</label>
+                    <input type="range" id="throttle" min="0" max="100" value="0">
+                </div>
+            </div>
+
+            <div class="control-section">
+                <div class="section-title">Engine Configuration</div>
+                <div class="two-col">
+                    <div class="control-group">
+                        <label>Fuel Type</label>
+                        <select id="fuel-type">
+                            <option value="gasoline">Gasoline (91 oct)</option>
+                            <option value="premium">Premium (93 oct)</option>
+                            <option value="e85">E85 Ethanol</option>
+                            <option value="diesel">Diesel</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>Cylinders</label>
+                        <select id="cylinders">
+                            <option value="3">3 Cylinder</option>
+                            <option value="4" selected>4 Cylinder</option>
+                            <option value="5">5 Cylinder</option>
+                            <option value="6">6 Cylinder</option>
+                            <option value="8">8 Cylinder</option>
+                            <option value="10">10 Cylinder</option>
+                            <option value="12">12 Cylinder</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Engine Layout</label>
+                    <select id="engine-type">
+                        <option value="inline">Inline</option>
+                        <option value="v">V Configuration</option>
+                        <option value="boxer">Flat/Boxer</option>
+                        <option value="w">W Configuration</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label>Displacement <span id="v-displacement">2.0</span>L</label>
+                    <input type="range" id="displacement" min="0.8" max="8.0" step="0.1" value="2.0">
+                </div>
+
+                <div class="control-group">
+                    <label>Compression Ratio <span id="v-compression">10.5</span>:1</label>
+                    <input type="range" id="compression" min="8" max="22" step="0.5" value="10.5">
+                </div>
+            </div>
+
+            <div class="control-section">
+                <div class="section-title">Forced Induction</div>
+
+                <div class="toggle-row">
+                    <input type="checkbox" id="turbo-on">
+                    <label for="turbo-on">Turbocharger <span class="boost-badge turbo" id="turbo-status">OFF</span></label>
+                </div>
+
+                <div class="control-group">
+                    <label>Turbo Type</label>
+                    <select id="turbo-type" disabled>
+                        <option value="single">Single Turbo</option>
+                        <option value="twin">Twin Turbo</option>
+                        <option value="sequential">Sequential Twin</option>
+                        <option value="vgt">Variable Geometry (VGT)</option>
+                        <option value="electric">Electric Turbo (E-Turbo)</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label>Turbo Size <span id="v-turbo-size">Medium</span></label>
+                    <input type="range" id="turbo-size" min="1" max="5" step="1" value="3" disabled>
+                </div>
+
+                <div class="turbo-spool" id="turbo-spool-container" style="display: none;">
+                    <div class="turbo-spool-fill" id="turbo-spool"></div>
+                </div>
+
+                <div class="toggle-row" style="margin-top: 12px;">
+                    <input type="checkbox" id="super-on">
+                    <label for="super-on">Supercharger <span class="boost-badge super" id="super-status">OFF</span></label>
+                </div>
+
+                <div class="control-group">
+                    <label>Supercharger Type</label>
+                    <select id="super-type" disabled>
+                        <option value="roots">Roots (instant boost)</option>
+                        <option value="twinscrew">Twin-Screw (efficient)</option>
+                        <option value="centrifugal">Centrifugal (high RPM)</option>
+                        <option value="electric">Electric Supercharger</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label>Boost Target <span id="v-boost-target">8</span> PSI</label>
+                    <input type="range" id="boost-target" min="4" max="30" step="1" value="8" disabled>
+                </div>
+
+                <div class="boost-meter" id="boost-meter-container" style="display: none;">
+                    <div class="boost-fill" id="boost-fill"></div>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <div class="section-title">Animation</div>
+                <div class="control-group">
+                    <label>Animation Speed <span id="v-speed">1.0</span>x</label>
+                    <input type="range" id="anim-speed" min="0.1" max="3" step="0.1" value="1">
+                </div>
+            </div>
+        </div>
+
+        <div class="schematic-panel">
+            <canvas id="schematic-canvas"></canvas>
+        </div>
+    </div>
+
+    <script type="module">
+        // Fuel properties
+        const fuelTypes = {
+            gasoline: {
+                name: 'Gasoline 91',
+                octane: 91,
+                energyDensity: 1.0,
+                maxCompression: 11,
+                color: '#f4a460',
+                efficiency: 0.30,
+                ignition: 'spark'
+            },
+            premium: {
+                name: 'Premium 93',
+                octane: 93,
+                energyDensity: 1.02,
+                maxCompression: 12,
+                color: '#ffd700',
+                efficiency: 0.32,
+                ignition: 'spark'
+            },
+            e85: {
+                name: 'E85 Ethanol',
+                octane: 105,
+                energyDensity: 0.73,
+                maxCompression: 14,
+                color: '#90ee90',
+                efficiency: 0.28,
+                ignition: 'spark'
+            },
+            diesel: {
+                name: 'Diesel',
+                octane: 0, // Uses cetane rating instead
+                energyDensity: 1.12,
+                maxCompression: 22,
+                color: '#8b4513',
+                efficiency: 0.40,
+                ignition: 'compression'
+            }
+        };
+
+        // Turbo types
+        const turboTypes = {
+            single: { name: 'Single', lagFactor: 1.0, boostMult: 1.0, efficiency: 0.75 },
+            twin: { name: 'Twin', lagFactor: 0.7, boostMult: 1.2, efficiency: 0.78 },
+            sequential: { name: 'Sequential', lagFactor: 0.5, boostMult: 1.15, efficiency: 0.80 },
+            vgt: { name: 'VGT', lagFactor: 0.4, boostMult: 1.1, efficiency: 0.85 },
+            electric: { name: 'E-Turbo', lagFactor: 0.1, boostMult: 0.9, efficiency: 0.70 }
+        };
+
+        // Supercharger types
+        const superTypes = {
+            roots: { name: 'Roots', lowRpmBoost: 1.2, highRpmBoost: 0.8, parasitic: 0.15, instant: true },
+            twinscrew: { name: 'Twin-Screw', lowRpmBoost: 1.0, highRpmBoost: 1.0, parasitic: 0.10, instant: true },
+            centrifugal: { name: 'Centrifugal', lowRpmBoost: 0.3, highRpmBoost: 1.4, parasitic: 0.08, instant: false },
+            electric: { name: 'Electric', lowRpmBoost: 1.1, highRpmBoost: 0.9, parasitic: 0.02, instant: true }
+        };
+
+        // Engine state
+        const engine = {
+            running: false,
+            cranking: false,
+            rpm: 0,
+            targetRpm: 0,
+            throttle: 0,
+            temperature: 70,
+            oilPressure: 0,
+            fuel: 100,
+            crankAngle: 0,
+            stroke: 0,
+            type: 'inline',
+            layout: 'inline',
+            fuelType: 'gasoline',
+            displacement: 2.0,
+            compressionRatio: 10.5,
+            cylinders: 4,
+            animSpeed: 1,
+            viewMode: '3d',
+            optimizationMode: 'balanced',
+
+            // Forced induction
+            turboOn: false,
+            turboType: 'single',
+            turboSize: 3,
+            turboSpool: 0,
+
+            superOn: false,
+            superType: 'roots',
+            boostTarget: 8,
+            currentBoost: 0
+        };
+
+        // Calculate dynamic limits based on fuel type
+        function getMaxRPM() {
+            const fuel = fuelTypes[engine.fuelType];
+            let baseMax = fuel.ignition === 'diesel' ? 5000 : 7000;
+
+            if (engine.optimizationMode === 'rpm') baseMax *= 1.15;
+            if (engine.cylinders <= 4) baseMax *= 1.05;
+            if (engine.cylinders >= 8) baseMax *= 0.95;
+
+            return baseMax;
+        }
+
+        function getRedlineRPM() {
+            return getMaxRPM() * 0.93;
+        }
+
+        function getIdleRPM() {
+            return fuelTypes[engine.fuelType].ignition === 'diesel' ? 700 : 800;
+        }
+
+        // DOM elements
+        const canvas3D = document.getElementById('three-canvas');
+        const ctx3D = canvas3D.getContext('2d');
+        const schematicCanvas = document.getElementById('schematic-canvas');
+        const ctxSchematic = schematicCanvas.getContext('2d');
+
+        // Resize canvases
+        function resize() {
+            const container = document.getElementById('canvas-container');
+            canvas3D.width = container.clientWidth;
+            canvas3D.height = container.clientHeight;
+
+            const schematicPanel = document.querySelector('.schematic-panel');
+            schematicCanvas.width = schematicPanel.clientWidth;
+            schematicCanvas.height = schematicPanel.clientHeight;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+
+        // Calculate boost
+        function calculateBoost() {
+            if (!engine.running) return 0;
+
+            let boost = 0;
+            const rpmRatio = engine.rpm / getMaxRPM();
+            const throttleRatio = engine.throttle / 100;
+
+            // Turbo boost
+            if (engine.turboOn) {
+                const turbo = turboTypes[engine.turboType];
+                const sizeMultiplier = 0.6 + (engine.turboSize * 0.2);
+                const turboBoost = engine.boostTarget * turbo.boostMult * sizeMultiplier * engine.turboSpool * throttleRatio;
+                boost += turboBoost;
+            }
+
+            // Supercharger boost
+            if (engine.superOn) {
+                const sc = superTypes[engine.superType];
+                const rpmFactor = sc.lowRpmBoost + (sc.highRpmBoost - sc.lowRpmBoost) * rpmRatio;
+                const superBoost = engine.boostTarget * rpmFactor * throttleRatio * 0.8;
+                boost += superBoost;
+            }
+
+            return Math.min(boost, 35); // Cap at 35 PSI
+        }
+
+        // Update turbo spool
+        function updateTurboSpool(dt) {
+            if (!engine.turboOn || !engine.running) {
+                engine.turboSpool *= 0.95;
+                return;
+            }
+
+            const turbo = turboTypes[engine.turboType];
+            const exhaustEnergy = (engine.rpm / getMaxRPM()) * (engine.throttle / 100);
+            const targetSpool = Math.min(exhaustEnergy * 1.2, 1);
+
+            // Turbo size affects lag - bigger = more lag
+            const sizeLagFactor = 0.5 + (engine.turboSize * 0.15);
+            const spoolRate = (0.03 / turbo.lagFactor) / sizeLagFactor;
+
+            if (targetSpool > engine.turboSpool) {
+                engine.turboSpool += (targetSpool - engine.turboSpool) * spoolRate;
+            } else {
+                engine.turboSpool += (targetSpool - engine.turboSpool) * spoolRate * 2;
+            }
+
+            engine.turboSpool = Math.max(0, Math.min(1, engine.turboSpool));
+        }
+
+        function updateEngine(dt) {
+            const fuel = fuelTypes[engine.fuelType];
+            const IDLE_RPM = getIdleRPM();
+            const MAX_RPM = getMaxRPM();
+
+            if (engine.cranking) {
+                const crankSpeed = fuel.ignition === 'diesel' ? 300 : 400;
+                engine.rpm += (crankSpeed - engine.rpm) * 0.1;
+                if (engine.rpm > crankSpeed * 0.85 && Math.random() < 0.1) {
+                    engine.running = true;
+                    engine.cranking = false;
+                }
+            } else if (engine.running) {
+                // Calculate target RPM based on throttle
+                engine.targetRpm = IDLE_RPM + (engine.throttle / 100) * (MAX_RPM - IDLE_RPM);
+
+                // Apply optimization mode effects
+                let rpmResponse = 0.05;
+                if (engine.optimizationMode === 'rpm') rpmResponse = 0.08;
+                if (engine.optimizationMode === 'efficiency') rpmResponse = 0.03;
+
+                const rpmDiff = engine.targetRpm - engine.rpm;
+                engine.rpm += rpmDiff * rpmResponse;
+
+                // Update boost systems
+                updateTurboSpool(dt);
+                engine.currentBoost = calculateBoost();
+
+                // Temperature
+                let heatFactor = engine.rpm / MAX_RPM;
+                if (engine.turboOn) heatFactor *= 1.15;
+                if (engine.superOn) heatFactor *= 1.1;
+                const targetTemp = 180 + heatFactor * 60;
+                engine.temperature += (targetTemp - engine.temperature) * 0.01;
+
+                // Oil pressure
+                engine.oilPressure = 20 + (engine.rpm / MAX_RPM) * 55;
+
+                // Fuel consumption
+                let fuelRate = 0.001 + (engine.rpm / MAX_RPM) * 0.01;
+                fuelRate /= fuel.efficiency / 0.30;
+                if (engine.turboOn) fuelRate *= 1.2;
+                if (engine.superOn) fuelRate *= 1.15;
+                if (engine.optimizationMode === 'efficiency') fuelRate *= 0.85;
+                if (engine.optimizationMode === 'power') fuelRate *= 1.1;
+
+                engine.fuel = Math.max(0, engine.fuel - fuelRate);
+
+                if (engine.fuel <= 0) {
+                    engine.running = false;
+                }
+            } else {
+                engine.rpm *= 0.95;
+                engine.temperature += (70 - engine.temperature) * 0.005;
+                engine.oilPressure *= 0.9;
+                engine.turboSpool *= 0.9;
+                engine.currentBoost = 0;
+            }
+
+            // Update crank angle
+            if (engine.rpm > 0) {
+                const radiansPerSecond = (engine.rpm / 60) * Math.PI * 2;
+                engine.crankAngle += radiansPerSecond * (dt / 1000) * engine.animSpeed;
+                engine.crankAngle %= Math.PI * 4;
+                engine.stroke = Math.floor((engine.crankAngle / (Math.PI * 4)) * 4) % 4;
+            }
+        }
+
+        // Performance calculations
+        function getHorsepower() {
+            if (!engine.running) return 0;
+
+            const fuel = fuelTypes[engine.fuelType];
+            const MAX_RPM = getMaxRPM();
+
+            // Base power from displacement and cylinders
+            let basePower = engine.displacement * engine.cylinders * 22;
+
+            // Compression ratio effect
+            const compressionFactor = 0.8 + (engine.compressionRatio - 8) * 0.025;
+            basePower *= compressionFactor;
+
+            // Fuel energy density
+            basePower *= fuel.energyDensity;
+
+            // RPM factor (power curve)
+            const peakRpmRatio = fuel.ignition === 'diesel' ? 0.6 : 0.78;
+            const rpmRatio = engine.rpm / MAX_RPM;
+            const rpmFactor = Math.sin(rpmRatio / peakRpmRatio * Math.PI / 2) * (rpmRatio < peakRpmRatio ? 1 : 1 - (rpmRatio - peakRpmRatio) * 0.5);
+
+            // Throttle
+            const throttleFactor = 0.1 + (engine.throttle / 100) * 0.9;
+
+            // Boost effect
+            const boostFactor = 1 + (engine.currentBoost / 14.7) * 0.8;
+
+            // Supercharger parasitic loss
+            let parasiticLoss = 1;
+            if (engine.superOn) {
+                parasiticLoss = 1 - superTypes[engine.superType].parasitic * (engine.rpm / MAX_RPM);
+            }
+
+            // Optimization mode
+            let modeFactor = 1;
+            if (engine.optimizationMode === 'power') modeFactor = 1.1;
+            if (engine.optimizationMode === 'efficiency') modeFactor = 0.95;
+
+            const hp = basePower * rpmFactor * throttleFactor * boostFactor * parasiticLoss * modeFactor;
+            return Math.round(hp * 10) / 10;
+        }
+
+        function getTorque() {
+            if (!engine.running) return 0;
+            const hp = getHorsepower();
+            return Math.round((hp * 5252) / Math.max(engine.rpm, 1));
+        }
+
+        function getEfficiency() {
+            if (!engine.running) return 0;
+
+            const fuel = fuelTypes[engine.fuelType];
+            let efficiency = fuel.efficiency * 100;
+
+            // Compression ratio helps
+            efficiency += (engine.compressionRatio - 10) * 0.8;
+
+            // Turbo helps efficiency at partial load
+            if (engine.turboOn && engine.throttle < 60) {
+                efficiency += turboTypes[engine.turboType].efficiency * 5;
+            }
+
+            // Supercharger hurts efficiency
+            if (engine.superOn) {
+                efficiency -= superTypes[engine.superType].parasitic * 30;
+            }
+
+            // Optimization mode
+            if (engine.optimizationMode === 'efficiency') efficiency *= 1.15;
+            if (engine.optimizationMode === 'power') efficiency *= 0.9;
+
+            return Math.round(efficiency);
+        }
+
+        function getAFR() {
+            const fuel = fuelTypes[engine.fuelType];
+            const stoich = fuel.ignition === 'diesel' ? 14.5 : 14.7;
+
+            if (!engine.running) return stoich;
+
+            let afr = stoich;
+
+            // Rich under boost
+            if (engine.currentBoost > 5) {
+                afr -= (engine.currentBoost - 5) * 0.15;
+            }
+
+            // Lean at part throttle for efficiency
+            if (engine.throttle < 30 && engine.optimizationMode === 'efficiency') {
+                afr += 1.5;
+            }
+
+            // Rich for power
+            if (engine.optimizationMode === 'power' && engine.throttle > 70) {
+                afr -= 1.0;
+            }
+
+            return Math.round(afr * 10) / 10;
+        }
+
+        function getFuelRate() {
+            if (!engine.running) return 0;
+
+            const fuel = fuelTypes[engine.fuelType];
+            const MAX_RPM = getMaxRPM();
+
+            let baseFuelRate = 0.3 + engine.displacement * 0.25;
+            const rpmFactor = engine.rpm / MAX_RPM;
+            const throttleFactor = 0.15 + (engine.throttle / 100) * 0.85;
+
+            baseFuelRate *= rpmFactor * throttleFactor;
+            baseFuelRate /= fuel.efficiency / 0.30;
+
+            if (engine.turboOn && engine.currentBoost > 5) baseFuelRate *= 1.2;
+            if (engine.superOn) baseFuelRate *= 1.1;
+            if (engine.optimizationMode === 'efficiency') baseFuelRate *= 0.85;
+
+            return Math.round(baseFuelRate * 10) / 10;
+        }
+
+        // 3D Engine Visualization
+        function draw3DEngine() {
+            const W = canvas3D.width;
+            const H = canvas3D.height;
+            const cx = W / 2;
+            const cy = H / 2 - 50;
+
+            ctx3D.fillStyle = '#0f0f1a';
+            ctx3D.fillRect(0, 0, W, H);
+
+            const scale = Math.min(W, H) / 5;
+            const time = Date.now() / 1000;
+
+            if (engine.viewMode === '3d') {
+                draw3DView(cx, cy, scale, time);
+            } else if (engine.viewMode === 'cutaway') {
+                drawCutawayView(cx, cy, scale);
+            } else {
+                drawExplodedView(cx, cy, scale);
+            }
+        }
+
+        function draw3DView(cx, cy, scale, time) {
+            const rotationY = Math.sin(time * 0.3) * 0.3;
+            drawEngineBlock3D(cx, cy, scale, 0.4, rotationY);
+            drawPistons3D(cx, cy, scale);
+            drawForcedInduction3D(cx, cy, scale);
+        }
+
+        function drawEngineBlock3D(cx, cy, scale, rotX, rotY) {
+            ctx3D.save();
+
+            const blockWidth = scale * (0.8 + engine.cylinders * 0.1);
+            const blockHeight = scale * 1.8;
+            const blockDepth = scale * 0.8;
+
+            const depthOffsetX = Math.sin(rotY) * blockDepth * 0.5;
+            const depthOffsetY = Math.sin(rotX) * blockDepth * 0.3;
+
+            // Top face
+            ctx3D.fillStyle = '#3a3a50';
+            ctx3D.beginPath();
+            ctx3D.moveTo(cx - blockWidth/2, cy - blockHeight/2);
+            ctx3D.lineTo(cx + blockWidth/2, cy - blockHeight/2);
+            ctx3D.lineTo(cx + blockWidth/2 + depthOffsetX, cy - blockHeight/2 - depthOffsetY);
+            ctx3D.lineTo(cx - blockWidth/2 + depthOffsetX, cy - blockHeight/2 - depthOffsetY);
+            ctx3D.closePath();
+            ctx3D.fill();
+            ctx3D.strokeStyle = '#555';
+            ctx3D.stroke();
+
+            // Front face
+            ctx3D.fillStyle = '#2a2a40';
+            ctx3D.fillRect(cx - blockWidth/2, cy - blockHeight/2, blockWidth, blockHeight);
+            ctx3D.strokeStyle = '#444';
+            ctx3D.strokeRect(cx - blockWidth/2, cy - blockHeight/2, blockWidth, blockHeight);
+
+            // Side face
+            ctx3D.fillStyle = '#252535';
+            ctx3D.beginPath();
+            ctx3D.moveTo(cx + blockWidth/2, cy - blockHeight/2);
+            ctx3D.lineTo(cx + blockWidth/2 + depthOffsetX, cy - blockHeight/2 - depthOffsetY);
+            ctx3D.lineTo(cx + blockWidth/2 + depthOffsetX, cy + blockHeight/2 - depthOffsetY);
+            ctx3D.lineTo(cx + blockWidth/2, cy + blockHeight/2);
+            ctx3D.closePath();
+            ctx3D.fill();
+            ctx3D.stroke();
+
+            // Cylinder head
+            const headHeight = scale * 0.3;
+            ctx3D.fillStyle = '#4a4a60';
+            ctx3D.fillRect(cx - blockWidth/2 - 10, cy - blockHeight/2 - headHeight, blockWidth + 20, headHeight);
+
+            // Intake manifold
+            const fuel = fuelTypes[engine.fuelType];
+            ctx3D.fillStyle = fuel.ignition === 'diesel' ? '#3a4a3a' : '#3a3a50';
+            ctx3D.beginPath();
+            ctx3D.ellipse(cx, cy - blockHeight/2 - headHeight - 30, blockWidth * 0.3, 20, 0, 0, Math.PI * 2);
+            ctx3D.fill();
+            ctx3D.strokeStyle = '#555';
+            ctx3D.stroke();
+
+            // Oil pan
+            ctx3D.fillStyle = '#222230';
+            ctx3D.beginPath();
+            ctx3D.moveTo(cx - blockWidth/2, cy + blockHeight/2);
+            ctx3D.lineTo(cx - blockWidth/2 + 20, cy + blockHeight/2 + 40);
+            ctx3D.lineTo(cx + blockWidth/2 - 20, cy + blockHeight/2 + 40);
+            ctx3D.lineTo(cx + blockWidth/2, cy + blockHeight/2);
+            ctx3D.closePath();
+            ctx3D.fill();
+            ctx3D.stroke();
+
+            // Spark plugs or injectors
+            const numCylinders = engine.cylinders;
+            const spacing = (blockWidth - 40) / Math.min(numCylinders, 8);
+            const displayCylinders = Math.min(numCylinders, 8);
+
+            for (let i = 0; i < displayCylinders; i++) {
+                const x = cx - blockWidth/2 + 20 + i * spacing + spacing/2;
+
+                if (fuel.ignition === 'spark') {
+                    ctx3D.strokeStyle = '#e74c3c';
+                    ctx3D.lineWidth = 3;
+                    ctx3D.beginPath();
+                    ctx3D.moveTo(x, cy - blockHeight/2 - headHeight);
+                    ctx3D.quadraticCurveTo(x + 30, cy - blockHeight/2 - headHeight - 50, x + 50, cy - blockHeight/2 - headHeight - 20);
+                    ctx3D.stroke();
+                } else {
+                    // Diesel injector
+                    ctx3D.fillStyle = '#666';
+                    ctx3D.fillRect(x - 4, cy - blockHeight/2 - headHeight - 15, 8, 15);
+                }
+            }
+            ctx3D.lineWidth = 1;
+
+            ctx3D.restore();
+        }
+
+        function drawPistons3D(cx, cy, scale) {
+            const blockWidth = scale * (0.8 + engine.cylinders * 0.1);
+            const blockHeight = scale * 1.8;
+            const numCylinders = Math.min(engine.cylinders, 8);
+            const spacing = (blockWidth - 40) / numCylinders;
+            const pistonRadius = spacing * 0.35;
+            const strokeLength = blockHeight * 0.3;
+
+            for (let i = 0; i < numCylinders; i++) {
+                const x = cx - blockWidth/2 + 20 + i * spacing + spacing/2;
+
+                const phaseOffset = (i / numCylinders) * Math.PI * 4;
+                const pistonAngle = engine.crankAngle + phaseOffset;
+                const pistonOffset = Math.cos(pistonAngle) * strokeLength / 2;
+                const pistonY = cy + pistonOffset;
+
+                const strokePhase = ((pistonAngle % (Math.PI * 4)) / (Math.PI * 4)) * 4;
+                const currentStroke = Math.floor(strokePhase);
+
+                // Cylinder bore
+                ctx3D.fillStyle = '#151520';
+                ctx3D.beginPath();
+                ctx3D.ellipse(x, cy - blockHeight * 0.15, pistonRadius + 2, pistonRadius * 0.4 + 2, 0, 0, Math.PI * 2);
+                ctx3D.fill();
+
+                // Piston
+                const pistonColor = currentStroke === 2 ? '#ff6b4a' : '#6a6a80';
+                ctx3D.fillStyle = pistonColor;
+                ctx3D.beginPath();
+                ctx3D.ellipse(x, pistonY, pistonRadius, pistonRadius * 0.4, 0, 0, Math.PI * 2);
+                ctx3D.fill();
+                ctx3D.strokeStyle = '#888';
+                ctx3D.stroke();
+
+                // Connecting rod
+                ctx3D.strokeStyle = '#555';
+                ctx3D.lineWidth = 4;
+                ctx3D.beginPath();
+                ctx3D.moveTo(x, pistonY + pistonRadius * 0.2);
+                ctx3D.lineTo(cx, cy + blockHeight * 0.35);
+                ctx3D.stroke();
+                ctx3D.lineWidth = 1;
+
+                // Combustion
+                if (currentStroke === 2 && engine.running && Math.random() < 0.3) {
+                    const fuel = fuelTypes[engine.fuelType];
+                    ctx3D.fillStyle = fuel.ignition === 'diesel' ? 'rgba(255, 150, 50, 0.8)' : 'rgba(255, 200, 50, 0.8)';
+                    ctx3D.beginPath();
+                    ctx3D.arc(x, pistonY - pistonRadius * 0.3, 5 + Math.random() * 10, 0, Math.PI * 2);
+                    ctx3D.fill();
+                }
+            }
+
+            // Crankshaft
+            ctx3D.save();
+            ctx3D.translate(cx, cy + blockHeight * 0.35);
+            ctx3D.rotate(engine.crankAngle);
+
+            ctx3D.fillStyle = '#4a4a5a';
+            ctx3D.beginPath();
+            ctx3D.arc(0, 0, 25, 0, Math.PI * 2);
+            ctx3D.fill();
+            ctx3D.strokeStyle = '#666';
+            ctx3D.stroke();
+
+            ctx3D.fillStyle = '#3a3a4a';
+            ctx3D.fillRect(-5, -40, 10, 40);
+            ctx3D.fillRect(-5, 0, 10, 40);
+
+            ctx3D.restore();
+        }
+
+        function drawForcedInduction3D(cx, cy, scale) {
+            const blockWidth = scale * (0.8 + engine.cylinders * 0.1);
+            const blockHeight = scale * 1.8;
+
+            // Turbo
+            if (engine.turboOn) {
+                const turboX = cx + blockWidth/2 + 60;
+                const turboY = cy + blockHeight * 0.3;
+                const turboSize = 20 + engine.turboSize * 5;
+
+                // Turbo housing
+                ctx3D.fillStyle = '#4a4a5a';
+                ctx3D.beginPath();
+                ctx3D.arc(turboX, turboY, turboSize, 0, Math.PI * 2);
+                ctx3D.fill();
+                ctx3D.strokeStyle = '#666';
+                ctx3D.stroke();
+
+                // Compressor wheel (spinning)
+                ctx3D.save();
+                ctx3D.translate(turboX, turboY);
+                ctx3D.rotate(engine.crankAngle * engine.turboSpool * 3);
+
+                ctx3D.strokeStyle = '#888';
+                ctx3D.lineWidth = 2;
+                for (let i = 0; i < 8; i++) {
+                    ctx3D.beginPath();
+                    ctx3D.moveTo(0, 0);
+                    ctx3D.lineTo(Math.cos(i * Math.PI / 4) * (turboSize - 5), Math.sin(i * Math.PI / 4) * (turboSize - 5));
+                    ctx3D.stroke();
+                }
+                ctx3D.lineWidth = 1;
+                ctx3D.restore();
+
+                // Spool glow
+                if (engine.turboSpool > 0.5) {
+                    ctx3D.fillStyle = `rgba(255, 100, 50, ${(engine.turboSpool - 0.5) * 0.6})`;
+                    ctx3D.beginPath();
+                    ctx3D.arc(turboX, turboY, turboSize + 5, 0, Math.PI * 2);
+                    ctx3D.fill();
+                }
+
+                // Exhaust pipe to turbo
+                ctx3D.strokeStyle = '#555';
+                ctx3D.lineWidth = 8;
+                ctx3D.beginPath();
+                ctx3D.moveTo(cx + blockWidth/2, cy + blockHeight * 0.2);
+                ctx3D.quadraticCurveTo(cx + blockWidth/2 + 40, cy + blockHeight * 0.25, turboX - turboSize, turboY);
+                ctx3D.stroke();
+                ctx3D.lineWidth = 1;
+
+                // Label
+                ctx3D.fillStyle = '#0af';
+                ctx3D.font = '10px system-ui';
+                ctx3D.fillText(turboTypes[engine.turboType].name + ' Turbo', turboX - 25, turboY + turboSize + 15);
+            }
+
+            // Supercharger
+            if (engine.superOn) {
+                const superX = cx;
+                const superY = cy - blockHeight/2 - 80;
+
+                // Supercharger housing
+                ctx3D.fillStyle = '#5a5a6a';
+                if (engine.superType === 'centrifugal') {
+                    ctx3D.beginPath();
+                    ctx3D.arc(superX, superY, 25, 0, Math.PI * 2);
+                    ctx3D.fill();
+                } else {
+                    ctx3D.fillRect(superX - 35, superY - 20, 70, 40);
+                }
+                ctx3D.strokeStyle = '#777';
+                ctx3D.stroke();
+
+                // Belt drive
+                ctx3D.strokeStyle = '#333';
+                ctx3D.lineWidth = 4;
+                ctx3D.beginPath();
+                ctx3D.moveTo(superX, superY + 20);
+                ctx3D.lineTo(cx, cy + blockHeight * 0.35);
+                ctx3D.stroke();
+                ctx3D.lineWidth = 1;
+
+                // Rotors (simplified)
+                ctx3D.save();
+                ctx3D.translate(superX, superY);
+                ctx3D.rotate(engine.crankAngle * 2);
+
+                ctx3D.fillStyle = '#888';
+                ctx3D.fillRect(-20, -5, 40, 10);
+                ctx3D.restore();
+
+                // Label
+                ctx3D.fillStyle = '#f80';
+                ctx3D.font = '10px system-ui';
+                ctx3D.fillText(superTypes[engine.superType].name + ' SC', superX - 25, superY - 30);
+            }
+        }
+
+        function drawCutawayView(cx, cy, scale) {
+            const fuel = fuelTypes[engine.fuelType];
+            const cylinderWidth = scale * 0.8;
+            const cylinderHeight = scale * 1.5;
+
+            // Cylinder walls
+            ctx3D.fillStyle = '#2a2a40';
+            ctx3D.fillRect(cx - cylinderWidth/2 - 20, cy - cylinderHeight/2, 20, cylinderHeight);
+            ctx3D.fillRect(cx + cylinderWidth/2, cy - cylinderHeight/2, 20, cylinderHeight);
+
+            // Cylinder bore
+            ctx3D.fillStyle = '#151520';
+            ctx3D.fillRect(cx - cylinderWidth/2, cy - cylinderHeight/2, cylinderWidth, cylinderHeight);
+
+            // Combustion chamber
+            ctx3D.fillStyle = '#1a1a25';
+            ctx3D.beginPath();
+            ctx3D.moveTo(cx - cylinderWidth/2, cy - cylinderHeight/2);
+            ctx3D.quadraticCurveTo(cx, cy - cylinderHeight/2 - 30, cx + cylinderWidth/2, cy - cylinderHeight/2);
+            ctx3D.closePath();
+            ctx3D.fill();
+
+            // Piston
+            const strokeLength = cylinderHeight * 0.4;
+            const pistonOffset = Math.cos(engine.crankAngle) * strokeLength / 2;
+            const pistonY = cy + pistonOffset;
+            const pistonHeight = 40;
+
+            const gradient = ctx3D.createLinearGradient(cx - cylinderWidth/2, 0, cx + cylinderWidth/2, 0);
+            gradient.addColorStop(0, '#5a5a70');
+            gradient.addColorStop(0.5, '#7a7a90');
+            gradient.addColorStop(1, '#5a5a70');
+            ctx3D.fillStyle = gradient;
+            ctx3D.fillRect(cx - cylinderWidth/2 + 5, pistonY, cylinderWidth - 10, pistonHeight);
+
+            // Piston rings
+            ctx3D.strokeStyle = '#333';
+            ctx3D.lineWidth = 2;
+            for (let i = 0; i < 3; i++) {
+                ctx3D.beginPath();
+                ctx3D.moveTo(cx - cylinderWidth/2 + 5, pistonY + 8 + i * 10);
+                ctx3D.lineTo(cx + cylinderWidth/2 - 5, pistonY + 8 + i * 10);
+                ctx3D.stroke();
+            }
+
+            // Connecting rod
+            ctx3D.fillStyle = '#4a4a5a';
+            ctx3D.save();
+            ctx3D.translate(cx, pistonY + pistonHeight);
+            const rodAngle = Math.atan2(Math.sin(engine.crankAngle) * 50, cylinderHeight * 0.5 + Math.cos(engine.crankAngle) * 50);
+            ctx3D.rotate(rodAngle);
+            ctx3D.fillRect(-8, 0, 16, cylinderHeight * 0.4);
+            ctx3D.restore();
+
+            // Crankshaft
+            ctx3D.save();
+            ctx3D.translate(cx, cy + cylinderHeight * 0.5);
+            ctx3D.rotate(engine.crankAngle);
+
+            ctx3D.fillStyle = '#5a5a6a';
+            ctx3D.beginPath();
+            ctx3D.arc(0, 0, 30, 0, Math.PI * 2);
+            ctx3D.fill();
+            ctx3D.strokeStyle = '#777';
+            ctx3D.stroke();
+
+            ctx3D.fillStyle = '#4a4a5a';
+            ctx3D.fillRect(-6, -50, 12, 50);
+
+            ctx3D.fillStyle = '#5a5a6a';
+            ctx3D.beginPath();
+            ctx3D.arc(0, -50, 15, 0, Math.PI * 2);
+            ctx3D.fill();
+            ctx3D.stroke();
+
+            ctx3D.restore();
+
+            // Valves
+            const valveOpenIntake = engine.stroke === 0 ? Math.sin(engine.crankAngle * 2) * 0.5 + 0.5 : 0;
+            const valveOpenExhaust = engine.stroke === 3 ? Math.sin(engine.crankAngle * 2) * 0.5 + 0.5 : 0;
+
+            ctx3D.fillStyle = '#6a6a80';
+            ctx3D.save();
+            ctx3D.translate(cx - cylinderWidth * 0.25, cy - cylinderHeight/2 - 20 - valveOpenIntake * 15);
+            ctx3D.beginPath();
+            ctx3D.moveTo(-15, 0);
+            ctx3D.lineTo(15, 0);
+            ctx3D.lineTo(5, -40);
+            ctx3D.lineTo(-5, -40);
+            ctx3D.closePath();
+            ctx3D.fill();
+            ctx3D.restore();
+
+            ctx3D.fillStyle = '#8a6a60';
+            ctx3D.save();
+            ctx3D.translate(cx + cylinderWidth * 0.25, cy - cylinderHeight/2 - 20 - valveOpenExhaust * 15);
+            ctx3D.beginPath();
+            ctx3D.moveTo(-15, 0);
+            ctx3D.lineTo(15, 0);
+            ctx3D.lineTo(5, -40);
+            ctx3D.lineTo(-5, -40);
+            ctx3D.closePath();
+            ctx3D.fill();
+            ctx3D.restore();
+
+            // Spark plug or injector
+            if (fuel.ignition === 'spark') {
+                ctx3D.fillStyle = '#888';
+                ctx3D.fillRect(cx - 5, cy - cylinderHeight/2 - 60, 10, 40);
+                ctx3D.fillStyle = '#c9a227';
+                ctx3D.fillRect(cx - 3, cy - cylinderHeight/2 - 25, 6, 10);
+
+                if (engine.stroke === 2 && engine.running) {
+                    ctx3D.fillStyle = `rgba(255, 220, 100, ${0.5 + Math.random() * 0.5})`;
+                    ctx3D.beginPath();
+                    ctx3D.arc(cx, cy - cylinderHeight/2 - 15, 8 + Math.random() * 5, 0, Math.PI * 2);
+                    ctx3D.fill();
+                }
+            } else {
+                // Diesel injector
+                ctx3D.fillStyle = '#666';
+                ctx3D.fillRect(cx - 6, cy - cylinderHeight/2 - 50, 12, 35);
+                ctx3D.fillStyle = '#444';
+                ctx3D.beginPath();
+                ctx3D.moveTo(cx - 4, cy - cylinderHeight/2 - 15);
+                ctx3D.lineTo(cx + 4, cy - cylinderHeight/2 - 15);
+                ctx3D.lineTo(cx, cy - cylinderHeight/2 - 5);
+                ctx3D.closePath();
+                ctx3D.fill();
+
+                if (engine.stroke === 2 && engine.running) {
+                    ctx3D.fillStyle = `rgba(255, 150, 50, ${0.5 + Math.random() * 0.5})`;
+                    ctx3D.beginPath();
+                    ctx3D.arc(cx, cy - cylinderHeight/2 + 10, 12 + Math.random() * 8, 0, Math.PI * 2);
+                    ctx3D.fill();
+                }
+            }
+
+            // Labels
+            ctx3D.fillStyle = '#888';
+            ctx3D.font = '12px system-ui';
+            ctx3D.fillText('Intake Valve', cx - cylinderWidth * 0.25 - 35, cy - cylinderHeight/2 - 70);
+            ctx3D.fillText('Exhaust Valve', cx + cylinderWidth * 0.25 - 35, cy - cylinderHeight/2 - 70);
+            ctx3D.fillText(fuel.ignition === 'spark' ? 'Spark Plug' : 'Injector', cx + 15, cy - cylinderHeight/2 - 40);
+        }
+
+        function drawExplodedView(cx, cy, scale) {
+            const components = [
+                { name: 'Cylinder Head', y: -200, color: '#4a4a60', width: 200, height: 50 },
+                { name: 'Head Gasket', y: -140, color: '#8a8a9a', width: 180, height: 10 },
+                { name: 'Cylinder Block', y: -50, color: '#3a3a50', width: 180, height: 150 },
+                { name: 'Piston', y: 80, color: '#6a6a80', width: 60, height: 50 },
+                { name: 'Piston Rings', y: 140, color: '#555', width: 70, height: 15 },
+                { name: 'Connecting Rod', y: 180, color: '#4a4a5a', width: 20, height: 80 },
+                { name: 'Crankshaft', y: 280, color: '#5a5a6a', width: 200, height: 40 },
+                { name: 'Oil Pan', y: 350, color: '#2a2a3a', width: 220, height: 60 }
+            ];
+
+            const explodeOffset = 1 + Math.sin(Date.now() / 2000) * 0.2;
+
+            ctx3D.font = '11px system-ui';
+
+            components.forEach((comp, i) => {
+                const y = cy + comp.y * explodeOffset;
+
+                ctx3D.fillStyle = comp.color;
+                ctx3D.fillRect(cx - comp.width/2, y - comp.height/2, comp.width, comp.height);
+                ctx3D.strokeStyle = '#666';
+                ctx3D.strokeRect(cx - comp.width/2, y - comp.height/2, comp.width, comp.height);
+
+                ctx3D.fillStyle = '#aaa';
+                ctx3D.fillText(comp.name, cx + comp.width/2 + 20, y + 4);
+
+                if (i < components.length - 1) {
+                    ctx3D.strokeStyle = '#333';
+                    ctx3D.setLineDash([5, 5]);
+                    ctx3D.beginPath();
+                    ctx3D.moveTo(cx, y + comp.height/2);
+                    const nextY = cy + components[i + 1].y * explodeOffset;
+                    ctx3D.lineTo(cx, nextY - components[i + 1].height/2);
+                    ctx3D.stroke();
+                    ctx3D.setLineDash([]);
+                }
+            });
+        }
+
+        // Schematic View
+        function drawSchematic() {
+            const W = schematicCanvas.width;
+            const H = schematicCanvas.height;
+            const fuel = fuelTypes[engine.fuelType];
+
+            ctxSchematic.fillStyle = '#0f0f1a';
+            ctxSchematic.fillRect(0, 0, W, H);
+
+            const strokes = fuel.ignition === 'diesel' ? [
+                { name: 'INTAKE', desc: 'Air enters cylinder', color: '#3498db', valve: 'intake' },
+                { name: 'COMPRESSION', desc: 'Air compressed (hot)', color: '#9b59b6', valve: 'none' },
+                { name: 'POWER', desc: 'Fuel injected & ignites', color: '#e74c3c', valve: 'none' },
+                { name: 'EXHAUST', desc: 'Burnt gases expelled', color: '#f39c12', valve: 'exhaust' }
+            ] : [
+                { name: 'INTAKE', desc: 'Air-fuel mixture enters', color: '#3498db', valve: 'intake' },
+                { name: 'COMPRESSION', desc: 'Mixture compressed', color: '#9b59b6', valve: 'none' },
+                { name: 'POWER', desc: 'Spark ignites mixture', color: '#e74c3c', valve: 'none' },
+                { name: 'EXHAUST', desc: 'Burnt gases expelled', color: '#f39c12', valve: 'exhaust' }
+            ];
+
+            const cylinderWidth = 55;
+            const cylinderHeight = 70;
+            const spacing = W / 4;
+            const startY = H / 2 - 5;
+
+            strokes.forEach((stroke, i) => {
+                const x = spacing * i + spacing / 2;
+                const isActive = engine.stroke === i && engine.running;
+
+                if (isActive) {
+                    ctxSchematic.fillStyle = `${stroke.color}22`;
+                    ctxSchematic.fillRect(x - spacing/2 + 5, 10, spacing - 10, H - 20);
+                }
+
+                ctxSchematic.fillStyle = isActive ? stroke.color : '#666';
+                ctxSchematic.font = isActive ? 'bold 13px system-ui' : '11px system-ui';
+                ctxSchematic.textAlign = 'center';
+                ctxSchematic.fillText(stroke.name, x, 25);
+
+                ctxSchematic.font = '9px system-ui';
+                ctxSchematic.fillStyle = '#555';
+                ctxSchematic.fillText(stroke.desc, x, 40);
+
+                ctxSchematic.strokeStyle = isActive ? stroke.color : '#444';
+                ctxSchematic.lineWidth = isActive ? 2 : 1;
+                ctxSchematic.strokeRect(x - cylinderWidth/2, startY - cylinderHeight/2, cylinderWidth, cylinderHeight);
+
+                let pistonPos = [0.7, 0.2, 0.3, 0.7][i];
+                const pistonY = startY - cylinderHeight/2 + pistonPos * cylinderHeight;
+
+                ctxSchematic.fillStyle = isActive ? '#7a7a90' : '#4a4a5a';
+                ctxSchematic.fillRect(x - cylinderWidth/2 + 5, pistonY, cylinderWidth - 10, 18);
+
+                const intakeOpen = stroke.valve === 'intake';
+                ctxSchematic.fillStyle = intakeOpen && isActive ? '#3498db' : '#666';
+                ctxSchematic.beginPath();
+                ctxSchematic.arc(x - 12, startY - cylinderHeight/2 - 5, 5, 0, Math.PI * 2);
+                ctxSchematic.fill();
+
+                const exhaustOpen = stroke.valve === 'exhaust';
+                ctxSchematic.fillStyle = exhaustOpen && isActive ? '#f39c12' : '#666';
+                ctxSchematic.beginPath();
+                ctxSchematic.arc(x + 12, startY - cylinderHeight/2 - 5, 5, 0, Math.PI * 2);
+                ctxSchematic.fill();
+
+                if (isActive && engine.running && i === 2) {
+                    ctxSchematic.fillStyle = `rgba(255, 200, 50, ${0.5 + Math.random() * 0.5})`;
+                    ctxSchematic.beginPath();
+                    ctxSchematic.arc(x, startY - cylinderHeight/2 + 12, 8 + Math.random() * 4, 0, Math.PI * 2);
+                    ctxSchematic.fill();
+                }
+
+                ctxSchematic.strokeStyle = '#555';
+                ctxSchematic.lineWidth = 3;
+                ctxSchematic.beginPath();
+                ctxSchematic.moveTo(x, pistonY + 18);
+                ctxSchematic.lineTo(x, startY + cylinderHeight/2 + 12);
+                ctxSchematic.stroke();
+
+                ctxSchematic.strokeStyle = isActive ? stroke.color : '#444';
+                ctxSchematic.lineWidth = 1;
+                ctxSchematic.beginPath();
+                ctxSchematic.arc(x, startY + cylinderHeight/2 + 20, 8, 0, Math.PI * 2);
+                ctxSchematic.stroke();
+
+                ctxSchematic.fillStyle = isActive ? stroke.color : '#555';
+                ctxSchematic.font = 'bold 14px system-ui';
+                ctxSchematic.fillText((i + 1).toString(), x, H - 20);
+            });
+
+            ctxSchematic.strokeStyle = '#555';
+            ctxSchematic.lineWidth = 4;
+            ctxSchematic.beginPath();
+            ctxSchematic.moveTo(spacing / 2 - 25, startY + cylinderHeight/2 + 20);
+            ctxSchematic.lineTo(spacing * 3.5 + 25, startY + cylinderHeight/2 + 20);
+            ctxSchematic.stroke();
+
+            // Legend
+            ctxSchematic.font = '9px system-ui';
+            ctxSchematic.textAlign = 'left';
+            ctxSchematic.fillStyle = '#3498db';
+            ctxSchematic.fillText('● Intake', 10, H - 8);
+            ctxSchematic.fillStyle = '#f39c12';
+            ctxSchematic.fillText('● Exhaust', 70, H - 8);
+            ctxSchematic.fillStyle = fuel.color;
+            ctxSchematic.fillText('● ' + fuel.name, 140, H - 8);
+        }
+
+        // Update UI
+        function updateUI() {
+            const MAX_RPM = getMaxRPM();
+            const REDLINE_RPM = getRedlineRPM();
+
+            document.getElementById('rpm-display').textContent = Math.round(engine.rpm);
+            document.getElementById('rpm-value').textContent = (engine.rpm / 1000).toFixed(1) + 'k';
+
+            const stateEl = document.getElementById('engine-state');
+            if (engine.cranking) {
+                stateEl.textContent = 'CRANKING';
+                stateEl.className = 'engine-state cranking';
+            } else if (engine.running) {
+                if (engine.rpm >= REDLINE_RPM) {
+                    stateEl.textContent = 'REDLINE!';
+                    stateEl.className = 'engine-state redline';
+                } else {
+                    stateEl.textContent = 'RUNNING';
+                    stateEl.className = 'engine-state running';
+                }
+            } else {
+                stateEl.textContent = 'OFF';
+                stateEl.className = 'engine-state off';
+            }
+
+            // Gauges
+            const rpmAngle = -135 + (engine.rpm / MAX_RPM) * 270;
+            document.getElementById('rpm-needle').style.transform = `translateX(-50%) rotate(${rpmAngle}deg)`;
+
+            const boostAngle = -135 + (Math.max(0, engine.currentBoost) / 30) * 270;
+            document.getElementById('boost-needle').style.transform = `translateX(-50%) rotate(${boostAngle}deg)`;
+            document.getElementById('boost-value').textContent = engine.currentBoost.toFixed(1) + ' PSI';
+
+            const tempAngle = -135 + ((engine.temperature - 70) / 180) * 270;
+            document.getElementById('temp-needle').style.transform = `translateX(-50%) rotate(${tempAngle}deg)`;
+            document.getElementById('temp-value').textContent = Math.round(engine.temperature) + '°F';
+
+            const oilAngle = -135 + (engine.oilPressure / 80) * 270;
+            document.getElementById('oil-needle').style.transform = `translateX(-50%) rotate(${oilAngle}deg)`;
+            document.getElementById('oil-value').textContent = Math.round(engine.oilPressure);
+
+            const fuelAngle = -135 + (engine.fuel / 100) * 180;
+            document.getElementById('fuel-needle').style.transform = `translateX(-50%) rotate(${fuelAngle}deg)`;
+            document.getElementById('fuel-value').textContent = Math.round(engine.fuel) + '%';
+
+            // Performance stats
+            document.getElementById('stat-hp').textContent = getHorsepower();
+            document.getElementById('stat-torque').textContent = getTorque();
+            document.getElementById('stat-efficiency').textContent = getEfficiency();
+            document.getElementById('stat-boost').textContent = engine.currentBoost.toFixed(1);
+            document.getElementById('stat-afr').textContent = getAFR();
+            document.getElementById('stat-fuel-rate').textContent = getFuelRate();
+
+            // Cycle indicator
+            const fuel = fuelTypes[engine.fuelType];
+            document.getElementById('cycle-name').textContent = fuel.ignition === 'diesel' ? 'Diesel Cycle' : '4-Stroke Otto';
+            const strokeNames = ['Intake', 'Compression', 'Power', 'Exhaust'];
+            document.getElementById('cycle-phase').textContent = engine.running ? strokeNames[engine.stroke] + ' Stroke' : 'Engine Off';
+
+            ['intake', 'compression', 'power', 'exhaust'].forEach((name, i) => {
+                const dot = document.getElementById(`dot-${name}`);
+                dot.className = 'stroke-dot';
+                if (engine.running && engine.stroke === i) {
+                    dot.classList.add(name);
+                }
+            });
+
+            // Turbo spool
+            document.getElementById('turbo-spool').style.width = (engine.turboSpool * 100) + '%';
+            document.getElementById('turbo-status').textContent = engine.turboOn ? (engine.turboSpool * 100).toFixed(0) + '%' : 'OFF';
+
+            // Supercharger status
+            document.getElementById('super-status').textContent = engine.superOn ? 'ON' : 'OFF';
+
+            // Boost meter
+            document.getElementById('boost-fill').style.width = (Math.min(engine.currentBoost / 30, 1) * 100) + '%';
+        }
+
+        // Animation loop
+        let lastTime = 0;
+        function animate(time) {
+            const dt = time - lastTime || 16;
+            lastTime = time;
+
+            updateEngine(dt);
+            draw3DEngine();
+            drawSchematic();
+            updateUI();
+
+            requestAnimationFrame(animate);
+        }
+        animate(0);
+
+        // Event listeners
+        document.getElementById('start-btn').addEventListener('click', () => {
+            if (!engine.running && !engine.cranking && engine.fuel > 0) {
+                engine.cranking = true;
+            }
+        });
+
+        document.getElementById('stop-btn').addEventListener('click', () => {
+            engine.running = false;
+            engine.cranking = false;
+        });
+
+        document.getElementById('throttle').addEventListener('input', (e) => {
+            engine.throttle = parseFloat(e.target.value);
+            document.getElementById('v-throttle').textContent = engine.throttle;
+        });
+
+        document.getElementById('fuel-type').addEventListener('change', (e) => {
+            engine.fuelType = e.target.value;
+            const fuel = fuelTypes[engine.fuelType];
+
+            // Auto-adjust compression for fuel type
+            const compressionSlider = document.getElementById('compression');
+            if (fuel.ignition === 'diesel') {
+                compressionSlider.min = 14;
+                compressionSlider.max = 22;
+                if (engine.compressionRatio < 14) {
+                    engine.compressionRatio = 16;
+                    compressionSlider.value = 16;
+                    document.getElementById('v-compression').textContent = '16.0';
+                }
+            } else {
+                compressionSlider.min = 8;
+                compressionSlider.max = 14;
+                if (engine.compressionRatio > fuel.maxCompression) {
+                    engine.compressionRatio = fuel.maxCompression;
+                    compressionSlider.value = fuel.maxCompression;
+                    document.getElementById('v-compression').textContent = fuel.maxCompression.toFixed(1);
+                }
+            }
+        });
+
+        document.getElementById('cylinders').addEventListener('change', (e) => {
+            engine.cylinders = parseInt(e.target.value);
+        });
+
+        document.getElementById('engine-type').addEventListener('change', (e) => {
+            engine.layout = e.target.value;
+        });
+
+        document.getElementById('displacement').addEventListener('input', (e) => {
+            engine.displacement = parseFloat(e.target.value);
+            document.getElementById('v-displacement').textContent = engine.displacement.toFixed(1);
+        });
+
+        document.getElementById('compression').addEventListener('input', (e) => {
+            engine.compressionRatio = parseFloat(e.target.value);
+            document.getElementById('v-compression').textContent = engine.compressionRatio.toFixed(1);
+        });
+
+        // Turbo controls
+        document.getElementById('turbo-on').addEventListener('change', (e) => {
+            engine.turboOn = e.target.checked;
+            document.getElementById('turbo-type').disabled = !e.target.checked;
+            document.getElementById('turbo-size').disabled = !e.target.checked;
+            document.getElementById('turbo-spool-container').style.display = e.target.checked ? 'block' : 'none';
+            updateBoostControls();
+        });
+
+        document.getElementById('turbo-type').addEventListener('change', (e) => {
+            engine.turboType = e.target.value;
+        });
+
+        document.getElementById('turbo-size').addEventListener('input', (e) => {
+            engine.turboSize = parseInt(e.target.value);
+            const sizes = ['Tiny', 'Small', 'Medium', 'Large', 'Huge'];
+            document.getElementById('v-turbo-size').textContent = sizes[engine.turboSize - 1];
+        });
+
+        // Supercharger controls
+        document.getElementById('super-on').addEventListener('change', (e) => {
+            engine.superOn = e.target.checked;
+            document.getElementById('super-type').disabled = !e.target.checked;
+            updateBoostControls();
+        });
+
+        document.getElementById('super-type').addEventListener('change', (e) => {
+            engine.superType = e.target.value;
+        });
+
+        function updateBoostControls() {
+            const boostEnabled = engine.turboOn || engine.superOn;
+            document.getElementById('boost-target').disabled = !boostEnabled;
+            document.getElementById('boost-meter-container').style.display = boostEnabled ? 'block' : 'none';
+        }
+
+        document.getElementById('boost-target').addEventListener('input', (e) => {
+            engine.boostTarget = parseInt(e.target.value);
+            document.getElementById('v-boost-target').textContent = engine.boostTarget;
+        });
+
+        document.getElementById('anim-speed').addEventListener('input', (e) => {
+            engine.animSpeed = parseFloat(e.target.value);
+            document.getElementById('v-speed').textContent = engine.animSpeed.toFixed(1);
+        });
+
+        // View toggle
+        document.querySelectorAll('.view-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                engine.viewMode = btn.dataset.view;
+            });
+        });
+
+        // Optimization mode
+        document.querySelectorAll('.opt-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.opt-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                engine.optimizationMode = btn.dataset.mode;
+            });
+        });
+    </script>
+</body>
+</html>

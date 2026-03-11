@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Impact Physics Simulator</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0a0a12;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            overflow: hidden;
+            color: #e0e0e0;
+        }
+
+        #canvas {
+            display: block;
+            cursor: crosshair;
+        }
+
+        .controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(15, 15, 25, 0.95);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 100, 50, 0.3);
+            width: 320px;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+            z-index: 100;
+        }
+
+        .controls h2 {
+            font-size: 1.1rem;
+            color: #ff6633;
+            margin-bottom: 15px;
+            text-align: center;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 100, 50, 0.2);
+        }
+
+        .section-title {
+            font-size: 0.7rem;
+            color: #ff9966;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 15px 0 10px 0;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255, 100, 50, 0.15);
+        }
+
+        .control-group {
+            margin-bottom: 12px;
+        }
+
+        .control-group label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            margin-bottom: 5px;
+            color: #aaa;
+        }
+
+        .control-group label span {
+            color: #ff9966;
+            font-weight: 600;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 5px;
+            -webkit-appearance: none;
+            background: #333;
+            border-radius: 3px;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: linear-gradient(135deg, #ff6633, #ff3300);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        select {
+            width: 100%;
+            padding: 8px 12px;
+            background: #1a1a2a;
+            border: 1px solid #444;
+            color: #e0e0e0;
+            border-radius: 6px;
+            font-size: 0.85rem;
+        }
+
+        .detonate-btn {
+            width: 100%;
+            padding: 15px;
+            margin-top: 15px;
+            background: linear-gradient(135deg, #ff4400, #cc0000);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            transition: all 0.2s;
+        }
+
+        .detonate-btn:hover {
+            transform: scale(1.02);
+            box-shadow: 0 0 30px rgba(255, 50, 0, 0.5);
+        }
+
+        .detonate-btn:active {
+            transform: scale(0.98);
+        }
+
+        .reset-btn {
+            width: 100%;
+            padding: 10px;
+            margin-top: 8px;
+            background: #333;
+            border: 1px solid #555;
+            border-radius: 6px;
+            color: #aaa;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+
+        .reset-btn:hover {
+            background: #444;
+            color: #fff;
+        }
+
+        .readout {
+            margin-top: 15px;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            font-size: 0.75rem;
+        }
+
+        .readout-title {
+            color: #ff6633;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 0.8rem;
+        }
+
+        .readout-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            color: #888;
+        }
+
+        .readout-row span {
+            color: #ff9966;
+        }
+
+        .phase-indicator {
+            text-align: center;
+            padding: 8px;
+            margin-top: 10px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .phase-ready { background: #1a3a1a; color: #4a4; }
+        .phase-detonation { background: #4a1a1a; color: #f44; animation: pulse 0.2s infinite; }
+        .phase-fireball { background: #4a2a1a; color: #fa4; }
+        .phase-shockwave { background: #3a3a1a; color: #aa4; }
+        .phase-fallout { background: #2a2a3a; color: #88a; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .info-panel {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(15, 15, 25, 0.9);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            font-size: 0.75rem;
+            color: #888;
+            max-width: 300px;
+        }
+
+        .info-panel h3 {
+            color: #ff9966;
+            margin-bottom: 8px;
+        }
+
+        .scale-indicator {
+            position: fixed;
+            bottom: 20px;
+            right: 350px;
+            background: rgba(15, 15, 25, 0.9);
+            padding: 10px 15px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            color: #888;
+        }
+
+        .scale-bar {
+            width: 100px;
+            height: 4px;
+            background: #ff6633;
+            margin-top: 5px;
+            border-radius: 2px;
+        }
+
+        .presets {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            margin-bottom: 10px;
+        }
+
+        .preset-btn {
+            padding: 6px 8px;
+            background: #1a1a2a;
+            border: 1px solid #444;
+            border-radius: 4px;
+            color: #aaa;
+            font-size: 0.7rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .preset-btn:hover {
+            border-color: #ff6633;
+            color: #ff9966;
+        }
+
+        .two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+
+    <div class="controls">
+        <h2>Impact Physics Simulator</h2>
+
+        <div class="section-title">Event Type</div>
+        <div class="control-group">
+            <select id="event-type">
+                <option value="nuclear">Nuclear Detonation</option>
+                <option value="meteor">Meteor Impact</option>
+                <option value="asteroid">Asteroid Impact</option>
+                <option value="conventional">Conventional Explosion</option>
+            </select>
+        </div>
+
+        <div class="section-title">Presets</div>
+        <div class="presets">
+            <button class="preset-btn" data-preset="hiroshima">Hiroshima (15 kt)</button>
+            <button class="preset-btn" data-preset="tsar">Tsar Bomba (50 Mt)</button>
+            <button class="preset-btn" data-preset="tunguska">Tunguska Event</button>
+            <button class="preset-btn" data-preset="chicxulub">Chicxulub</button>
+            <button class="preset-btn" data-preset="chelyabinsk">Chelyabinsk</button>
+            <button class="preset-btn" data-preset="moab">MOAB</button>
+        </div>
+
+        <div class="section-title">Parameters</div>
+        <div class="control-group">
+            <label>Yield <span id="v-yield">15</span> <span id="yield-unit">kilotons</span></label>
+            <input type="range" id="yield" min="0.001" max="100000" step="0.001" value="15">
+        </div>
+
+        <div class="control-group">
+            <label>Altitude <span id="v-altitude">600</span> m</label>
+            <input type="range" id="altitude" min="0" max="50000" step="10" value="600">
+        </div>
+
+        <div id="meteor-params" style="display: none;">
+            <div class="control-group">
+                <label>Diameter <span id="v-diameter">50</span> m</label>
+                <input type="range" id="diameter" min="1" max="10000" step="1" value="50">
+            </div>
+            <div class="control-group">
+                <label>Velocity <span id="v-velocity">20</span> km/s</label>
+                <input type="range" id="velocity" min="5" max="72" step="1" value="20">
+            </div>
+            <div class="control-group">
+                <label>Impact Angle <span id="v-angle">45</span>°</label>
+                <input type="range" id="angle" min="5" max="90" step="1" value="45">
+            </div>
+            <div class="control-group">
+                <label>Composition</label>
+                <select id="composition">
+                    <option value="iron">Iron (dense)</option>
+                    <option value="stone" selected>Stony (average)</option>
+                    <option value="carbonaceous">Carbonaceous (porous)</option>
+                    <option value="comet">Comet (icy)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="section-title">Visualization</div>
+        <div class="two-col">
+            <div class="control-group">
+                <label>Time Scale <span id="v-timescale">1</span>x</label>
+                <input type="range" id="timescale" min="0.1" max="10" step="0.1" value="1">
+            </div>
+            <div class="control-group">
+                <label>View Scale <span id="v-viewscale">1</span> km</label>
+                <input type="range" id="viewscale" min="0.1" max="1000" step="0.1" value="1">
+            </div>
+        </div>
+
+        <button class="detonate-btn" id="detonate-btn">DETONATE</button>
+        <button class="reset-btn" id="reset-btn">Reset Simulation</button>
+
+        <div class="phase-indicator phase-ready" id="phase">READY</div>
+
+        <div class="readout">
+            <div class="readout-title">Physics Data</div>
+            <div class="readout-row">Energy Release <span id="r-energy">0 J</span></div>
+            <div class="readout-row">Fireball Radius <span id="r-fireball">0 m</span></div>
+            <div class="readout-row">Shockwave Radius <span id="r-shockwave">0 m</span></div>
+            <div class="readout-row">Peak Overpressure <span id="r-pressure">0 psi</span></div>
+            <div class="readout-row">Thermal Radius <span id="r-thermal">0 m</span></div>
+            <div class="readout-row">Crater Diameter <span id="r-crater">0 m</span></div>
+            <div class="readout-row">Elapsed Time <span id="r-time">0 ms</span></div>
+        </div>
+    </div>
+
+    <div class="scale-indicator">
+        <div>Scale: <span id="scale-label">1 km</span></div>
+        <div class="scale-bar"></div>
+    </div>
+
+    <div class="info-panel">
+        <h3>About</h3>
+        <p>Educational physics simulation of high-energy impact events. Click DETONATE or click anywhere on the canvas to trigger. Adjust parameters to see how yield, altitude, and composition affect blast physics.</p>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        let W, H;
+        function resize() {
+            W = canvas.width = window.innerWidth;
+            H = canvas.height = window.innerHeight;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+
+        // Simulation state
+        const sim = {
+            active: false,
+            phase: 'ready', // ready, detonation, fireball, shockwave, fallout, done
+            time: 0,
+            eventType: 'nuclear',
+
+            // Nuclear params
+            yieldKt: 15,
+            altitude: 600,
+
+            // Meteor params
+            diameter: 50,
+            velocity: 20,
+            angle: 45,
+            composition: 'stone',
+
+            // View
+            timeScale: 1,
+            viewScale: 1, // km per 100px
+            centerX: 0,
+            centerY: 0,
+
+            // Calculated
+            energyJ: 0,
+            fireballRadius: 0,
+            shockwaveRadius: 0,
+            thermalRadius: 0,
+            craterRadius: 0,
+            peakPressure: 0
+        };
+
+        // Particle systems
+        let particles = [];
+        let shockwaves = [];
+        let debris = [];
+        let thermalWaves = [];
+
+        // Physics constants
+        const KT_TO_JOULES = 4.184e12;
+        const MT_TO_KT = 1000;
+
+        // Composition densities (kg/m³)
+        const densities = {
+            iron: 7800,
+            stone: 3500,
+            carbonaceous: 2000,
+            comet: 500
+        };
+
+        // Calculate energy from meteor impact
+        function getMeteorEnergy() {
+            const density = densities[sim.composition];
+            const radius = sim.diameter / 2;
+            const volume = (4/3) * Math.PI * Math.pow(radius, 3);
+            const mass = density * volume;
+            const velocityMs = sim.velocity * 1000;
+            const angleRad = sim.angle * Math.PI / 180;
+
+            // Kinetic energy: 0.5 * m * v²
+            const kineticEnergy = 0.5 * mass * Math.pow(velocityMs * Math.sin(angleRad), 2);
+            return kineticEnergy;
+        }
+
+        // Calculate nuclear energy
+        function getNuclearEnergy() {
+            return sim.yieldKt * KT_TO_JOULES;
+        }
+
+        // Get total energy based on event type
+        function getTotalEnergy() {
+            if (sim.eventType === 'nuclear' || sim.eventType === 'conventional') {
+                return getNuclearEnergy();
+            } else {
+                return getMeteorEnergy();
+            }
+        }
+
+        // Calculate fireball radius (nuclear)
+        function getFireballRadius(energy, time) {
+            // Sedov-Taylor solution for point explosion
+            const yieldKt = energy / KT_TO_JOULES;
+            const maxRadius = 90 * Math.pow(yieldKt, 0.4); // meters
+
+            // Time evolution (rapid initial expansion, then slows)
+            const expansionTime = 0.5; // seconds to reach max
+            const progress = Math.min(time / expansionTime, 1);
+            return maxRadius * Math.pow(progress, 0.4);
+        }
+
+        // Calculate shockwave radius
+        function getShockwaveRadius(energy, time) {
+            // Simplified blast wave propagation
+            // Initial speed ~7km/s, decays to sound speed
+            const yieldKt = energy / KT_TO_JOULES;
+            const scaleFactor = Math.pow(yieldKt, 1/3);
+
+            // Radius grows with time, starts fast, slows down
+            const initialSpeed = 7000; // m/s
+            const soundSpeed = 343; // m/s
+
+            // Exponential decay of speed
+            const decayRate = 0.5;
+            const avgSpeed = soundSpeed + (initialSpeed - soundSpeed) * Math.exp(-decayRate * time);
+
+            return avgSpeed * time * scaleFactor * 0.1;
+        }
+
+        // Calculate overpressure at distance
+        function getOverpressure(energy, distance) {
+            const yieldKt = energy / KT_TO_JOULES;
+            // Scaled distance
+            const z = distance / Math.pow(yieldKt, 1/3);
+
+            // Simplified overpressure formula (psi)
+            if (z < 1) return 200;
+            return 200 / Math.pow(z, 3);
+        }
+
+        // Calculate thermal radiation radius
+        function getThermalRadius(energy) {
+            const yieldKt = energy / KT_TO_JOULES;
+            // Radius for 3rd degree burns (~6 cal/cm²)
+            return 1900 * Math.pow(yieldKt, 0.41);
+        }
+
+        // Calculate crater dimensions
+        function getCraterRadius(energy, isSurface) {
+            if (!isSurface && sim.altitude > 100) return 0;
+
+            const yieldKt = energy / KT_TO_JOULES;
+            // Crater radius scales with cube root of energy
+            return 50 * Math.pow(yieldKt, 0.33);
+        }
+
+        // Particle class
+        class Particle {
+            constructor(x, y, type) {
+                this.x = x;
+                this.y = y;
+                this.type = type;
+                this.vx = 0;
+                this.vy = 0;
+                this.life = 1;
+                this.maxLife = 1;
+                this.size = 5;
+                this.color = [255, 200, 100];
+            }
+
+            update(dt) {
+                this.x += this.vx * dt;
+                this.y += this.vy * dt;
+                this.vy += 50 * dt; // gravity
+                this.life -= dt / this.maxLife;
+            }
+
+            draw() {
+                if (this.life <= 0) return;
+                const alpha = this.life;
+                const [r, g, b] = this.color;
+                ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * this.life, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // Convert world coordinates to screen
+        function worldToScreen(wx, wy) {
+            const scale = 100 / (sim.viewScale * 1000); // pixels per meter
+            return {
+                x: W/2 + (wx - sim.centerX) * scale,
+                y: H * 0.7 - (wy - sim.centerY) * scale
+            };
+        }
+
+        // Convert meters to screen pixels
+        function metersToPixels(meters) {
+            return meters * 100 / (sim.viewScale * 1000);
+        }
+
+        // Initialize detonation
+        function detonate(x, y) {
+            sim.active = true;
+            sim.time = 0;
+            sim.phase = 'detonation';
+
+            // Set center point
+            if (x !== undefined && y !== undefined) {
+                // Clicked position - convert to world coords
+                const scale = 100 / (sim.viewScale * 1000);
+                sim.centerX = (x - W/2) / scale;
+                sim.centerY = (H * 0.7 - y) / scale;
+            } else {
+                sim.centerX = 0;
+                sim.centerY = sim.altitude;
+            }
+
+            // Calculate energy
+            sim.energyJ = getTotalEnergy();
+            sim.thermalRadius = getThermalRadius(sim.energyJ);
+            sim.craterRadius = getCraterRadius(sim.energyJ, sim.altitude < 100);
+
+            // Clear particles
+            particles = [];
+            shockwaves = [];
+            debris = [];
+            thermalWaves = [];
+
+            // Create initial flash particles
+            const screenPos = worldToScreen(sim.centerX, sim.centerY);
+            for (let i = 0; i < 200; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 100 + Math.random() * 500;
+                const p = new Particle(screenPos.x, screenPos.y, 'flash');
+                p.vx = Math.cos(angle) * speed;
+                p.vy = Math.sin(angle) * speed;
+                p.maxLife = 0.3 + Math.random() * 0.3;
+                p.life = p.maxLife;
+                p.size = 3 + Math.random() * 5;
+                p.color = [255, 255, 255];
+                particles.push(p);
+            }
+
+            updateReadouts();
+        }
+
+        // Reset simulation
+        function reset() {
+            sim.active = false;
+            sim.phase = 'ready';
+            sim.time = 0;
+            sim.fireballRadius = 0;
+            sim.shockwaveRadius = 0;
+            particles = [];
+            shockwaves = [];
+            debris = [];
+            thermalWaves = [];
+            updatePhaseIndicator();
+            updateReadouts();
+        }
+
+        // Update simulation
+        function update(dt) {
+            if (!sim.active) return;
+
+            const scaledDt = dt * sim.timeScale;
+            sim.time += scaledDt;
+
+            // Update physics based on time
+            sim.fireballRadius = getFireballRadius(sim.energyJ, sim.time);
+            sim.shockwaveRadius = getShockwaveRadius(sim.energyJ, sim.time);
+            sim.peakPressure = getOverpressure(sim.energyJ, sim.shockwaveRadius);
+
+            // Phase transitions
+            if (sim.time < 0.1) {
+                sim.phase = 'detonation';
+            } else if (sim.time < 2) {
+                sim.phase = 'fireball';
+            } else if (sim.time < 30) {
+                sim.phase = 'shockwave';
+            } else {
+                sim.phase = 'fallout';
+            }
+
+            // Spawn fireball particles
+            if (sim.time < 3 && Math.random() < 0.5) {
+                const screenPos = worldToScreen(sim.centerX, sim.centerY);
+                const fireballPx = metersToPixels(sim.fireballRadius);
+                const angle = Math.random() * Math.PI * 2;
+                const dist = Math.random() * fireballPx;
+
+                const p = new Particle(
+                    screenPos.x + Math.cos(angle) * dist,
+                    screenPos.y + Math.sin(angle) * dist,
+                    'fireball'
+                );
+                p.vx = Math.cos(angle) * (50 + Math.random() * 100);
+                p.vy = -50 - Math.random() * 150; // Rise
+                p.maxLife = 1 + Math.random() * 2;
+                p.life = p.maxLife;
+                p.size = 5 + Math.random() * 15;
+
+                // Color based on temperature (white -> yellow -> orange -> red)
+                const temp = 1 - (dist / fireballPx);
+                if (temp > 0.7) {
+                    p.color = [255, 255, 200 + temp * 55];
+                } else if (temp > 0.4) {
+                    p.color = [255, 200, 100];
+                } else {
+                    p.color = [255, 100 + temp * 100, 50];
+                }
+
+                particles.push(p);
+            }
+
+            // Spawn debris for ground impact
+            if (sim.altitude < 100 && sim.time < 5 && Math.random() < 0.3) {
+                const screenPos = worldToScreen(sim.centerX, 0);
+                const angle = -Math.PI/2 + (Math.random() - 0.5) * Math.PI * 0.8;
+                const speed = 200 + Math.random() * 400;
+
+                const p = new Particle(
+                    screenPos.x + (Math.random() - 0.5) * 100,
+                    screenPos.y,
+                    'debris'
+                );
+                p.vx = Math.cos(angle) * speed;
+                p.vy = Math.sin(angle) * speed;
+                p.maxLife = 2 + Math.random() * 3;
+                p.life = p.maxLife;
+                p.size = 2 + Math.random() * 8;
+                p.color = [100 + Math.random() * 50, 80 + Math.random() * 40, 60];
+
+                debris.push(p);
+            }
+
+            // Spawn mushroom cloud particles
+            if (sim.time > 1 && sim.time < 20 && Math.random() < 0.4) {
+                const screenPos = worldToScreen(sim.centerX, sim.centerY);
+                const stemHeight = metersToPixels(sim.fireballRadius * 3) * Math.min(sim.time / 5, 1);
+
+                // Stem
+                const p = new Particle(
+                    screenPos.x + (Math.random() - 0.5) * 30,
+                    screenPos.y - Math.random() * stemHeight,
+                    'cloud'
+                );
+                p.vx = (Math.random() - 0.5) * 20;
+                p.vy = -30 - Math.random() * 50;
+                p.maxLife = 5 + Math.random() * 5;
+                p.life = p.maxLife;
+                p.size = 10 + Math.random() * 20;
+                p.color = [80, 70, 60];
+
+                particles.push(p);
+
+                // Cap
+                if (sim.time > 3) {
+                    const capWidth = stemHeight * 0.8;
+                    const pc = new Particle(
+                        screenPos.x + (Math.random() - 0.5) * capWidth,
+                        screenPos.y - stemHeight + (Math.random() - 0.5) * 50,
+                        'cloud'
+                    );
+                    pc.vx = (Math.random() - 0.5) * 50;
+                    pc.vy = -10 - Math.random() * 30;
+                    pc.maxLife = 8 + Math.random() * 5;
+                    pc.life = pc.maxLife;
+                    pc.size = 15 + Math.random() * 30;
+                    pc.color = [100, 90, 80];
+
+                    particles.push(pc);
+                }
+            }
+
+            // Update particles
+            particles = particles.filter(p => {
+                p.update(scaledDt);
+                return p.life > 0;
+            });
+
+            debris = debris.filter(p => {
+                p.update(scaledDt);
+                // Stop at ground
+                const groundY = worldToScreen(0, 0).y;
+                if (p.y > groundY) {
+                    p.y = groundY;
+                    p.vy = 0;
+                    p.vx *= 0.8;
+                }
+                return p.life > 0;
+            });
+
+            updatePhaseIndicator();
+            updateReadouts();
+        }
+
+        // Draw simulation
+        function draw() {
+            // Background gradient (sky)
+            const skyGrad = ctx.createLinearGradient(0, 0, 0, H);
+
+            // Adjust sky color based on simulation state
+            if (sim.active && sim.time < 2) {
+                const flash = Math.max(0, 1 - sim.time);
+                skyGrad.addColorStop(0, `rgb(${50 + flash * 200}, ${50 + flash * 150}, ${80 + flash * 100})`);
+                skyGrad.addColorStop(0.6, `rgb(${30 + flash * 150}, ${20 + flash * 100}, ${40 + flash * 80})`);
+                skyGrad.addColorStop(1, `rgb(${20 + flash * 50}, ${15 + flash * 30}, ${25 + flash * 20})`);
+            } else {
+                skyGrad.addColorStop(0, '#1a1a2e');
+                skyGrad.addColorStop(0.6, '#0f0f1a');
+                skyGrad.addColorStop(1, '#0a0a12');
+            }
+            ctx.fillStyle = skyGrad;
+            ctx.fillRect(0, 0, W, H);
+
+            // Ground
+            const groundY = worldToScreen(0, 0).y;
+            ctx.fillStyle = '#1a1512';
+            ctx.fillRect(0, groundY, W, H - groundY);
+
+            // Grid lines
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            ctx.lineWidth = 1;
+
+            const gridSpacing = metersToPixels(sim.viewScale * 200); // Grid every 200m at 1km scale
+            for (let x = 0; x < W; x += gridSpacing) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, H);
+                ctx.stroke();
+            }
+
+            // Draw active simulation
+            if (sim.active) {
+                const screenPos = worldToScreen(sim.centerX, sim.centerY);
+
+                // Thermal radiation zone
+                if (sim.time > 0.01 && sim.time < 5) {
+                    const thermalPx = metersToPixels(sim.thermalRadius * Math.min(sim.time * 2, 1));
+                    const thermalGrad = ctx.createRadialGradient(
+                        screenPos.x, screenPos.y, 0,
+                        screenPos.x, screenPos.y, thermalPx
+                    );
+                    const intensity = Math.max(0, 1 - sim.time / 5);
+                    thermalGrad.addColorStop(0, `rgba(255, 200, 100, ${intensity * 0.3})`);
+                    thermalGrad.addColorStop(0.5, `rgba(255, 100, 50, ${intensity * 0.15})`);
+                    thermalGrad.addColorStop(1, 'rgba(255, 50, 0, 0)');
+                    ctx.fillStyle = thermalGrad;
+                    ctx.beginPath();
+                    ctx.arc(screenPos.x, screenPos.y, thermalPx, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // Fireball
+                const fireballPx = metersToPixels(sim.fireballRadius);
+                if (fireballPx > 1 && sim.time < 10) {
+                    const fbGrad = ctx.createRadialGradient(
+                        screenPos.x, screenPos.y, 0,
+                        screenPos.x, screenPos.y, fireballPx
+                    );
+
+                    const age = Math.min(sim.time / 3, 1);
+                    if (age < 0.3) {
+                        // White hot
+                        fbGrad.addColorStop(0, `rgba(255, 255, 255, ${1 - age})`);
+                        fbGrad.addColorStop(0.3, `rgba(255, 255, 200, ${0.8 - age})`);
+                        fbGrad.addColorStop(0.7, `rgba(255, 200, 100, ${0.5 - age})`);
+                        fbGrad.addColorStop(1, 'rgba(255, 100, 50, 0)');
+                    } else {
+                        // Cooling
+                        const cool = (age - 0.3) / 0.7;
+                        fbGrad.addColorStop(0, `rgba(255, ${150 - cool * 100}, ${50}, ${0.7 - cool * 0.5})`);
+                        fbGrad.addColorStop(0.5, `rgba(200, ${80 - cool * 50}, 30, ${0.4 - cool * 0.3})`);
+                        fbGrad.addColorStop(1, 'rgba(100, 50, 30, 0)');
+                    }
+
+                    ctx.fillStyle = fbGrad;
+                    ctx.beginPath();
+                    ctx.arc(screenPos.x, screenPos.y, fireballPx, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // Shockwave ring
+                const shockwavePx = metersToPixels(sim.shockwaveRadius);
+                if (shockwavePx > fireballPx && sim.time < 60) {
+                    const swAlpha = Math.max(0, 0.6 - sim.time / 60);
+                    ctx.strokeStyle = `rgba(200, 220, 255, ${swAlpha})`;
+                    ctx.lineWidth = 3 + 10 / (1 + sim.time);
+                    ctx.beginPath();
+                    ctx.arc(screenPos.x, screenPos.y, shockwavePx, 0, Math.PI * 2);
+                    ctx.stroke();
+
+                    // Pressure distortion effect
+                    ctx.strokeStyle = `rgba(255, 255, 255, ${swAlpha * 0.3})`;
+                    ctx.lineWidth = 20 / (1 + sim.time * 0.5);
+                    ctx.beginPath();
+                    ctx.arc(screenPos.x, screenPos.y, shockwavePx * 0.95, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+
+                // Crater
+                if (sim.craterRadius > 0 && sim.time > 0.5) {
+                    const craterPx = metersToPixels(sim.craterRadius);
+                    const craterScreenPos = worldToScreen(sim.centerX, 0);
+
+                    ctx.fillStyle = '#0a0806';
+                    ctx.beginPath();
+                    ctx.ellipse(craterScreenPos.x, craterScreenPos.y, craterPx, craterPx * 0.3, 0, 0, Math.PI);
+                    ctx.fill();
+
+                    // Crater rim
+                    ctx.strokeStyle = '#2a2015';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.ellipse(craterScreenPos.x, craterScreenPos.y, craterPx * 1.2, craterPx * 0.4, 0, Math.PI, Math.PI * 2);
+                    ctx.stroke();
+                }
+            }
+
+            // Draw particles
+            debris.forEach(p => p.draw());
+            particles.forEach(p => p.draw());
+
+            // Detonation point marker (when not active)
+            if (!sim.active) {
+                const markerPos = worldToScreen(0, sim.altitude);
+                ctx.strokeStyle = '#ff6633';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(markerPos.x - 20, markerPos.y);
+                ctx.lineTo(markerPos.x + 20, markerPos.y);
+                ctx.moveTo(markerPos.x, markerPos.y - 20);
+                ctx.lineTo(markerPos.x, markerPos.y + 20);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Altitude line
+                ctx.strokeStyle = 'rgba(255, 100, 50, 0.3)';
+                ctx.beginPath();
+                ctx.moveTo(markerPos.x, markerPos.y);
+                ctx.lineTo(markerPos.x, groundY);
+                ctx.stroke();
+
+                // Altitude label
+                ctx.fillStyle = '#ff9966';
+                ctx.font = '12px system-ui';
+                ctx.fillText(`${sim.altitude}m`, markerPos.x + 10, (markerPos.y + groundY) / 2);
+            }
+        }
+
+        // Update phase indicator
+        function updatePhaseIndicator() {
+            const el = document.getElementById('phase');
+            el.textContent = sim.phase.toUpperCase();
+            el.className = 'phase-indicator phase-' + sim.phase;
+        }
+
+        // Update readouts
+        function updateReadouts() {
+            const formatNumber = (n) => {
+                if (n >= 1e12) return (n / 1e12).toFixed(2) + ' TJ';
+                if (n >= 1e9) return (n / 1e9).toFixed(2) + ' GJ';
+                if (n >= 1e6) return (n / 1e6).toFixed(2) + ' MJ';
+                if (n >= 1e3) return (n / 1e3).toFixed(2) + ' kJ';
+                return n.toFixed(2) + ' J';
+            };
+
+            const formatDistance = (m) => {
+                if (m >= 1000) return (m / 1000).toFixed(2) + ' km';
+                return m.toFixed(0) + ' m';
+            };
+
+            document.getElementById('r-energy').textContent = formatNumber(sim.energyJ);
+            document.getElementById('r-fireball').textContent = formatDistance(sim.fireballRadius);
+            document.getElementById('r-shockwave').textContent = formatDistance(sim.shockwaveRadius);
+            document.getElementById('r-pressure').textContent = sim.peakPressure.toFixed(1) + ' psi';
+            document.getElementById('r-thermal').textContent = formatDistance(sim.thermalRadius);
+            document.getElementById('r-crater').textContent = formatDistance(sim.craterRadius);
+
+            if (sim.active) {
+                if (sim.time < 1) {
+                    document.getElementById('r-time').textContent = (sim.time * 1000).toFixed(0) + ' ms';
+                } else {
+                    document.getElementById('r-time').textContent = sim.time.toFixed(2) + ' s';
+                }
+            } else {
+                document.getElementById('r-time').textContent = '0 ms';
+            }
+        }
+
+        // Animation loop
+        let lastTime = 0;
+        function animate(time) {
+            const dt = Math.min((time - lastTime) / 1000, 0.1);
+            lastTime = time;
+
+            update(dt);
+            draw();
+
+            requestAnimationFrame(animate);
+        }
+        animate(0);
+
+        // Event listeners
+        document.getElementById('event-type').addEventListener('change', (e) => {
+            sim.eventType = e.target.value;
+            const meteorParams = document.getElementById('meteor-params');
+
+            if (sim.eventType === 'meteor' || sim.eventType === 'asteroid') {
+                meteorParams.style.display = 'block';
+                document.getElementById('yield').parentElement.parentElement.style.display = 'none';
+            } else {
+                meteorParams.style.display = 'none';
+                document.getElementById('yield').parentElement.parentElement.style.display = 'block';
+            }
+        });
+
+        document.getElementById('yield').addEventListener('input', (e) => {
+            sim.yieldKt = parseFloat(e.target.value);
+
+            // Smart unit display
+            let display, unit;
+            if (sim.yieldKt >= 1000) {
+                display = (sim.yieldKt / 1000).toFixed(2);
+                unit = 'megatons';
+            } else if (sim.yieldKt >= 1) {
+                display = sim.yieldKt.toFixed(1);
+                unit = 'kilotons';
+            } else {
+                display = (sim.yieldKt * 1000).toFixed(0);
+                unit = 'tons';
+            }
+
+            document.getElementById('v-yield').textContent = display;
+            document.getElementById('yield-unit').textContent = unit;
+        });
+
+        document.getElementById('altitude').addEventListener('input', (e) => {
+            sim.altitude = parseFloat(e.target.value);
+            document.getElementById('v-altitude').textContent = sim.altitude;
+        });
+
+        document.getElementById('diameter').addEventListener('input', (e) => {
+            sim.diameter = parseFloat(e.target.value);
+            document.getElementById('v-diameter').textContent = sim.diameter;
+        });
+
+        document.getElementById('velocity').addEventListener('input', (e) => {
+            sim.velocity = parseFloat(e.target.value);
+            document.getElementById('v-velocity').textContent = sim.velocity;
+        });
+
+        document.getElementById('angle').addEventListener('input', (e) => {
+            sim.angle = parseFloat(e.target.value);
+            document.getElementById('v-angle').textContent = sim.angle;
+        });
+
+        document.getElementById('composition').addEventListener('change', (e) => {
+            sim.composition = e.target.value;
+        });
+
+        document.getElementById('timescale').addEventListener('input', (e) => {
+            sim.timeScale = parseFloat(e.target.value);
+            document.getElementById('v-timescale').textContent = sim.timeScale.toFixed(1);
+        });
+
+        document.getElementById('viewscale').addEventListener('input', (e) => {
+            sim.viewScale = parseFloat(e.target.value);
+            document.getElementById('v-viewscale').textContent = sim.viewScale.toFixed(1);
+            document.getElementById('scale-label').textContent = sim.viewScale.toFixed(1) + ' km';
+        });
+
+        document.getElementById('detonate-btn').addEventListener('click', () => detonate());
+        document.getElementById('reset-btn').addEventListener('click', reset);
+
+        // Click to detonate
+        canvas.addEventListener('click', (e) => {
+            if (e.target === canvas) {
+                detonate(e.clientX, e.clientY);
+            }
+        });
+
+        // Presets
+        const presets = {
+            hiroshima: { type: 'nuclear', yield: 15, altitude: 600 },
+            tsar: { type: 'nuclear', yield: 50000, altitude: 4000 },
+            tunguska: { type: 'meteor', diameter: 60, velocity: 15, angle: 30, composition: 'stone' },
+            chicxulub: { type: 'asteroid', diameter: 10000, velocity: 20, angle: 60, composition: 'stone' },
+            chelyabinsk: { type: 'meteor', diameter: 20, velocity: 19, angle: 18, composition: 'stone' },
+            moab: { type: 'conventional', yield: 0.011, altitude: 0 }
+        };
+
+        document.querySelectorAll('.preset-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const preset = presets[btn.dataset.preset];
+
+                if (preset.type === 'nuclear' || preset.type === 'conventional') {
+                    document.getElementById('event-type').value = preset.type;
+                    sim.eventType = preset.type;
+                    sim.yieldKt = preset.yield;
+                    sim.altitude = preset.altitude;
+
+                    document.getElementById('yield').value = preset.yield;
+                    document.getElementById('altitude').value = preset.altitude;
+
+                    document.getElementById('meteor-params').style.display = 'none';
+                    document.getElementById('yield').parentElement.parentElement.style.display = 'block';
+
+                    // Update display
+                    document.getElementById('yield').dispatchEvent(new Event('input'));
+                    document.getElementById('v-altitude').textContent = preset.altitude;
+                } else {
+                    document.getElementById('event-type').value = preset.type;
+                    sim.eventType = preset.type;
+                    sim.diameter = preset.diameter;
+                    sim.velocity = preset.velocity;
+                    sim.angle = preset.angle;
+                    sim.composition = preset.composition;
+                    sim.altitude = 0;
+
+                    document.getElementById('diameter').value = preset.diameter;
+                    document.getElementById('velocity').value = preset.velocity;
+                    document.getElementById('angle').value = preset.angle;
+                    document.getElementById('composition').value = preset.composition;
+
+                    document.getElementById('v-diameter').textContent = preset.diameter;
+                    document.getElementById('v-velocity').textContent = preset.velocity;
+                    document.getElementById('v-angle').textContent = preset.angle;
+
+                    document.getElementById('meteor-params').style.display = 'block';
+                    document.getElementById('yield').parentElement.parentElement.style.display = 'none';
+                }
+
+                // Auto-adjust view scale based on event size
+                if (preset.diameter >= 1000 || preset.yield >= 10000) {
+                    sim.viewScale = 100;
+                } else if (preset.diameter >= 100 || preset.yield >= 100) {
+                    sim.viewScale = 10;
+                } else {
+                    sim.viewScale = 1;
+                }
+                document.getElementById('viewscale').value = sim.viewScale;
+                document.getElementById('v-viewscale').textContent = sim.viewScale.toFixed(1);
+                document.getElementById('scale-label').textContent = sim.viewScale.toFixed(1) + ' km';
+            });
+        });
+
+        // Initial setup
+        updateReadouts();
+    </script>
+</body>
+</html>
