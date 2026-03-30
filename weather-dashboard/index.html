@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Weather Dashboard</title>
+  <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>Weather Dashboard</h1>
+      <div class="unit-toggle">
+        <button id="btn-f" class="active">°F</button>
+        <button id="btn-c">°C</button>
+      </div>
+    </header>
+
+    <div class="search-bar">
+      <input type="text" id="city-input" placeholder="Enter city (e.g. Omaha, Paris, London)" autocomplete="off">
+      <button id="search-btn">Search</button>
+    </div>
+
+    <div id="error-msg" class="error hidden"></div>
+
+    <div id="current-weather" class="card hidden">
+      <div class="weather-main">
+        <div class="weather-icon-wrap">
+          <img id="weather-icon" src="" alt="">
+          <p id="weather-desc"></p>
+        </div>
+        <div class="weather-temp">
+          <span id="temp-value"></span>
+          <span id="temp-unit"></span>
+        </div>
+      </div>
+      <h2 id="city-name"></h2>
+      <div class="weather-details">
+        <div class="detail">
+          <span class="label">Feels like</span>
+          <span id="feels-like"></span>
+        </div>
+        <div class="detail">
+          <span class="label">Humidity</span>
+          <span id="humidity"></span>
+        </div>
+        <div class="detail">
+          <span class="label">Wind</span>
+          <span id="wind"></span>
+        </div>
+        <div class="detail">
+          <span class="label">Visibility</span>
+          <span id="visibility"></span>
+        </div>
+        <div class="detail">
+          <span class="label">Pressure</span>
+          <span id="pressure"></span>
+        </div>
+        <div class="detail">
+          <span class="label">Sunrise / Sunset</span>
+          <span id="sun-times"></span>
+        </div>
+      </div>
+    </div>
+
+    <div id="forecast-section" class="hidden">
+      <h3>5-Day Forecast</h3>
+      <div id="forecast-cards"></div>
+    </div>
+
+    <div id="air-quality-section" class="hidden">
+      <h3>Air Quality</h3>
+      <div id="aqi-card" class="card aqi-card">
+        <div class="aqi-main">
+          <span id="aqi-index"></span>
+          <span id="aqi-label"></span>
+        </div>
+        <div class="aqi-details">
+          <div class="detail"><span class="label">PM2.5</span><span id="aqi-pm25"></span></div>
+          <div class="detail"><span class="label">PM10</span><span id="aqi-pm10"></span></div>
+          <div class="detail"><span class="label">O₃</span><span id="aqi-o3"></span></div>
+          <div class="detail"><span class="label">NO₂</span><span id="aqi-no2"></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="scripts/app.js"></script>
+</body>
+</html>
