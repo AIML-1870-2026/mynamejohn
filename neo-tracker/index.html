@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEO Close Approach Tracker</title>
+  <style>
+    :root {
+      --bg: #07070f;
+      --surface: #0d0d1c;
+      --surface2: #131326;
+      --border: #1a1a38;
+      --text: #dde0f5;
+      --dim: #555580;
+      --cyan: #00d4ff;
+      --orange: #ff7a00;
+      --red: #ff2244;
+      --green: #00e87a;
+      --yellow: #ffd700;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Courier New', monospace;
+      min-height: 100vh;
+    }
+
+    /* ── HEADER ── */
+    header {
+      background: linear-gradient(180deg, #0a0a22 0%, var(--bg) 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 18px 32px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .hdr-icon { font-size: 30px; }
+    .hdr-title {
+      font-size: 17px;
+      font-weight: bold;
+      color: var(--cyan);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+    .hdr-sub {
+      font-size: 10px;
+      color: var(--dim);
+      letter-spacing: 2px;
+      margin-top: 3px;
+    }
+    .hdr-live {
+      margin-left: auto;
+      font-size: 10px;
+      color: var(--green);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      letter-spacing: 2px;
+    }
+    .pulse-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(0,232,122,0.4); }
+      50% { opacity: 0.4; box-shadow: 0 0 6px 2px rgba(0,232,122,0.1); }
+    }
+
+    /* ── TABS ── */
+    .tabs {
+      display: flex;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      overflow-x: auto;
+    }
+    .tab-btn {
+      padding: 13px 22px;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--dim);
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active { color: var(--cyan); border-bottom-color: var(--cyan); }
+
+    /* ── LAYOUT ── */
+    .content {
+      padding: 28px 32px;
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── STAT CARDS ── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px;
+      text-align: center;
+    }
+    .stat-val {
+      font-size: 26px;
+      font-weight: bold;
+      color: var(--cyan);
+      display: block;
+      letter-spacing: 1px;
+    }
+    .stat-lbl {
+      font-size: 9px;
+      color: var(--dim);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-top: 5px;
+    }
+
+    /* ── SECTION HEADER ── */
+    .sec-hdr {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .sec-title {
+      font-size: 10px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--dim);
+    }
+    .sec-meta {
+      font-size: 11px;
+      color: var(--cyan);
+    }
+
+    /* ── ASTEROID CARDS ── */
+    .ast-grid { display: grid; gap: 10px; }
+    .ast-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      transition: border-color 0.2s;
+    }
+    .ast-card:hover { border-color: #334; }
+    .ast-card.haz { border-left: 3px solid var(--red); }
+    .ast-name {
+      font-size: 13px;
+      font-weight: bold;
+      color: var(--text);
+    }
+    .ast-meta {
+      font-size: 10px;
+      color: var(--dim);
+      margin-top: 4px;
+    }
+    .ast-stats { display: flex; gap: 20px; flex-shrink: 0; }
+    .ast-stat { text-align: right; }
+    .ast-sv { font-size: 14px; font-weight: bold; }
+    .ast-sl {
+      font-size: 9px;
+      color: var(--dim);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .haz-badge {
+      background: var(--red);
+      color: #fff;
+      font-size: 8px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      letter-spacing: 1px;
+      margin-left: 7px;
+      vertical-align: middle;
+    }
+    .size-pip {
+      display: inline-block;
+      height: 6px;
+      border-radius: 2px;
+      background: var(--cyan);
+      opacity: 0.5;
+      vertical-align: middle;
+      margin-left: 6px;
+    }
+
+    /* ── FILTER BAR ── */
+    .filter-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+    .filter-select {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 7px 12px;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .filter-select:focus { outline: 1px solid var(--cyan); }
+
+    /* ── DATA TABLE ── */
+    .tbl-wrap { overflow-x: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    th {
+      text-align: left;
+      padding: 9px 14px;
+      color: var(--dim);
+      letter-spacing: 2px;
+      font-size: 9px;
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 9px 14px;
+      border-bottom: 1px solid #10102a;
+      color: var(--text);
+    }
+    tr:hover td { background: var(--surface2); }
+
+    /* ── RISK BAR ── */
+    .risk-track {
+      width: 70px;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      display: inline-block;
+      vertical-align: middle;
+    }
+    .risk-fill {
+      height: 100%;
+      border-radius: 2px;
+      background: linear-gradient(90deg, var(--green) 0%, var(--yellow) 50%, var(--red) 100%);
+    }
+
+    /* ── GLOBE ── */
+    #globe-wrap {
+      width: 100%;
+      height: 520px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      background: #02020a;
+    }
+    #globe-legend {
+      margin-top: 14px;
+      display: flex;
+      gap: 20px;
+      font-size: 10px;
+      color: var(--dim);
+      letter-spacing: 1px;
+    }
+    .leg-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+
+    /* ── LOADING / ERROR ── */
+    .loading {
+      text-align: center;
+      padding: 56px;
+      color: var(--dim);
+      font-size: 11px;
+      letter-spacing: 3px;
+    }
+    .loading::after {
+      content: '';
+      animation: ellipsis 1.5s steps(4, end) infinite;
+    }
+    @keyframes ellipsis {
+      0%   { content: ''; }
+      25%  { content: '.'; }
+      50%  { content: '..'; }
+      75%  { content: '...'; }
+      100% { content: ''; }
+    }
+    .error {
+      text-align: center;
+      padding: 40px;
+      color: var(--red);
+      font-size: 11px;
+      letter-spacing: 1px;
+    }
+
+    /* ── TORINO COLORS ── */
+    .t0 { color: var(--green); }
+    .t1 { color: var(--yellow); }
+    .t2, .t3, .t4 { color: var(--orange); }
+    .t5, .t6, .t7, .t8, .t9, .t10 { color: var(--red); }
+
+    @media (max-width: 700px) {
+      header { padding: 14px 16px; }
+      .tabs { padding: 0 16px; }
+      .content { padding: 16px; }
+      .ast-card { flex-direction: column; align-items: flex-start; }
+      .ast-stats { flex-direction: row; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="hdr-icon">☄️</div>
+  <div>
+    <div class="hdr-title">NEO Close Approach Tracker</div>
+    <div class="hdr-sub">NASA · JPL Planetary Defense Data</div>
+  </div>
+  <div class="hdr-live">
+    <div class="pulse-dot"></div>
+    LIVE
+  </div>
+</header>
+
+<nav class="tabs">
+  <button class="tab-btn active" onclick="switchTab('week')">This Week</button>
+  <button class="tab-btn" onclick="switchTab('sbdb')">Close Approaches</button>
+  <button class="tab-btn" onclick="switchTab('sentry')">Sentry Watch</button>
+  <button class="tab-btn" onclick="switchTab('globe')">3D View</button>
+</nav>
+
+<div class="content">
+
+  <!-- ══════════════════════════════════
+       TAB 1 — THIS WEEK (NeoWs)
+  ══════════════════════════════════ -->
+  <section id="tab-week" class="tab-panel active">
+    <div class="stats-row">
+      <div class="stat-card">
+        <span class="stat-val" id="s-total">—</span>
+        <div class="stat-lbl">Asteroids This Week</div>
+      </div>
+      <div class="stat-card">
+        <span class="stat-val" id="s-haz" style="color: var(--red)">—</span>
+        <div class="stat-lbl">Potentially Hazardous</div>
+      </div>
+      <div class="stat-card">
+        <span class="stat-val" id="s-close">—</span>
+        <div class="stat-lbl">Closest Approach</div>
+      </div>
+      <div class="stat-card">
+        <span class="stat-val" id="s-fast">—</span>
+        <div class="stat-lbl">Fastest (km/s)</div>
+      </div>
+      <div class="stat-card">
+        <span class="stat-val" id="s-big">—</span>
+        <div class="stat-lbl">Largest (Est. Max)</div>
+      </div>
+    </div>
+
+    <div class="sec-hdr">
+      <span class="sec-title">Approaching Objects</span>
+      <span class="sec-meta" id="week-range"></span>
+    </div>
+    <div id="week-list" class="ast-grid">
+      <div class="loading">FETCHING ORBITAL DATA</div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════
+       TAB 2 — SBDB CLOSE APPROACHES
+  ══════════════════════════════════ -->
+  <section id="tab-sbdb" class="tab-panel">
+    <div class="sec-hdr">
+      <span class="sec-title">JPL SBDB — Upcoming Close Approaches</span>
+    </div>
+    <div class="filter-bar">
+      <select class="filter-select" id="dist-filter" onchange="loadSBDB()">
+        <option value="0.05">Within 0.05 AU</option>
+        <option value="0.1">Within 0.1 AU</option>
+        <option value="0.2" selected>Within 0.2 AU</option>
+        <option value="0.5">Within 0.5 AU</option>
+      </select>
+      <select class="filter-select" id="sort-filter" onchange="loadSBDB()">
+        <option value="dist">Sort: Distance</option>
+        <option value="date">Sort: Date</option>
+        <option value="v_rel">Sort: Velocity</option>
+        <option value="-h">Sort: Size (H mag)</option>
+      </select>
+    </div>
+    <div id="sbdb-table"><div class="loading">QUERYING JPL DATABASE</div></div>
+  </section>
+
+  <!-- ══════════════════════════════════
+       TAB 3 — SENTRY WATCH
+  ══════════════════════════════════ -->
+  <section id="tab-sentry" class="tab-panel">
+    <div class="stats-row">
+      <div class="stat-card">
+        <span class="stat-val" id="sn-count">—</span>
+        <div class="stat-lbl">Objects Monitored</div>
+      </div>
+      <div class="stat-card">
+        <span class="stat-val" id="sn-torino" style="color: var(--yellow)">—</span>
+        <div class="stat-lbl">Highest Torino Score</div>
+      </div>
+      <div class="stat-card">
+        <span class="stat-val" id="sn-ps">—</span>
+        <div class="stat-lbl">Highest Palermo Scale</div>
+      </div>
+      <div class="stat-card">
+        <span class="stat-val" id="sn-prob">—</span>
+        <div class="stat-lbl">Cumulative Impact Prob.</div>
+      </div>
+    </div>
+    <div class="sec-hdr">
+      <span class="sec-title">Impact Risk Objects — Ranked by Palermo Scale</span>
+      <span class="sec-meta">Top 50 shown</span>
+    </div>
+    <div id="sentry-table"><div class="loading">LOADING SENTRY DATA</div></div>
+  </section>
+
+  <!-- ══════════════════════════════════
+       TAB 4 — 3D GLOBE
+  ══════════════════════════════════ -->
+  <section id="tab-globe" class="tab-panel">
+    <div class="sec-hdr">
+      <span class="sec-title">3D View — This Week's Approaches</span>
+      <span class="sec-meta" style="color: var(--dim); font-size: 10px;">Altitude = miss distance · Moon ≈ 1 LD · 🔴 Hazardous · 🔵 Safe</span>
+    </div>
+    <div id="globe-wrap"></div>
+    <div id="globe-legend">
+      <span><span class="leg-dot" style="background:var(--red)"></span>Potentially Hazardous</span>
+      <span><span class="leg-dot" style="background:var(--cyan)"></span>Non-Hazardous</span>
+      <span><span class="leg-dot" style="background:#aaa"></span>Moon (1 LD reference)</span>
+    </div>
+  </section>
+
+</div><!-- /content -->
+
+<script src="https://unpkg.com/globe.gl@2.27.2/dist/globe.gl.min.js"></script>
+<script>
+// ─────────────────────────────────────────────────────────────────
+// CONSTANTS
+// ─────────────────────────────────────────────────────────────────
+const API_KEY = 'DEMO_KEY';
+const LD_KM   = 384400;    // 1 Lunar Distance in km
+const AU_KM   = 149597870.7;
+
+// ─────────────────────────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────────────────────────
+const fmt = d => d.toISOString().split('T')[0];
+
+function weekRange() {
+  const s = new Date();
+  const e = new Date(s); e.setDate(s.getDate() + 6);
+  return { start: fmt(s), end: fmt(e) };
+}
+
+const kmToLD  = km  => (parseFloat(km)  / LD_KM).toFixed(2);
+const auToLD  = au  => (parseFloat(au)  * AU_KM / LD_KM).toFixed(1);
+
+// ─────────────────────────────────────────────────────────────────
+// TABS
+// ─────────────────────────────────────────────────────────────────
+const loaded = {};
+
+function switchTab(id) {
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.classList.toggle('active', b.getAttribute('onclick').includes(`'${id}'`));
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => {
+    p.classList.toggle('active', p.id === 'tab-' + id);
+  });
+  if (!loaded[id]) {
+    loaded[id] = true;
+    if (id === 'sbdb')   loadSBDB();
+    if (id === 'sentry') loadSentry();
+    if (id === 'globe')  initGlobe();
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// TAB 1 — THIS WEEK (NeoWs)
+// ─────────────────────────────────────────────────────────────────
+let weekAsteroids = [];
+
+async function loadWeek() {
+  const { start, end } = weekRange();
+  document.getElementById('week-range').textContent = `${start} → ${end}`;
+  try {
+    const r = await fetch(
+      `https://api.nasa.gov/neo/rest/v1/feed?start_date=${start}&end_date=${end}&api_key=${API_KEY}`
+    );
+    const d = await r.json();
+    weekAsteroids = Object.values(d.near_earth_objects).flat();
+    weekAsteroids.sort((a, b) => {
+      const da = new Date(a.close_approach_data[0].close_approach_date);
+      const db = new Date(b.close_approach_data[0].close_approach_date);
+      return da - db;
+    });
+    renderWeekStats();
+    renderWeekCards();
+  } catch (e) {
+    document.getElementById('week-list').innerHTML =
+      `<div class="error">⚠ NeoWs fetch failed — ${e.message}</div>`;
+  }
+}
+
+function renderWeekStats() {
+  const all = weekAsteroids;
+  const haz = all.filter(a => a.is_potentially_hazardous_asteroid);
+  const minDist = Math.min(...all.map(a => parseFloat(a.close_approach_data[0].miss_distance.kilometers)));
+  const maxVel  = Math.max(...all.map(a => parseFloat(a.close_approach_data[0].relative_velocity.kilometers_per_second)));
+  const maxDiam = Math.max(...all.map(a => a.estimated_diameter.meters.estimated_diameter_max));
+
+  document.getElementById('s-total').textContent = all.length;
+  document.getElementById('s-haz').textContent   = haz.length;
+  document.getElementById('s-close').textContent = kmToLD(minDist) + ' LD';
+  document.getElementById('s-fast').textContent  = maxVel.toFixed(1);
+  document.getElementById('s-big').textContent   = Math.round(maxDiam) + ' m';
+}
+
+function renderWeekCards() {
+  if (!weekAsteroids.length) {
+    document.getElementById('week-list').innerHTML = '<div class="loading">NO DATA</div>';
+    return;
+  }
+  document.getElementById('week-list').innerHTML = weekAsteroids.map(a => {
+    const ca    = a.close_approach_data[0];
+    const distLD = kmToLD(ca.miss_distance.kilometers);
+    const vel   = parseFloat(ca.relative_velocity.kilometers_per_second).toFixed(2);
+    const dMin  = Math.round(a.estimated_diameter.meters.estimated_diameter_min);
+    const dMax  = Math.round(a.estimated_diameter.meters.estimated_diameter_max);
+    const haz   = a.is_potentially_hazardous_asteroid;
+    const pipW  = Math.min(dMax / 8, 100);
+    const distColor = parseFloat(distLD) < 5 ? 'var(--orange)' : 'var(--cyan)';
+
+    return `<div class="ast-card ${haz ? 'haz' : ''}">
+      <div>
+        <div class="ast-name">${a.name}${haz ? '<span class="haz-badge">⚠ HAZARDOUS</span>' : ''}</div>
+        <div class="ast-meta">
+          Approach: ${ca.close_approach_date} &nbsp;·&nbsp;
+          Size: ${dMin}–${dMax} m
+          <span class="size-pip" style="width:${pipW}px"></span>
+        </div>
+      </div>
+      <div class="ast-stats">
+        <div class="ast-stat">
+          <div class="ast-sv" style="color:${distColor}">${distLD} LD</div>
+          <div class="ast-sl">Miss Dist.</div>
+        </div>
+        <div class="ast-stat">
+          <div class="ast-sv">${vel} km/s</div>
+          <div class="ast-sl">Velocity</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ─────────────────────────────────────────────────────────────────
+// TAB 2 — SBDB CLOSE APPROACHES
+// ─────────────────────────────────────────────────────────────────
+async function loadSBDB() {
+  document.getElementById('sbdb-table').innerHTML = '<div class="loading">QUERYING JPL DATABASE</div>';
+  const distMax = document.getElementById('dist-filter').value;
+  const sort    = document.getElementById('sort-filter').value;
+  const today   = fmt(new Date());
+
+  try {
+    const r = await fetch(
+      `https://ssd-api.jpl.nasa.gov/cad.api?dist-max=${distMax}&date-min=${today}&sort=${sort}&limit=150&fullname=true`
+    );
+    const d = await r.json();
+    renderSBDB(d.data || [], d.fields || []);
+  } catch (e) {
+    document.getElementById('sbdb-table').innerHTML =
+      `<div class="error">⚠ SBDB fetch failed — ${e.message}</div>`;
+  }
+}
+
+function renderSBDB(rows, fields) {
+  if (!rows.length) {
+    document.getElementById('sbdb-table').innerHTML = '<div class="loading">NO RESULTS</div>';
+    return;
+  }
+  // SBDB fields: des, orbit_id, jd, cd, dist, dist_min, dist_max, v_rel, v_inf, t_sigma_f, h
+  document.getElementById('sbdb-table').innerHTML = `
+    <div class="tbl-wrap">
+    <table>
+      <thead><tr>
+        <th>Object</th>
+        <th>Date (UTC)</th>
+        <th>Distance (AU)</th>
+        <th>Distance (LD)</th>
+        <th>Velocity (km/s)</th>
+        <th>H (abs mag)</th>
+        <th>±σ</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map(r => {
+          const dist = parseFloat(r[4]);
+          const ld   = auToLD(r[4]);
+          const vrel = isNaN(parseFloat(r[7])) ? '—' : parseFloat(r[7]).toFixed(2);
+          const h    = r[10] ?? '—';
+          const sig  = r[9]  ?? '—';
+          const close = parseFloat(ld) < 5;
+          return `<tr>
+            <td style="font-weight:bold;color:${close ? 'var(--orange)' : 'var(--text)'}">${r[0]}</td>
+            <td style="color:var(--dim)">${r[3]}</td>
+            <td>${dist.toFixed(5)}</td>
+            <td style="color:${close ? 'var(--orange)' : 'var(--cyan)'}">${ld} LD</td>
+            <td>${vrel} km/s</td>
+            <td>${h}</td>
+            <td style="color:var(--dim)">${sig}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    </div>`;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// TAB 3 — SENTRY WATCH
+// ─────────────────────────────────────────────────────────────────
+async function loadSentry() {
+  try {
+    const r = await fetch('https://ssd-api.jpl.nasa.gov/sentry.api?all=1');
+    const d = await r.json();
+    const objs = (d.data || []).slice().sort(
+      (a, b) => parseFloat(b.ps_max) - parseFloat(a.ps_max)
+    );
+
+    // Stats
+    document.getElementById('sn-count').textContent = d.count ?? objs.length;
+    const maxTorino = objs.reduce((m, o) => Math.max(m, parseInt(o.ts_max ?? 0)), 0);
+    document.getElementById('sn-torino').textContent = maxTorino;
+    const maxPS = objs.length ? parseFloat(objs[0].ps_max).toFixed(2) : '—';
+    document.getElementById('sn-ps').textContent = maxPS;
+    const cumIP = objs.reduce((s, o) => s + parseFloat(o.ip ?? 0), 0);
+    document.getElementById('sn-prob').textContent = (cumIP * 100).toExponential(2) + '%';
+
+    renderSentry(objs.slice(0, 50));
+  } catch (e) {
+    document.getElementById('sentry-table').innerHTML =
+      `<div class="error">⚠ Sentry fetch failed — ${e.message}</div>`;
+  }
+}
+
+function renderSentry(objs) {
+  document.getElementById('sentry-table').innerHTML = `
+    <div class="tbl-wrap">
+    <table>
+      <thead><tr>
+        <th>Object</th>
+        <th>Year Range</th>
+        <th># Impacts</th>
+        <th>Impact Prob.</th>
+        <th>Palermo Scale</th>
+        <th>Torino</th>
+        <th>Size (m)</th>
+        <th>Risk Meter</th>
+      </tr></thead>
+      <tbody>
+        ${objs.map(o => {
+          const ps   = parseFloat(o.ps_max);
+          const ip   = parseFloat(o.ip ?? 0);
+          const ts   = parseInt(o.ts_max ?? 0);
+          const diam = o.diameter ? (parseFloat(o.diameter) * 1000).toFixed(0) + ' m' : '—';
+          // Normalise Palermo -10..0 → 0..100%
+          const riskPct = Math.min(Math.max((ps + 10) / 10 * 100, 1), 100).toFixed(0);
+          const psColor = ps > -2 ? 'var(--orange)' : 'var(--dim)';
+
+          return `<tr>
+            <td style="font-weight:bold">${o.des}</td>
+            <td style="color:var(--dim)">${o.range ?? '—'}</td>
+            <td>${o.n_imp ?? '—'}</td>
+            <td>${(ip * 100).toExponential(2)}%</td>
+            <td style="color:${psColor}">${ps.toFixed(2)}</td>
+            <td class="t${ts}">${ts}</td>
+            <td>${diam}</td>
+            <td>
+              <div class="risk-track">
+                <div class="risk-fill" style="width:${riskPct}%"></div>
+              </div>
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    </div>`;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// TAB 4 — GLOBE (globe.gl)
+// ─────────────────────────────────────────────────────────────────
+function initGlobe() {
+  const wrap = document.getElementById('globe-wrap');
+
+  // Wait for weekAsteroids if not yet loaded
+  if (!weekAsteroids.length) {
+    wrap.innerHTML = '<div class="loading">WAITING FOR ORBITAL DATA</div>';
+    const wait = setInterval(() => {
+      if (weekAsteroids.length) { clearInterval(wait); buildGlobe(wrap); }
+    }, 500);
+    return;
+  }
+  buildGlobe(wrap);
+}
+
+function buildGlobe(wrap) {
+  wrap.innerHTML = '';
+
+  if (typeof Globe === 'undefined') {
+    wrap.innerHTML = '<div class="error">⚠ globe.gl failed to load — check network connection</div>';
+    return;
+  }
+
+  // Build points: spread around globe, altitude = miss distance (LD units, scaled)
+  const points = weekAsteroids.map((a, i) => {
+    const total = weekAsteroids.length;
+    const distLD = parseFloat(kmToLD(a.close_approach_data[0].miss_distance.kilometers));
+    const lat = ((i / total) * 140) - 70;
+    const lng = ((i / total) * 360) - 180;
+    return {
+      lat, lng,
+      alt: Math.min(distLD / 40, 2.5),       // scaled altitude
+      size: Math.min(a.estimated_diameter.meters.estimated_diameter_max / 150 + 0.2, 3),
+      color: a.is_potentially_hazardous_asteroid ? '#ff2244' : '#00d4ff',
+      label: `${a.name}\nDist: ${distLD} LD\nApproach: ${a.close_approach_data[0].close_approach_date}`,
+    };
+  });
+
+  // Moon reference
+  points.push({ lat: 23, lng: 45, alt: 1 / 40, size: 2, color: '#aaaaaa', label: 'Moon\n1 LD = 384,400 km' });
+
+  Globe({ animateIn: true })(wrap)
+    .globeImageUrl('//unpkg.com/three-globe/example/img/earth-dark.jpg')
+    .bumpImageUrl('//unpkg.com/three-globe/example/img/earth-topology.png')
+    .backgroundImageUrl('//unpkg.com/three-globe/example/img/night-sky.png')
+    .pointsData(points)
+    .pointLat('lat')
+    .pointLng('lng')
+    .pointAltitude('alt')
+    .pointColor('color')
+    .pointRadius('size')
+    .pointLabel('label')
+    .width(wrap.clientWidth)
+    .height(520);
+}
+
+// ─────────────────────────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────────────────────────
+loaded['week'] = true;
+loadWeek();
+</script>
+
+</body>
+</html>
