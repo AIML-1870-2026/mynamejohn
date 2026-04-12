@@ -303,6 +303,7 @@
       <div style="font-size:9px;color:var(--dim);letter-spacing:2px;text-transform:uppercase;">Output</div>
       <div class="action-row">
         <button class="action-btn" onclick="togglePromptPreview()">Show Prompt</button>
+        <button class="action-btn" onclick="testConnection()">Test Key</button>
         <button class="action-btn" id="copy-btn" onclick="copyReview()" style="display:none;">Copy Markdown</button>
         <button class="action-btn" id="regen-btn" onclick="generate()" style="display:none;">Regenerate</button>
         <button class="action-btn" id="analyze-btn" onclick="analyzeSentiment()" style="display:none;">Analyze Sentiment</button>
@@ -428,6 +429,26 @@
     else setStar(2);
   }
 
+  // ── Test Connection ────────────────────────────────────────────────────────
+  async function testConnection() {
+    const key = apiKey || document.getElementById('key-input').value.trim();
+    if (!key) { showToast('Set your API key first', true); return; }
+    const body = document.getElementById('output-body');
+    body.className = 'output-body';
+    body.innerHTML = '<div style="color:var(--dim);font-size:11px;padding:8px 0;">Testing connection...</div>';
+    try {
+      const resp = await fetch('https://api.openai.com/v1/models', {
+        headers: { 'Authorization': 'Bearer ' + key }
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error?.message || `HTTP ${resp.status}`);
+      const models = data.data?.map(m => m.id).filter(id => id.startsWith('gpt')).slice(0, 5).join(', ');
+      body.innerHTML = `<div style="color:var(--green);font-size:12px;padding:8px 0;">Connection OK — models available: ${escapeHtml(models)}</div>`;
+    } catch (err) {
+      body.innerHTML = `<div class="error-box">Connection failed: ${escapeHtml(err.message)}</div>`;
+    }
+  }
+
   // ── Aspect Checkboxes ──────────────────────────────────────────────────────
   function toggleAspect(cb) {
     cb.closest('.aspect-item').classList.toggle('checked', cb.checked);
@@ -520,10 +541,7 @@ Opening paragraph about first impressions.
 
     const body = document.getElementById('output-body');
     body.className = 'output-body';
-    const streamPre = document.createElement('div');
-    streamPre.className = 'stream-pre cursor-blink';
-    body.innerHTML = '';
-    body.appendChild(streamPre);
+    body.innerHTML = '<div class="stream-pre cursor-blink" style="padding:8px 0;">Generating...</div>';
 
     try {
       const resp = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -534,41 +552,17 @@ Opening paragraph about first impressions.
         },
         body: JSON.stringify({
           model,
-          stream: true,
-          stream_options: { include_usage: true },
           messages: [{ role: 'user', content: prompt }]
         })
       });
 
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}));
-        throw new Error(err.error?.message || `HTTP ${resp.status}`);
-      }
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error?.message || `HTTP ${resp.status}`);
 
-      const reader = resp.body.getReader();
-      const decoder = new TextDecoder();
-      let usage = null;
+      currentReview = data.choices[0].message.content;
+      const usage = data.usage;
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        for (const line of chunk.split('\n')) {
-          const trimmed = line.replace(/^data: /, '').trim();
-          if (!trimmed || trimmed === '[DONE]') continue;
-          try {
-            const json = JSON.parse(trimmed);
-            const delta = json.choices?.[0]?.delta?.content;
-            if (delta) {
-              currentReview += delta;
-              streamPre.textContent = currentReview;
-            }
-            if (json.usage) usage = json.usage;
-          } catch {}
-        }
-      }
-
-      // Final render — swap raw stream text for formatted markdown
+      // Render
       body.className = 'output-body md-rendered';
       const starsHtml = '★'.repeat(starRating) + '☆'.repeat(5 - starRating);
       body.innerHTML = `<div class="review-stars" style="color:var(--yellow);margin-bottom:12px;">${starsHtml}</div>` + marked.parse(currentReview);
