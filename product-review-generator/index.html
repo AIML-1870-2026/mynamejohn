@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Product Review Generator</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    :root {
+      --bg: #07070f;
+      --surface: #0d0d1c;
+      --surface2: #131326;
+      --border: #1a1a38;
+      --text: #dde0f5;
+      --dim: #555580;
+      --cyan: #00d4ff;
+      --orange: #ff7a00;
+      --red: #ff2244;
+      --green: #00e87a;
+      --yellow: #ffd700;
+      --purple: #b388ff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Courier New', monospace; min-height: 100vh; padding-bottom: 80px; }
+
+    /* HEADER */
+    header { background: linear-gradient(180deg,#0a0a22 0%,var(--bg) 100%); border-bottom: 1px solid var(--border); padding: 18px 32px; display: flex; align-items: center; gap: 14px; }
+    .hdr-icon { font-size: 28px; }
+    .hdr-title { font-size: 17px; font-weight: bold; color: var(--cyan); letter-spacing: 3px; text-transform: uppercase; }
+    .hdr-sub { font-size: 10px; color: var(--dim); letter-spacing: 2px; margin-top: 3px; }
+
+    /* LAYOUT */
+    .main { padding: 24px 32px; max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: 360px 1fr; gap: 20px; }
+    @media(max-width:900px) { .main { grid-template-columns: 1fr; padding: 14px; } }
+
+    /* KEY BAR */
+    .key-bar { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 20px; margin: 16px 32px; display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+    @media(max-width:900px) { .key-bar { margin: 10px 14px; } }
+    .key-group { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 260px; }
+    .key-label { font-size: 10px; color: var(--dim); letter-spacing: 2px; white-space: nowrap; }
+    .key-input { flex: 1; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 7px 12px; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 12px; outline: none; }
+    .key-input:focus { border-color: var(--cyan); }
+    .key-status { font-size: 10px; padding: 3px 8px; border-radius: 10px; white-space: nowrap; }
+    .key-status.set { background: rgba(0,232,122,.15); color: var(--green); border: 1px solid rgba(0,232,122,.3); }
+    .key-status.unset { background: rgba(85,85,128,.1); color: var(--dim); border: 1px solid var(--border); }
+    .btn-sm { background: none; border: 1px solid var(--border); color: var(--dim); padding: 5px 10px; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 10px; cursor: pointer; letter-spacing: 1px; transition: all .2s; }
+    .btn-sm:hover { border-color: var(--cyan); color: var(--cyan); }
+    .file-label { background: none; border: 1px solid var(--border); color: var(--dim); padding: 5px 10px; border-radius: 4px; font-size: 10px; cursor: pointer; letter-spacing: 1px; transition: all .2s; white-space: nowrap; }
+    .file-label:hover { border-color: var(--cyan); color: var(--cyan); }
+
+    /* PANEL */
+    .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 18px; }
+    .panel-title { font-size: 9px; letter-spacing: 3px; text-transform: uppercase; color: var(--dim); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+    .panel-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+    .field { margin-bottom: 14px; }
+    .field-label { font-size: 9px; color: var(--dim); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px; display: block; }
+    input[type="text"], textarea, select { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 6px; font-family: 'Courier New', monospace; font-size: 12px; outline: none; }
+    input[type="text"]:focus, textarea:focus, select:focus { border-color: var(--cyan); }
+    textarea { resize: vertical; line-height: 1.6; }
+    select { cursor: pointer; }
+    select option { background: var(--surface2); }
+
+    /* STAR RATING */
+    .stars-row { display: flex; gap: 6px; margin-bottom: 14px; }
+    .star { font-size: 22px; cursor: pointer; color: var(--border); transition: color .15s; user-select: none; }
+    .star.lit { color: var(--yellow); }
+    .star:hover { color: var(--yellow); }
+
+    /* ASPECT CHECKBOXES */
+    .aspects-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .aspect-item { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--dim); cursor: pointer; padding: 5px 8px; border: 1px solid var(--border); border-radius: 4px; transition: all .15s; }
+    .aspect-item:hover { border-color: var(--cyan); color: var(--text); }
+    .aspect-item.checked { border-color: var(--cyan); color: var(--cyan); background: rgba(0,212,255,.07); }
+    .aspect-item input { display: none; }
+
+    /* CONTROLS ROW */
+    .ctrl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+    /* GENERATE BUTTON */
+    .gen-btn { width: 100%; background: var(--cyan); color: #000; border: none; padding: 13px; border-radius: 6px; font-family: 'Courier New', monospace; font-size: 13px; font-weight: bold; letter-spacing: 3px; cursor: pointer; text-transform: uppercase; transition: opacity .2s; margin-top: 6px; }
+    .gen-btn:hover { opacity: .85; }
+    .gen-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+    /* OUTPUT PANEL */
+    .output-panel { display: flex; flex-direction: column; gap: 14px; }
+    .output-hdr { display: flex; align-items: center; justify-content: space-between; }
+    .output-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; min-height: 200px; overflow: hidden; flex: 1; }
+    .output-topbar { padding: 10px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; font-size: 10px; color: var(--dim); letter-spacing: 2px; }
+    .output-body { padding: 20px; font-size: 13px; line-height: 1.8; }
+    .output-body.streaming { min-height: 120px; }
+    .cursor-blink::after { content: '▋'; animation: blink .7s infinite; color: var(--cyan); font-size: 14px; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+    .output-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 240px; color: var(--dim); font-size: 11px; letter-spacing: 2px; gap: 10px; }
+    .output-empty .icon { font-size: 40px; opacity: .3; }
+
+    /* MARKDOWN STYLES inside output */
+    .md-rendered h1, .md-rendered h2, .md-rendered h3 { color: var(--cyan); margin: 0 0 10px; letter-spacing: 1px; }
+    .md-rendered h3 { font-size: 14px; }
+    .md-rendered p { margin-bottom: 10px; }
+    .md-rendered ul, .md-rendered ol { padding-left: 20px; margin-bottom: 10px; }
+    .md-rendered li { margin-bottom: 4px; }
+    .md-rendered strong { color: var(--text); }
+    .md-rendered em { color: var(--purple); }
+    .md-rendered code { background: var(--surface2); padding: 2px 6px; border-radius: 3px; color: var(--green); font-size: 11px; }
+    .md-rendered hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+
+    /* STARS DISPLAY */
+    .review-stars { font-size: 20px; letter-spacing: 2px; margin-bottom: 6px; }
+
+    /* METRICS ROW */
+    .metrics-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .metric-pill { background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 4px 10px; font-size: 10px; color: var(--dim); letter-spacing: 1px; }
+    .metric-pill span { color: var(--text); }
+
+    /* SENTIMENT PANEL */
+    .sentiment-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+    .sentiment-panel .panel-title { margin-bottom: 12px; }
+    .aspect-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 11px; }
+    .aspect-bar-label { width: 130px; color: var(--dim); flex-shrink: 0; }
+    .aspect-bar-track { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+    .aspect-bar-fill { height: 100%; background: var(--cyan); border-radius: 3px; transition: width .5s; }
+    .aspect-bar-val { width: 28px; text-align: right; color: var(--text); }
+    .sentiment-badge { display: inline-block; padding: 3px 10px; border-radius: 10px; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; margin-right: 8px; }
+    .badge-positive { background: rgba(0,232,122,.15); color: var(--green); border: 1px solid rgba(0,232,122,.3); }
+    .badge-negative { background: rgba(255,34,68,.15); color: var(--red); border: 1px solid rgba(255,34,68,.3); }
+    .badge-neutral  { background: rgba(85,85,128,.15); color: var(--dim); border: 1px solid var(--border); }
+    .key-phrases { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .phrase-tag { background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 3px 10px; font-size: 10px; color: var(--dim); }
+
+    /* PROMPT PREVIEW */
+    .prompt-preview { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 12px; font-size: 11px; color: var(--dim); line-height: 1.7; white-space: pre-wrap; display: none; }
+    .prompt-preview.open { display: block; }
+
+    /* ACTION BUTTONS ROW */
+    .action-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .action-btn { background: none; border: 1px solid var(--border); color: var(--dim); padding: 7px 14px; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 11px; cursor: pointer; letter-spacing: 1px; transition: all .2s; }
+    .action-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+
+    /* FTC BANNER */
+    .ftc-banner { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(255,122,0,.12); border-top: 1px solid rgba(255,122,0,.35); padding: 10px 32px; font-size: 10px; color: var(--orange); letter-spacing: 1px; line-height: 1.6; z-index: 100; }
+    .ftc-banner strong { color: #ffaa44; }
+
+    /* ERROR */
+    .error-box { background: rgba(255,34,68,.1); border: 1px solid rgba(255,34,68,.3); border-radius: 6px; padding: 12px 16px; font-size: 12px; color: var(--red); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="hdr-icon">⭐</div>
+  <div>
+    <div class="hdr-title">Product Review Generator</div>
+    <div class="hdr-sub">OpenAI · LLM-Powered · Educational Demo</div>
+  </div>
+</header>
+
+<!-- KEY BAR -->
+<div class="key-bar">
+  <span style="font-size:10px;color:var(--dim);letter-spacing:2px;white-space:nowrap">API KEY:</span>
+  <div class="key-group">
+    <span class="key-label">OPENAI</span>
+    <input class="key-input" id="key-input" type="password" placeholder="sk-..." oninput="updateKeyStatus()">
+    <button class="btn-sm" onclick="setKey()">Set</button>
+    <button class="btn-sm" onclick="clearKey()">Clear</button>
+    <span class="key-status unset" id="key-status">NOT SET</span>
+  </div>
+  <label class="file-label">
+    📂 Load .env
+    <input type="file" accept=".env,.txt,.csv" style="display:none" onchange="loadEnvFile(event)">
+  </label>
+</div>
+
+<div class="main">
+
+  <!-- LEFT COLUMN: CONFIG -->
+  <div style="display:flex;flex-direction:column;gap:14px;">
+
+    <!-- PRODUCT INFO -->
+    <div class="panel">
+      <div class="panel-title">Product Info</div>
+
+      <div class="field">
+        <label class="field-label">Product Name *</label>
+        <input type="text" id="product-name" placeholder="e.g. Sony WH-1000XM5">
+      </div>
+
+      <div class="field">
+        <label class="field-label">Category</label>
+        <select id="product-category">
+          <option>Electronics</option>
+          <option>Clothing & Apparel</option>
+          <option>Food & Beverage</option>
+          <option>Home & Kitchen</option>
+          <option>Sports & Outdoors</option>
+          <option>Beauty & Personal Care</option>
+          <option>Books & Media</option>
+          <option>Software & Apps</option>
+          <option>Other</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Description / Features</label>
+        <textarea id="product-desc" rows="4" placeholder="Key features, specs, price range, what makes it notable..."></textarea>
+      </div>
+    </div>
+
+    <!-- REVIEW SETTINGS -->
+    <div class="panel">
+      <div class="panel-title">Review Settings</div>
+
+      <div class="field">
+        <label class="field-label">Star Rating</label>
+        <div class="stars-row" id="stars-row">
+          <span class="star lit" data-val="1" onclick="setStar(1)">★</span>
+          <span class="star lit" data-val="2" onclick="setStar(2)">★</span>
+          <span class="star lit" data-val="3" onclick="setStar(3)">★</span>
+          <span class="star lit" data-val="4" onclick="setStar(4)">★</span>
+          <span class="star" data-val="5" onclick="setStar(5)">★</span>
+        </div>
+        <div id="star-label" style="font-size:10px;color:var(--dim);letter-spacing:1px;">4 / 5 — Good</div>
+      </div>
+
+      <div class="ctrl-grid" style="margin-bottom:14px;">
+        <div class="field" style="margin:0;">
+          <label class="field-label">Model</label>
+          <select id="model-select">
+            <option value="gpt-4o">gpt-4o</option>
+            <option value="gpt-4o-mini" selected>gpt-4o-mini</option>
+            <option value="gpt-4-turbo">gpt-4-turbo</option>
+            <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
+          </select>
+        </div>
+        <div class="field" style="margin:0;">
+          <label class="field-label">Tone</label>
+          <select id="tone-select">
+            <option>Casual</option>
+            <option>Professional</option>
+            <option>Expert</option>
+            <option>Enthusiast</option>
+            <option>Skeptical</option>
+          </select>
+        </div>
+        <div class="field" style="margin:0;">
+          <label class="field-label">Sentiment</label>
+          <select id="sentiment-select" onchange="syncSentimentToStars()">
+            <option value="positive">Positive (4–5★)</option>
+            <option value="balanced">Balanced (3★)</option>
+            <option value="critical">Critical (1–2★)</option>
+          </select>
+        </div>
+        <div class="field" style="margin:0;">
+          <label class="field-label">Length</label>
+          <select id="length-select">
+            <option value="short">Short (~100 words)</option>
+            <option value="medium" selected>Medium (~250 words)</option>
+            <option value="long">Long (~500 words)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Aspect Focus</label>
+        <div class="aspects-grid" id="aspects-grid">
+          <label class="aspect-item checked">
+            <input type="checkbox" value="Build Quality / Durability" checked onchange="toggleAspect(this)"> Build Quality
+          </label>
+          <label class="aspect-item checked">
+            <input type="checkbox" value="Value for Money" checked onchange="toggleAspect(this)"> Value for Money
+          </label>
+          <label class="aspect-item checked">
+            <input type="checkbox" value="Performance / Speed" checked onchange="toggleAspect(this)"> Performance
+          </label>
+          <label class="aspect-item">
+            <input type="checkbox" value="Design & Aesthetics" onchange="toggleAspect(this)"> Design
+          </label>
+          <label class="aspect-item">
+            <input type="checkbox" value="Ease of Use" onchange="toggleAspect(this)"> Ease of Use
+          </label>
+          <label class="aspect-item">
+            <input type="checkbox" value="Customer Support" onchange="toggleAspect(this)"> Customer Support
+          </label>
+          <label class="aspect-item">
+            <input type="checkbox" value="Packaging & Delivery" onchange="toggleAspect(this)"> Packaging
+          </label>
+          <label class="aspect-item">
+            <input type="checkbox" value="Compatibility" onchange="toggleAspect(this)"> Compatibility
+          </label>
+        </div>
+      </div>
+
+      <button class="gen-btn" id="gen-btn" onclick="generate()">Generate Review</button>
+    </div>
+
+  </div>
+
+  <!-- RIGHT COLUMN: OUTPUT -->
+  <div class="output-panel">
+
+    <!-- PROMPT PREVIEW -->
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+      <div style="font-size:9px;color:var(--dim);letter-spacing:2px;text-transform:uppercase;">Output</div>
+      <div class="action-row">
+        <button class="action-btn" onclick="togglePromptPreview()">Show Prompt</button>
+        <button class="action-btn" id="copy-btn" onclick="copyReview()" style="display:none;">Copy Markdown</button>
+        <button class="action-btn" id="regen-btn" onclick="generate()" style="display:none;">Regenerate</button>
+        <button class="action-btn" id="analyze-btn" onclick="analyzeSentiment()" style="display:none;">Analyze Sentiment</button>
+      </div>
+    </div>
+
+    <div id="prompt-preview" class="prompt-preview"></div>
+
+    <!-- REVIEW OUTPUT BOX -->
+    <div class="output-box">
+      <div class="output-topbar">
+        <span id="output-model-label">—</span>
+        <div class="metrics-row" id="metrics-row"></div>
+      </div>
+      <div class="output-body" id="output-body">
+        <div class="output-empty">
+          <div class="icon">📝</div>
+          <div>Configure a product and click Generate</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SENTIMENT ANALYSIS PANEL -->
+    <div class="sentiment-panel" id="sentiment-panel" style="display:none;">
+      <div class="panel-title">Sentiment Analysis</div>
+      <div id="sentiment-body"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- FTC BANNER -->
+<div class="ftc-banner">
+  <strong>Educational Tool Only.</strong> The FTC banned fake AI-generated reviews (Oct 2024) — penalties up to $51,744 per violation. Generated content is for learning and demonstration purposes only. Do not publish as genuine reviews.
+</div>
+
+<script>
+  // ── State ──────────────────────────────────────────────────────────────────
+  let apiKey = '';
+  let starRating = 4;
+  let currentReview = '';
+  let generating = false;
+
+  const STAR_LABELS = { 1: '1 / 5 — Poor', 2: '2 / 5 — Below Average', 3: '3 / 5 — Average', 4: '4 / 5 — Good', 5: '5 / 5 — Excellent' };
+  const LENGTH_WORDS = { short: '~100 words', medium: '~250 words', long: '~500 words' };
+
+  // ── Key Management ─────────────────────────────────────────────────────────
+  function setKey() {
+    const val = document.getElementById('key-input').value.trim();
+    if (!val) return;
+    apiKey = val;
+    document.getElementById('key-input').value = '';
+    updateKeyStatus();
+  }
+
+  function clearKey() {
+    apiKey = '';
+    document.getElementById('key-input').value = '';
+    updateKeyStatus();
+  }
+
+  function updateKeyStatus() {
+    const live = document.getElementById('key-input').value.trim();
+    const active = apiKey || live;
+    const el = document.getElementById('key-status');
+    el.textContent = active ? 'SET' : 'NOT SET';
+    el.className = 'key-status ' + (active ? 'set' : 'unset');
+  }
+
+  function loadEnvFile(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const text = ev.target.result;
+      const match = text.match(/OPENAI_API_KEY=([^\s\n]+)/);
+      if (match) {
+        apiKey = match[1].trim();
+        updateKeyStatus();
+        showToast('OpenAI key loaded from file');
+      } else {
+        showToast('No OPENAI_API_KEY found in file', true);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  }
+
+  window.addEventListener('beforeunload', () => { apiKey = ''; });
+
+  // ── Star Rating ────────────────────────────────────────────────────────────
+  function setStar(n) {
+    starRating = n;
+    document.querySelectorAll('.star').forEach((s, i) => {
+      s.classList.toggle('lit', i < n);
+    });
+    document.getElementById('star-label').textContent = STAR_LABELS[n];
+    // sync sentiment dropdown
+    const sent = document.getElementById('sentiment-select');
+    if (n >= 4) sent.value = 'positive';
+    else if (n === 3) sent.value = 'balanced';
+    else sent.value = 'critical';
+  }
+
+  function syncSentimentToStars() {
+    const v = document.getElementById('sentiment-select').value;
+    if (v === 'positive') setStar(5);
+    else if (v === 'balanced') setStar(3);
+    else setStar(2);
+  }
+
+  // ── Aspect Checkboxes ──────────────────────────────────────────────────────
+  function toggleAspect(cb) {
+    cb.closest('.aspect-item').classList.toggle('checked', cb.checked);
+  }
+
+  function getSelectedAspects() {
+    return [...document.querySelectorAll('#aspects-grid input:checked')].map(i => i.value);
+  }
+
+  // ── Prompt Builder ─────────────────────────────────────────────────────────
+  function buildPrompt() {
+    const name = document.getElementById('product-name').value.trim() || 'the product';
+    const cat  = document.getElementById('product-category').value;
+    const desc = document.getElementById('product-desc').value.trim();
+    const tone = document.getElementById('tone-select').value;
+    const sent = document.getElementById('sentiment-select').value;
+    const len  = document.getElementById('length-select').value;
+    const aspects = getSelectedAspects();
+
+    const systemPrompt =
+`You are writing a product review for a consumer website. Write in an authentic, human voice.
+
+Product: ${name}
+Category: ${cat}${desc ? '\nDescription: ' + desc : ''}
+
+Instructions:
+- Tone: ${tone}
+- Overall sentiment: ${sent}
+- Target star rating: ${starRating}/5
+- Approximate length: ${LENGTH_WORDS[len]}
+${aspects.length ? '- Address these aspects: ' + aspects.join(', ') : ''}
+
+Format the review using markdown:
+### [Catchy headline here]
+
+Opening paragraph about first impressions.
+
+**Pros:**
+- ...
+
+**Cons:**
+- ...
+
+**Verdict:** closing sentence.`;
+
+    return systemPrompt;
+  }
+
+  // ── Prompt Preview ─────────────────────────────────────────────────────────
+  function togglePromptPreview() {
+    const el = document.getElementById('prompt-preview');
+    const btn = document.querySelector('.action-btn[onclick="togglePromptPreview()"]');
+    if (el.classList.toggle('open')) {
+      el.textContent = buildPrompt();
+      btn.textContent = 'Hide Prompt';
+    } else {
+      btn.textContent = 'Show Prompt';
+    }
+  }
+
+  // ── Generate ───────────────────────────────────────────────────────────────
+  async function generate() {
+    const key = apiKey || document.getElementById('key-input').value.trim();
+    if (!key) { showError('Enter your OpenAI API key first.'); return; }
+    if (!document.getElementById('product-name').value.trim()) { showError('Enter a product name.'); return; }
+    if (generating) return;
+
+    generating = true;
+    currentReview = '';
+    const model = document.getElementById('model-select').value;
+    const prompt = buildPrompt();
+    const t0 = Date.now();
+
+    document.getElementById('gen-btn').disabled = true;
+    document.getElementById('copy-btn').style.display = 'none';
+    document.getElementById('regen-btn').style.display = 'none';
+    document.getElementById('analyze-btn').style.display = 'none';
+    document.getElementById('sentiment-panel').style.display = 'none';
+    document.getElementById('output-model-label').textContent = model;
+    document.getElementById('metrics-row').innerHTML = '';
+
+    const body = document.getElementById('output-body');
+    body.innerHTML = '';
+    body.className = 'output-body streaming cursor-blink';
+
+    try {
+      const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + key,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model,
+          stream: true,
+          messages: [{ role: 'user', content: prompt }]
+        })
+      });
+
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.error?.message || `HTTP ${resp.status}`);
+      }
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let usage = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        for (const line of chunk.split('\n')) {
+          const trimmed = line.replace(/^data: /, '').trim();
+          if (!trimmed || trimmed === '[DONE]') continue;
+          try {
+            const json = JSON.parse(trimmed);
+            const delta = json.choices?.[0]?.delta?.content;
+            if (delta) {
+              currentReview += delta;
+              body.innerHTML = marked.parse(currentReview);
+              body.classList.add('cursor-blink');
+            }
+            if (json.usage) usage = json.usage;
+          } catch {}
+        }
+      }
+
+      // Final render
+      body.className = 'output-body md-rendered';
+      const starsHtml = '★'.repeat(starRating) + '☆'.repeat(5 - starRating);
+      body.innerHTML = `<div class="review-stars" style="color:var(--yellow);margin-bottom:12px;">${starsHtml}</div>` + marked.parse(currentReview);
+
+      // Metrics
+      const elapsed = Date.now() - t0;
+      const pills = [`<div class="metric-pill">⏱ <span>${elapsed}ms</span></div>`];
+      if (usage) {
+        pills.push(`<div class="metric-pill">tokens <span>${usage.total_tokens}</span></div>`);
+        pills.push(`<div class="metric-pill">in <span>${usage.prompt_tokens}</span> / out <span>${usage.completion_tokens}</span></div>`);
+      }
+      document.getElementById('metrics-row').innerHTML = pills.join('');
+
+      document.getElementById('copy-btn').style.display = '';
+      document.getElementById('regen-btn').style.display = '';
+      document.getElementById('analyze-btn').style.display = '';
+
+    } catch (err) {
+      body.className = 'output-body';
+      body.innerHTML = `<div class="error-box">Error: ${escapeHtml(err.message)}</div>`;
+    } finally {
+      generating = false;
+      document.getElementById('gen-btn').disabled = false;
+    }
+  }
+
+  // ── Sentiment Analysis ─────────────────────────────────────────────────────
+  async function analyzeSentiment() {
+    if (!currentReview) return;
+    const key = apiKey || document.getElementById('key-input').value.trim();
+    if (!key) { showError('Enter your OpenAI API key first.'); return; }
+
+    const panel = document.getElementById('sentiment-panel');
+    const body  = document.getElementById('sentiment-body');
+    panel.style.display = 'block';
+    body.innerHTML = '<div style="color:var(--dim);font-size:11px;padding:8px 0;">Analyzing...</div>';
+    document.getElementById('analyze-btn').disabled = true;
+
+    const aspects = getSelectedAspects();
+    const schemaAspects = aspects.reduce((acc, a) => { acc[a.split(' ')[0].toLowerCase()] = { type: 'number', description: 'Score 1-5' }; return acc; }, {});
+
+    const analysisPrompt = `Analyze the following product review and return JSON only, no prose.
+
+Review:
+"""
+${currentReview}
+"""
+
+Return this exact JSON structure:
+{
+  "overall_sentiment": "positive" | "negative" | "neutral",
+  "confidence": <0.0 to 1.0>,
+  "star_estimate": <1 to 5>,
+  "aspect_scores": {
+    ${aspects.map(a => `"${a}": <score 1.0-5.0 or null if not mentioned>`).join(',\n    ')}
+  },
+  "key_phrases": [<3-6 notable phrases from the review>]
+}`;
+
+    try {
+      const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: document.getElementById('model-select').value,
+          response_format: { type: 'json_object' },
+          messages: [{ role: 'user', content: analysisPrompt }]
+        })
+      });
+
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error?.message || `HTTP ${resp.status}`);
+
+      const result = JSON.parse(data.choices[0].message.content);
+      renderSentimentPanel(result);
+    } catch (err) {
+      body.innerHTML = `<div class="error-box">Analysis failed: ${escapeHtml(err.message)}</div>`;
+    } finally {
+      document.getElementById('analyze-btn').disabled = false;
+    }
+  }
+
+  function renderSentimentPanel(result) {
+    const body = document.getElementById('sentiment-body');
+    const badgeClass = result.overall_sentiment === 'positive' ? 'badge-positive'
+                     : result.overall_sentiment === 'negative' ? 'badge-negative' : 'badge-neutral';
+    const confidence = Math.round((result.confidence || 0) * 100);
+    const starEst = result.star_estimate || starRating;
+
+    let html = `<div style="margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <span class="sentiment-badge ${badgeClass}">${result.overall_sentiment || '—'}</span>
+      <span style="font-size:11px;color:var(--dim);">Confidence: <span style="color:var(--text)">${confidence}%</span></span>
+      <span style="font-size:11px;color:var(--dim);">Est. Stars: <span style="color:var(--yellow)">${'★'.repeat(starEst)}${'☆'.repeat(5-starEst)}</span></span>
+    </div>`;
+
+    const scores = result.aspect_scores || {};
+    const validScores = Object.entries(scores).filter(([, v]) => v !== null && v !== undefined);
+    if (validScores.length) {
+      html += `<div style="margin-bottom:12px;">`;
+      for (const [aspect, score] of validScores) {
+        const pct = Math.round(((score - 1) / 4) * 100);
+        html += `<div class="aspect-bar-row">
+          <div class="aspect-bar-label">${aspect}</div>
+          <div class="aspect-bar-track"><div class="aspect-bar-fill" style="width:${pct}%"></div></div>
+          <div class="aspect-bar-val">${Number(score).toFixed(1)}</div>
+        </div>`;
+      }
+      html += `</div>`;
+    }
+
+    if (result.key_phrases?.length) {
+      html += `<div style="font-size:9px;color:var(--dim);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">Key Phrases</div>
+        <div class="key-phrases">`;
+      for (const phrase of result.key_phrases) {
+        html += `<span class="phrase-tag">${escapeHtml(phrase)}</span>`;
+      }
+      html += `</div>`;
+    }
+
+    body.innerHTML = html;
+  }
+
+  // ── Copy ───────────────────────────────────────────────────────────────────
+  function copyReview() {
+    if (!currentReview) return;
+    navigator.clipboard.writeText(currentReview).then(() => showToast('Copied to clipboard'));
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  function escapeHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function showError(msg) {
+    document.getElementById('output-body').className = 'output-body';
+    document.getElementById('output-body').innerHTML = `<div class="error-box">${escapeHtml(msg)}</div>`;
+  }
+
+  let toastTimer;
+  function showToast(msg, isErr) {
+    let toast = document.getElementById('toast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'toast';
+      toast.style.cssText = 'position:fixed;top:22px;right:22px;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 18px;border-radius:6px;font-size:11px;letter-spacing:1px;z-index:999;transition:opacity .3s;';
+      document.body.appendChild(toast);
+    }
+    toast.textContent = msg;
+    toast.style.borderColor = isErr ? 'var(--red)' : 'var(--cyan)';
+    toast.style.opacity = '1';
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { toast.style.opacity = '0'; }, 2200);
+  }
+</script>
+</body>
+</html>
