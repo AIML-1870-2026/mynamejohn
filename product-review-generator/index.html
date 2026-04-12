@@ -64,7 +64,7 @@
     .stars-row { display: flex; gap: 6px; margin-bottom: 14px; }
     .star { font-size: 22px; cursor: pointer; color: var(--border); transition: color .15s; user-select: none; }
     .star.lit { color: var(--yellow); }
-    .star:hover { color: var(--yellow); }
+    .star.hover { color: var(--yellow); }
 
     /* ASPECT CHECKBOXES */
     .aspects-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
@@ -83,11 +83,10 @@
 
     /* OUTPUT PANEL */
     .output-panel { display: flex; flex-direction: column; gap: 14px; }
-    .output-hdr { display: flex; align-items: center; justify-content: space-between; }
     .output-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; min-height: 200px; overflow: hidden; flex: 1; }
     .output-topbar { padding: 10px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; font-size: 10px; color: var(--dim); letter-spacing: 2px; }
     .output-body { padding: 20px; font-size: 13px; line-height: 1.8; }
-    .output-body.streaming { min-height: 120px; }
+    .stream-pre { white-space: pre-wrap; word-break: break-word; font-family: 'Courier New', monospace; font-size: 12px; color: var(--dim); line-height: 1.8; min-height: 120px; }
     .cursor-blink::after { content: '▋'; animation: blink .7s infinite; color: var(--cyan); font-size: 14px; }
     @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
     .output-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 240px; color: var(--dim); font-size: 11px; letter-spacing: 2px; gap: 10px; }
@@ -142,6 +141,7 @@
 
     /* ERROR */
     .error-box { background: rgba(255,34,68,.1); border: 1px solid rgba(255,34,68,.3); border-radius: 6px; padding: 12px 16px; font-size: 12px; color: var(--red); }
+    input.invalid { border-color: var(--red) !important; }
   </style>
 </head>
 <body>
@@ -211,12 +211,13 @@
 
       <div class="field">
         <label class="field-label">Star Rating</label>
-        <div class="stars-row" id="stars-row">
-          <span class="star lit" data-val="1" onclick="setStar(1)">★</span>
-          <span class="star lit" data-val="2" onclick="setStar(2)">★</span>
-          <span class="star lit" data-val="3" onclick="setStar(3)">★</span>
-          <span class="star lit" data-val="4" onclick="setStar(4)">★</span>
-          <span class="star" data-val="5" onclick="setStar(5)">★</span>
+        <div class="stars-row" id="stars-row"
+             onmouseleave="clearStarHover()">
+          <span class="star lit" data-val="1" onclick="setStar(1)" onmouseenter="hoverStar(1)">★</span>
+          <span class="star lit" data-val="2" onclick="setStar(2)" onmouseenter="hoverStar(2)">★</span>
+          <span class="star lit" data-val="3" onclick="setStar(3)" onmouseenter="hoverStar(3)">★</span>
+          <span class="star lit" data-val="4" onclick="setStar(4)" onmouseenter="hoverStar(4)">★</span>
+          <span class="star" data-val="5" onclick="setStar(5)" onmouseenter="hoverStar(5)">★</span>
         </div>
         <div id="star-label" style="font-size:10px;color:var(--dim);letter-spacing:1px;">4 / 5 — Good</div>
       </div>
@@ -395,15 +396,29 @@
   // ── Star Rating ────────────────────────────────────────────────────────────
   function setStar(n) {
     starRating = n;
-    document.querySelectorAll('.star').forEach((s, i) => {
-      s.classList.toggle('lit', i < n);
-    });
+    renderStars(n);
     document.getElementById('star-label').textContent = STAR_LABELS[n];
-    // sync sentiment dropdown
     const sent = document.getElementById('sentiment-select');
     if (n >= 4) sent.value = 'positive';
     else if (n === 3) sent.value = 'balanced';
     else sent.value = 'critical';
+  }
+
+  function renderStars(n) {
+    document.querySelectorAll('.star').forEach((s, i) => {
+      s.classList.toggle('lit', i < n);
+      s.classList.remove('hover');
+    });
+  }
+
+  function hoverStar(n) {
+    document.querySelectorAll('.star').forEach((s, i) => {
+      s.classList.toggle('hover', i < n);
+    });
+  }
+
+  function clearStarHover() {
+    document.querySelectorAll('.star').forEach(s => s.classList.remove('hover'));
   }
 
   function syncSentimentToStars() {
@@ -477,7 +492,14 @@ Opening paragraph about first impressions.
   async function generate() {
     const key = apiKey || document.getElementById('key-input').value.trim();
     if (!key) { showError('Enter your OpenAI API key first.'); return; }
-    if (!document.getElementById('product-name').value.trim()) { showError('Enter a product name.'); return; }
+    const nameEl = document.getElementById('product-name');
+    if (!nameEl.value.trim()) {
+      nameEl.classList.add('invalid');
+      nameEl.focus();
+      showError('Enter a product name.');
+      return;
+    }
+    nameEl.classList.remove('invalid');
     if (generating) return;
 
     generating = true;
@@ -486,7 +508,9 @@ Opening paragraph about first impressions.
     const prompt = buildPrompt();
     const t0 = Date.now();
 
-    document.getElementById('gen-btn').disabled = true;
+    const genBtn = document.getElementById('gen-btn');
+    genBtn.disabled = true;
+    genBtn.textContent = 'Generating...';
     document.getElementById('copy-btn').style.display = 'none';
     document.getElementById('regen-btn').style.display = 'none';
     document.getElementById('analyze-btn').style.display = 'none';
@@ -495,8 +519,11 @@ Opening paragraph about first impressions.
     document.getElementById('metrics-row').innerHTML = '';
 
     const body = document.getElementById('output-body');
+    body.className = 'output-body';
+    const streamPre = document.createElement('div');
+    streamPre.className = 'stream-pre cursor-blink';
     body.innerHTML = '';
-    body.className = 'output-body streaming cursor-blink';
+    body.appendChild(streamPre);
 
     try {
       const resp = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -508,6 +535,7 @@ Opening paragraph about first impressions.
         body: JSON.stringify({
           model,
           stream: true,
+          stream_options: { include_usage: true },
           messages: [{ role: 'user', content: prompt }]
         })
       });
@@ -533,15 +561,14 @@ Opening paragraph about first impressions.
             const delta = json.choices?.[0]?.delta?.content;
             if (delta) {
               currentReview += delta;
-              body.innerHTML = marked.parse(currentReview);
-              body.classList.add('cursor-blink');
+              streamPre.textContent = currentReview;
             }
             if (json.usage) usage = json.usage;
           } catch {}
         }
       }
 
-      // Final render
+      // Final render — swap raw stream text for formatted markdown
       body.className = 'output-body md-rendered';
       const starsHtml = '★'.repeat(starRating) + '☆'.repeat(5 - starRating);
       body.innerHTML = `<div class="review-stars" style="color:var(--yellow);margin-bottom:12px;">${starsHtml}</div>` + marked.parse(currentReview);
@@ -564,7 +591,8 @@ Opening paragraph about first impressions.
       body.innerHTML = `<div class="error-box">Error: ${escapeHtml(err.message)}</div>`;
     } finally {
       generating = false;
-      document.getElementById('gen-btn').disabled = false;
+      genBtn.disabled = false;
+      genBtn.textContent = 'Generate Review';
     }
   }
 
