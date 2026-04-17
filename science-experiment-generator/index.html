@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Science Experiment Generator</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+
+    :root {
+      --bg: #050510;
+      --surface: #0b0b1e;
+      --surface2: #0f0f28;
+      --border: #1c1c42;
+      --text: #e8eaf8;
+      --dim: #4a4a78;
+      --cyan: #00e5ff;
+      --magenta: #ff2d78;
+      --purple: #b44cff;
+      --orange: #ff7a00;
+      --green: #00f59b;
+      --yellow: #ffe156;
+      --red: #ff2244;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Space Mono', monospace; min-height: 100vh; overflow-x: hidden; }
+
+    /* ── CANVAS ── */
+    #stars-canvas { position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: .45; }
+
+    /* ── HEADER ── */
+    header {
+      position: relative; z-index: 1;
+      padding: 30px 40px 26px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, #09091f 0%, transparent 100%);
+      overflow: hidden;
+    }
+    .hdr-glow {
+      position: absolute; top: -80px; left: 50%; transform: translateX(-50%);
+      width: 700px; height: 220px;
+      background: radial-gradient(ellipse at center, rgba(0,229,255,.1) 0%, rgba(180,76,255,.07) 50%, transparent 70%);
+      pointer-events: none;
+    }
+    .hdr-inner { position: relative; display: flex; align-items: center; gap: 18px; }
+    .hdr-flask {
+      font-size: 42px;
+      filter: drop-shadow(0 0 14px rgba(0,229,255,.55));
+      animation: flask-bob 3.2s ease-in-out infinite;
+    }
+    @keyframes flask-bob {
+      0%,100% { transform: translateY(0) rotate(-6deg); }
+      50%      { transform: translateY(-7px) rotate(6deg); }
+    }
+    .hdr-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 23px; font-weight: 700; letter-spacing: 2px;
+      background: linear-gradient(90deg, var(--cyan) 0%, var(--purple) 50%, var(--magenta) 100%);
+      background-size: 200% auto;
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+      animation: shimmer-text 4s linear infinite;
+    }
+    @keyframes shimmer-text {
+      from { background-position: 0% center; }
+      to   { background-position: 200% center; }
+    }
+    .hdr-sub { font-size: 10px; color: var(--dim); letter-spacing: 3px; margin-top: 4px; text-transform: uppercase; }
+    .hdr-badges { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+    .hdr-badge { font-size: 9px; letter-spacing: 2px; padding: 4px 10px; border-radius: 20px; border: 1px solid; text-transform: uppercase; }
+    .badge-ai  { border-color: rgba(0,229,255,.4);  color: var(--cyan);    background: rgba(0,229,255,.07); }
+    .badge-k12 { border-color: rgba(180,76,255,.4); color: var(--purple);  background: rgba(180,76,255,.07); }
+
+    /* ── LAYOUT ── */
+    .content { position: relative; z-index: 1; padding: 26px 40px; max-width: 960px; margin: 0 auto; }
+
+    /* ── KEY BAR ── */
+    .key-bar {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+      padding: 13px 20px; margin-bottom: 20px;
+      display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+      transition: border-color .3s;
+    }
+    .key-bar:focus-within { border-color: rgba(0,229,255,.3); }
+    .key-label { font-size: 9px; color: var(--dim); letter-spacing: 3px; text-transform: uppercase; white-space: nowrap; }
+    .key-input {
+      flex: 1; min-width: 200px;
+      background: var(--bg); border: 1px solid var(--border); color: var(--text);
+      padding: 7px 12px; border-radius: 6px;
+      font-family: 'Space Mono', monospace; font-size: 12px; outline: none;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .key-input:focus { border-color: var(--cyan); box-shadow: 0 0 0 3px rgba(0,229,255,.1); }
+    .key-status { font-size: 9px; padding: 4px 10px; border-radius: 20px; white-space: nowrap; letter-spacing: 1px; }
+    .key-status.set   { background: rgba(0,245,155,.12); color: var(--green);  border: 1px solid rgba(0,245,155,.3); }
+    .key-status.unset { background: rgba(74,74,120,.1);  color: var(--dim);    border: 1px solid var(--border); }
+
+    /* ── BUTTONS ── */
+    .btn-sm {
+      background: none; border: 1px solid var(--border); color: var(--dim);
+      padding: 5px 12px; border-radius: 6px;
+      font-family: 'Space Mono', monospace; font-size: 10px; cursor: pointer;
+      letter-spacing: 1px; transition: all .2s; white-space: nowrap;
+    }
+    .btn-sm:hover { border-color: var(--cyan); color: var(--cyan); box-shadow: 0 0 8px rgba(0,229,255,.15); }
+    .file-label {
+      background: none; border: 1px solid var(--border); color: var(--dim);
+      padding: 5px 12px; border-radius: 6px; font-size: 10px;
+      font-family: 'Space Mono', monospace; cursor: pointer;
+      letter-spacing: 1px; transition: all .2s; white-space: nowrap;
+    }
+    .file-label:hover { border-color: var(--cyan); color: var(--cyan); }
+
+    /* ── FORM CARD ── */
+    .form-card-wrap {
+      position: relative; border-radius: 14px; padding: 2px; margin-bottom: 20px;
+      animation: border-spin 6s linear infinite;
+    }
+    @keyframes border-spin {
+      0%   { background: linear-gradient(0deg,   rgba(0,229,255,.35), rgba(180,76,255,.2), rgba(255,45,120,.25)); }
+      33%  { background: linear-gradient(120deg, rgba(0,229,255,.35), rgba(180,76,255,.2), rgba(255,45,120,.25)); }
+      66%  { background: linear-gradient(240deg, rgba(0,229,255,.35), rgba(180,76,255,.2), rgba(255,45,120,.25)); }
+      100% { background: linear-gradient(360deg, rgba(0,229,255,.35), rgba(180,76,255,.2), rgba(255,45,120,.25)); }
+    }
+    .form-card { background: var(--surface); border-radius: 12px; padding: 24px 26px; }
+
+    .form-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+    .form-group { display: flex; flex-direction: column; gap: 7px; }
+    .field-label { font-size: 9px; color: var(--dim); letter-spacing: 3px; text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
+    .lbl-icon { font-size: 12px; }
+
+    select.select-field {
+      background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+      padding: 10px 32px 10px 12px; border-radius: 8px;
+      font-family: 'Space Mono', monospace; font-size: 12px; cursor: pointer; outline: none;
+      appearance: none; -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%234a4a78'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 12px center;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    select.select-field:focus { border-color: var(--cyan); box-shadow: 0 0 0 3px rgba(0,229,255,.1); }
+
+    textarea {
+      width: 100%; background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+      padding: 12px 14px; border-radius: 8px;
+      font-family: 'Space Mono', monospace; font-size: 12px; line-height: 1.7; resize: vertical; outline: none;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    textarea:focus { border-color: var(--cyan); box-shadow: 0 0 0 3px rgba(0,229,255,.1); }
+    textarea::placeholder { color: var(--dim); }
+
+    /* ── DOMAIN PILLS ── */
+    .domain-row { margin-bottom: 18px; }
+    .domain-label { font-size: 9px; color: var(--dim); letter-spacing: 3px; text-transform: uppercase; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+    .domain-pills { display: flex; gap: 7px; flex-wrap: wrap; }
+    .domain-pill {
+      background: none; border: 1px solid var(--border); color: var(--dim);
+      padding: 6px 14px; border-radius: 20px;
+      font-family: 'Space Mono', monospace; font-size: 10px;
+      cursor: pointer; letter-spacing: 1px; transition: all .2s; white-space: nowrap;
+    }
+    .domain-pill:hover { transform: translateY(-1px); }
+    .domain-pill[data-domain="any"].active    { border-color: var(--text);    color: var(--text);    background: rgba(232,234,248,.08); }
+    .domain-pill[data-domain="chemistry"].active  { border-color: var(--cyan);    color: var(--cyan);    background: rgba(0,229,255,.1); }
+    .domain-pill[data-domain="physics"].active    { border-color: var(--yellow);  color: var(--yellow);  background: rgba(255,225,86,.1); }
+    .domain-pill[data-domain="biology"].active    { border-color: var(--green);   color: var(--green);   background: rgba(0,245,155,.1); }
+    .domain-pill[data-domain="earth"].active      { border-color: var(--orange);  color: var(--orange);  background: rgba(255,122,0,.1); }
+    .domain-pill[data-domain="engineering"].active{ border-color: var(--purple);  color: var(--purple);  background: rgba(180,76,255,.1); }
+
+    /* ── CHIPS ── */
+    .example-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; align-items: center; }
+    .chips-label { font-size: 9px; color: var(--dim); letter-spacing: 2px; }
+    .chip {
+      border: 1px solid var(--border); color: var(--dim); background: none;
+      padding: 4px 10px; border-radius: 20px;
+      font-family: 'Space Mono', monospace; font-size: 10px; cursor: pointer;
+      transition: all .2s; letter-spacing: 1px;
+    }
+    .chip:hover { transform: translateY(-1px); border-color: var(--cyan); color: var(--cyan); background: rgba(0,229,255,.06); }
+
+    /* ── ACTION ROW ── */
+    .action-row { display: flex; gap: 10px; align-items: center; margin-top: 6px; flex-wrap: wrap; }
+
+    .gen-btn {
+      position: relative; overflow: hidden;
+      background: linear-gradient(135deg, var(--cyan) 0%, var(--purple) 60%, var(--magenta) 100%);
+      color: #fff; border: none; padding: 13px 34px; border-radius: 8px;
+      font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 700;
+      letter-spacing: 2px; cursor: pointer; text-transform: uppercase;
+      transition: transform .15s, box-shadow .2s;
+      box-shadow: 0 4px 22px rgba(0,229,255,.22), 0 2px 8px rgba(180,76,255,.18);
+    }
+    .gen-btn::after {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(105deg, transparent 30%, rgba(255,255,255,.22) 50%, transparent 70%);
+      transform: translateX(-100%); transition: transform .4s;
+    }
+    .gen-btn:hover:not(:disabled)::after { transform: translateX(100%); }
+    .gen-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,229,255,.32), 0 4px 16px rgba(180,76,255,.28); }
+    .gen-btn:active:not(:disabled) { transform: translateY(0); }
+    .gen-btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+
+    .surprise-btn {
+      background: linear-gradient(135deg, var(--yellow), var(--orange));
+      color: #000; border: none; padding: 13px 20px; border-radius: 8px;
+      font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 700;
+      letter-spacing: 1px; cursor: pointer; text-transform: uppercase;
+      transition: transform .15s, box-shadow .2s;
+      box-shadow: 0 4px 18px rgba(255,122,0,.25);
+    }
+    .surprise-btn:hover { transform: translateY(-2px) rotate(-2deg); box-shadow: 0 8px 28px rgba(255,122,0,.35); }
+    .surprise-btn:active { transform: translateY(0) rotate(0); }
+    .surprise-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+    /* ── LOADING DOTS ── */
+    .loading-dots { display: inline-flex; gap: 4px; align-items: center; }
+    .loading-dots span { width: 5px; height: 5px; border-radius: 50%; background: #fff; animation: dot-bounce .8s ease-in-out infinite; }
+    .loading-dots span:nth-child(2) { animation-delay: .15s; opacity: .7; }
+    .loading-dots span:nth-child(3) { animation-delay: .3s;  opacity: .5; }
+    @keyframes dot-bounce { 0%,100%{transform:translateY(0);opacity:.4} 50%{transform:translateY(-6px);opacity:1} }
+
+    /* ── LOADING MESSAGE ── */
+    .loading-msg { font-size: 10px; color: var(--dim); letter-spacing: 1px; animation: fade-cycle 2.5s ease-in-out infinite; }
+    @keyframes fade-cycle { 0%,100%{opacity:.4} 50%{opacity:1} }
+
+    /* ── META BADGES ── */
+    .meta-row { display: flex; gap: 8px; flex-wrap: wrap; padding: 10px 20px; border-bottom: 1px solid var(--border); }
+    .meta-badge { font-size: 9px; letter-spacing: 1px; padding: 3px 10px; border-radius: 20px; border: 1px solid; }
+    .badge-domain   { border-color: rgba(0,229,255,.3);  color: var(--cyan);   background: rgba(0,229,255,.07); }
+    .badge-diff     { border-color: rgba(255,225,86,.3); color: var(--yellow); background: rgba(255,225,86,.07); }
+    .badge-time     { border-color: rgba(0,245,155,.3);  color: var(--green);  background: rgba(0,245,155,.07); }
+
+    /* ── OUTPUT ── */
+    .output-wrap {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+      overflow: hidden; margin-top: 6px; display: none;
+      animation: slide-up .3s ease;
+    }
+    .output-wrap.visible { display: block; }
+    @keyframes slide-up { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+
+    .output-hdr {
+      padding: 11px 20px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      background: linear-gradient(90deg, rgba(0,229,255,.05) 0%, transparent 100%);
+    }
+    .output-label {
+      font-size: 9px; color: var(--cyan); letter-spacing: 3px; text-transform: uppercase;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .output-label::before {
+      content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+      background: var(--cyan); box-shadow: 0 0 8px var(--cyan);
+      animation: pulse-dot 1.4s ease-in-out infinite;
+    }
+    @keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.3;transform:scale(.6)} }
+    .output-actions { display: flex; gap: 7px; align-items: center; }
+
+    .icon-btn {
+      background: none; border: 1px solid var(--border); color: var(--dim);
+      padding: 5px 10px; border-radius: 6px; font-size: 12px; cursor: pointer;
+      transition: all .2s; white-space: nowrap; font-family: 'Space Mono', monospace;
+      letter-spacing: 1px; font-size: 10px;
+    }
+    .icon-btn:hover { border-color: var(--cyan); color: var(--cyan); box-shadow: 0 0 8px rgba(0,229,255,.15); }
+    .icon-btn.green:hover { border-color: var(--green); color: var(--green); }
+    .icon-btn.purple:hover { border-color: var(--purple); color: var(--purple); }
+    .icon-btn.magenta:hover { border-color: var(--magenta); color: var(--magenta); }
+
+    .output-body { padding: 22px 26px; font-size: 13px; line-height: 1.9; min-height: 80px; }
+
+    /* ── MARKDOWN ── */
+    .output-body h1 {
+      font-family: 'Space Grotesk', sans-serif; font-size: 21px; font-weight: 700;
+      background: linear-gradient(90deg, var(--cyan), var(--purple));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+      margin: 4px 0 18px; letter-spacing: 1px;
+    }
+    .output-body h2 {
+      font-family: 'Space Grotesk', sans-serif; font-size: 11px; font-weight: 600;
+      letter-spacing: 2px; text-transform: uppercase;
+      margin: 24px 0 10px; padding: 8px 14px;
+      border-left: 3px solid; border-radius: 0 6px 6px 0;
+    }
+    .output-body h2:nth-of-type(1) { color: var(--cyan);    border-color: var(--cyan);    background: rgba(0,229,255,.05); }
+    .output-body h2:nth-of-type(2) { color: var(--purple);  border-color: var(--purple);  background: rgba(180,76,255,.05); }
+    .output-body h2:nth-of-type(3) { color: var(--green);   border-color: var(--green);   background: rgba(0,245,155,.05); }
+    .output-body h2:nth-of-type(4) { color: var(--yellow);  border-color: var(--yellow);  background: rgba(255,225,86,.05); }
+    .output-body h2:nth-of-type(5) { color: var(--magenta); border-color: var(--magenta); background: rgba(255,45,120,.05); }
+    .output-body h2:nth-of-type(6) { color: var(--orange);  border-color: var(--orange);  background: rgba(255,122,0,.05); }
+    .output-body h3 { font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 600; color: var(--yellow); margin: 14px 0 6px; letter-spacing: 1px; }
+    .output-body p { margin-bottom: 10px; }
+    .output-body ul { margin: 6px 0 12px 4px; list-style: none; }
+    .output-body ul li { padding-left: 18px; position: relative; margin-bottom: 6px; }
+    .output-body ul li::before { content: '›'; position: absolute; left: 2px; color: var(--cyan); font-weight: bold; }
+    .output-body ol { margin: 6px 0 12px 20px; }
+    .output-body ol li { margin-bottom: 8px; padding-left: 4px; }
+    .output-body ol li::marker { color: var(--purple); font-weight: bold; }
+    .output-body strong { color: var(--text); font-weight: 700; }
+    .output-body em { color: var(--purple); font-style: italic; }
+    .output-body code { background: var(--surface2); border: 1px solid var(--border); padding: 2px 6px; border-radius: 4px; font-size: 11px; color: var(--green); }
+    .output-body hr { border: none; height: 1px; background: linear-gradient(90deg, transparent, var(--border), transparent); margin: 18px 0; }
+
+    /* ── CURSOR ── */
+    .cursor-blink::after { content: '▋'; animation: blink .6s infinite; color: var(--cyan); }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+    /* ── REMIX BAR ── */
+    .remix-bar {
+      display: none; gap: 8px; flex-wrap: wrap; padding: 14px 20px;
+      border-top: 1px solid var(--border);
+      background: linear-gradient(90deg, rgba(180,76,255,.04), transparent);
+    }
+    .remix-bar.visible { display: flex; }
+    .remix-label { font-size: 9px; color: var(--dim); letter-spacing: 2px; align-self: center; white-space: nowrap; }
+    .remix-btn {
+      background: none; border: 1px solid var(--border); color: var(--dim);
+      padding: 6px 14px; border-radius: 20px;
+      font-family: 'Space Mono', monospace; font-size: 10px; cursor: pointer;
+      letter-spacing: 1px; transition: all .2s; white-space: nowrap;
+    }
+    .remix-btn:hover { transform: translateY(-1px); }
+    .remix-btn:nth-child(2):hover { border-color: var(--red);    color: var(--red);    background: rgba(255,34,68,.07); }
+    .remix-btn:nth-child(3):hover { border-color: var(--green);  color: var(--green);  background: rgba(0,245,155,.07); }
+    .remix-btn:nth-child(4):hover { border-color: var(--purple); color: var(--purple); background: rgba(180,76,255,.07); }
+    .remix-btn:nth-child(5):hover { border-color: var(--yellow); color: var(--yellow); background: rgba(255,225,86,.07); }
+
+    /* ── ERROR ── */
+    .error-msg { background: rgba(255,34,68,.08); border: 1px solid rgba(255,34,68,.3); border-radius: 8px; padding: 12px 16px; font-size: 12px; color: var(--red); margin-top: 12px; display: none; }
+    .error-msg.show { display: block; }
+
+    /* ── STEP MODE OVERLAY ── */
+    .step-overlay {
+      position: fixed; inset: 0; z-index: 100;
+      background: rgba(5,5,16,.96); backdrop-filter: blur(12px);
+      display: none; flex-direction: column; align-items: center; justify-content: center;
+      padding: 32px;
+    }
+    .step-overlay.active { display: flex; animation: fade-in .25s ease; }
+    @keyframes fade-in { from{opacity:0} to{opacity:1} }
+
+    .step-progress-bar {
+      position: absolute; top: 0; left: 0; height: 3px;
+      background: linear-gradient(90deg, var(--cyan), var(--purple));
+      transition: width .4s ease;
+    }
+
+    .step-counter {
+      font-size: 11px; color: var(--dim); letter-spacing: 3px; text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+    .step-number {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 100px; font-weight: 700; line-height: 1;
+      background: linear-gradient(135deg, var(--cyan), var(--purple));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+      margin-bottom: 24px;
+      animation: num-pop .3s ease;
+    }
+    @keyframes num-pop { from{transform:scale(.8);opacity:0} to{transform:scale(1);opacity:1} }
+    .step-text {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 22px; font-weight: 500; line-height: 1.6;
+      text-align: center; max-width: 680px; color: var(--text);
+      margin-bottom: 44px;
+      animation: step-slide .3s ease;
+    }
+    @keyframes step-slide { from{transform:translateY(10px);opacity:0} to{transform:translateY(0);opacity:1} }
+    .step-nav { display: flex; gap: 16px; align-items: center; }
+    .step-nav-btn {
+      background: none; border: 2px solid var(--border); color: var(--text);
+      width: 56px; height: 56px; border-radius: 50%; font-size: 22px; cursor: pointer;
+      transition: all .2s; display: flex; align-items: center; justify-content: center;
+    }
+    .step-nav-btn:hover:not(:disabled) { border-color: var(--cyan); color: var(--cyan); background: rgba(0,229,255,.08); transform: scale(1.1); }
+    .step-nav-btn:disabled { opacity: .25; cursor: not-allowed; }
+    .step-done-btn {
+      background: linear-gradient(135deg, var(--cyan), var(--purple));
+      color: #fff; border: none; padding: 12px 28px; border-radius: 8px;
+      font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 700;
+      letter-spacing: 2px; cursor: pointer; text-transform: uppercase; transition: transform .15s;
+    }
+    .step-done-btn:hover { transform: scale(1.04); }
+    .step-exit {
+      position: absolute; top: 20px; right: 24px;
+      background: none; border: 1px solid var(--border); color: var(--dim);
+      padding: 6px 14px; border-radius: 6px; font-family: 'Space Mono', monospace;
+      font-size: 10px; cursor: pointer; letter-spacing: 1px; transition: all .2s;
+    }
+    .step-exit:hover { border-color: var(--red); color: var(--red); }
+
+    /* ── HISTORY ── */
+    .history-section { margin-top: 32px; display: none; }
+    .history-section.visible { display: block; }
+    .history-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px; cursor: pointer; user-select: none;
+    }
+    .sec-title { font-size: 9px; color: var(--dim); letter-spacing: 3px; text-transform: uppercase; }
+    .history-toggle { font-size: 9px; color: var(--dim); letter-spacing: 2px; }
+    .history-list { display: flex; flex-direction: column; gap: 8px; }
+    .history-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+      padding: 13px 18px; display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; transition: border-color .2s, transform .15s;
+    }
+    .history-card:hover { border-color: rgba(0,229,255,.2); transform: translateX(2px); }
+    .history-meta { font-size: 11px; color: var(--dim); }
+    .history-meta strong { color: var(--text); font-family: 'Space Grotesk', sans-serif; font-size: 12px; }
+    .history-domain-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+    .del-btn { background: none; border: none; color: var(--dim); cursor: pointer; font-size: 16px; padding: 2px 6px; transition: color .2s; line-height: 1; }
+    .del-btn:hover { color: var(--red); }
+
+    .divider { height: 1px; background: linear-gradient(90deg, transparent, var(--border) 20%, var(--border) 80%, transparent); margin: 28px 0; }
+
+    /* ── PRINT ── */
+    @media print {
+      body { background: #fff; color: #000; }
+      #stars-canvas, header .hdr-glow, .key-bar, .form-card-wrap, .output-hdr, .remix-bar, .history-section, .step-overlay { display: none !important; }
+      .output-wrap { display: block !important; border: none; box-shadow: none; }
+      .output-body h1, .output-body h2, .output-body h3 { color: #000 !important; -webkit-text-fill-color: #000 !important; background: none !important; border-left-color: #000 !important; }
+      .output-body h2 { background: #f0f0f0 !important; }
+    }
+
+    @media (max-width: 600px) {
+      .content { padding: 16px 18px; }
+      header { padding: 20px 18px; }
+      .hdr-title { font-size: 18px; }
+      .hdr-badges { display: none; }
+      .step-number { font-size: 70px; }
+      .step-text { font-size: 17px; }
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="stars-canvas"></canvas>
+
+<!-- STEP MODE OVERLAY -->
+<div class="step-overlay" id="step-overlay">
+  <div class="step-progress-bar" id="step-progress"></div>
+  <button class="step-exit" onclick="closeStepMode()">✕ Exit</button>
+  <div class="step-counter" id="step-counter">Step 1 of 6</div>
+  <div class="step-number" id="step-number">1</div>
+  <div class="step-text" id="step-text"></div>
+  <div class="step-nav">
+    <button class="step-nav-btn" id="step-prev" onclick="stepNav(-1)">←</button>
+    <button class="step-done-btn" id="step-done" onclick="closeStepMode()">Done</button>
+    <button class="step-nav-btn" id="step-next" onclick="stepNav(1)">→</button>
+  </div>
+</div>
+
+<header>
+  <div class="hdr-glow"></div>
+  <div class="hdr-inner">
+    <div class="hdr-flask">⚗️</div>
+    <div>
+      <div class="hdr-title">Science Experiment Generator</div>
+      <div class="hdr-sub">Drop your supplies — get a real experiment</div>
+    </div>
+    <div class="hdr-badges">
+      <span class="hdr-badge badge-ai">AI Powered</span>
+      <span class="hdr-badge badge-k12">K – 12</span>
+    </div>
+  </div>
+</header>
+
+<div class="content">
+
+  <!-- API KEY -->
+  <div class="key-bar">
+    <span class="key-label">OpenAI Key</span>
+    <input class="key-input" id="key-input" type="password" placeholder="sk-...">
+    <button class="btn-sm" onclick="setKey()">Set</button>
+    <button class="btn-sm" onclick="clearKey()">Clear</button>
+    <span class="key-status unset" id="key-status">NOT SET</span>
+    <label class="file-label">📂 Load .env<input type="file" accept=".env,.txt" style="display:none" onchange="loadEnvFile(event)"></label>
+  </div>
+
+  <!-- FORM -->
+  <div class="form-card-wrap">
+    <div class="form-card">
+
+      <!-- Row 1: Grade + Model -->
+      <div class="form-row">
+        <div class="form-group">
+          <div class="field-label"><span class="lbl-icon">🎓</span> Grade Level</div>
+          <select class="select-field" id="grade-select">
+            <option value="Kindergarten">Kindergarten</option>
+            <option value="1st Grade">1st Grade</option>
+            <option value="2nd Grade">2nd Grade</option>
+            <option value="3rd Grade">3rd Grade</option>
+            <option value="4th Grade">4th Grade</option>
+            <option value="5th Grade">5th Grade</option>
+            <option value="6th Grade">6th Grade</option>
+            <option value="7th Grade">7th Grade</option>
+            <option value="8th Grade">8th Grade</option>
+            <option value="9th Grade">9th Grade</option>
+            <option value="10th Grade">10th Grade</option>
+            <option value="11th Grade">11th Grade</option>
+            <option value="12th Grade">12th Grade</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <div class="field-label"><span class="lbl-icon">🤖</span> Model</div>
+          <select class="select-field" id="model-select">
+            <option value="gpt-4o-mini">gpt-4o-mini</option>
+            <option value="gpt-4o">gpt-4o</option>
+            <option value="gpt-4-turbo">gpt-4-turbo</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Row 2: Domain filter -->
+      <div class="domain-row">
+        <div class="domain-label"><span class="lbl-icon">🔭</span> Science Domain</div>
+        <div class="domain-pills">
+          <button class="domain-pill active" data-domain="any"         onclick="setDomain(this)">✦ Any</button>
+          <button class="domain-pill"        data-domain="chemistry"   onclick="setDomain(this)">⚗️ Chemistry</button>
+          <button class="domain-pill"        data-domain="physics"     onclick="setDomain(this)">⚡ Physics</button>
+          <button class="domain-pill"        data-domain="biology"     onclick="setDomain(this)">🌿 Biology</button>
+          <button class="domain-pill"        data-domain="earth"       onclick="setDomain(this)">🌍 Earth Science</button>
+          <button class="domain-pill"        data-domain="engineering" onclick="setDomain(this)">🔧 Engineering</button>
+        </div>
+      </div>
+
+      <!-- Row 3: Supplies -->
+      <div class="form-group" style="margin-bottom:20px">
+        <div class="field-label"><span class="lbl-icon">🧪</span> Available Household Materials</div>
+        <textarea id="supplies-input" rows="3" placeholder="e.g. baking soda, vinegar, food coloring, salt, sugar, paper towels, flashlight..."></textarea>
+        <div class="example-chips">
+          <span class="chips-label">Quick load:</span>
+          <button class="chip" onclick="loadSupplies('kitchen')">🍳 Kitchen</button>
+          <button class="chip" onclick="loadSupplies('art')">🎨 Art</button>
+          <button class="chip" onclick="loadSupplies('outdoor')">🌿 Outdoor</button>
+          <button class="chip" onclick="loadSupplies('electronics')">🔋 Electronics</button>
+        </div>
+      </div>
+
+      <!-- Row 4: Buttons -->
+      <div class="action-row">
+        <button class="gen-btn" id="gen-btn" onclick="generate()">Generate Experiment</button>
+        <button class="surprise-btn" id="surprise-btn" onclick="surpriseMe()" title="Random grade, domain, and supplies">🎲 Surprise Me</button>
+        <button class="btn-sm" onclick="clearAll()">Clear</button>
+        <span class="loading-msg" id="loading-msg" style="display:none"></span>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ERROR -->
+  <div class="error-msg" id="error-msg"></div>
+
+  <!-- OUTPUT -->
+  <div class="output-wrap" id="output-wrap">
+    <div class="output-hdr">
+      <span class="output-label" id="output-label">Experiment</span>
+      <div class="output-actions">
+        <button class="icon-btn purple" id="step-mode-btn" onclick="openStepMode()" style="display:none">▶ Step Mode</button>
+        <button class="icon-btn" onclick="shareExperiment()" title="Copy shareable link">🔗 Share</button>
+        <button class="icon-btn" onclick="window.print()" title="Print">🖨 Print</button>
+        <button class="icon-btn green" id="save-btn" onclick="saveExperiment()">Save</button>
+        <button class="icon-btn" onclick="copyOutput()">Copy</button>
+      </div>
+    </div>
+
+    <!-- META BADGES -->
+    <div class="meta-row" id="meta-row" style="display:none">
+      <span class="meta-badge badge-domain" id="meta-domain"></span>
+      <span class="meta-badge badge-diff"   id="meta-diff"></span>
+      <span class="meta-badge badge-time"   id="meta-time"></span>
+    </div>
+
+    <div class="output-body" id="output-body">
+      <span style="color:var(--dim)">Your experiment will appear here...</span>
+    </div>
+
+    <!-- REMIX BAR -->
+    <div class="remix-bar" id="remix-bar">
+      <span class="remix-label">Remix:</span>
+      <button class="remix-btn" onclick="remix('harder')">🔥 Make it Harder</button>
+      <button class="remix-btn" onclick="remix('easier')">🌱 Make it Easier</button>
+      <button class="remix-btn" onclick="remix('different')">🔀 Different Approach</button>
+      <button class="remix-btn" onclick="remix('extension')">⭐ Add Extension Activity</button>
+    </div>
+  </div>
+
+  <!-- HISTORY -->
+  <div class="history-section" id="history-section">
+    <div class="divider"></div>
+    <div class="history-header" onclick="toggleHistory()">
+      <div class="sec-title">Session History (<span id="history-count">0</span>)</div>
+      <div class="history-toggle" id="history-toggle">▼ Show</div>
+    </div>
+    <div class="history-list" id="history-list" style="display:none"></div>
+  </div>
+
+</div>
+
+<script>
+// ══════════════════════════════════════════
+// STARS BACKGROUND
+// ══════════════════════════════════════════
+(function() {
+  const c = document.getElementById('stars-canvas');
+  const ctx = c.getContext('2d');
+  let W, H, stars = [];
+
+  function resize() { W = c.width = window.innerWidth; H = c.height = window.innerHeight; }
+
+  function init() {
+    stars = Array.from({ length: 130 }, () => ({
+      x: Math.random() * W, y: Math.random() * H,
+      r: Math.random() * 1.3 + .3, a: Math.random(),
+      speed: Math.random() * .004 + .001,
+      phase: Math.random() * Math.PI * 2,
+    }));
+  }
+
+  function draw(t) {
+    ctx.clearRect(0, 0, W, H);
+    for (const s of stars) {
+      const alpha = s.a * (.5 + .5 * Math.sin(t * s.speed * 1000 + s.phase));
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(180,200,255,${alpha})`;
+      ctx.fill();
+    }
+    requestAnimationFrame(draw);
+  }
+
+  window.addEventListener('resize', () => { resize(); init(); });
+  resize(); init(); requestAnimationFrame(draw);
+})();
+
+// ══════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════
+let apiKey = null;
+let lastRawText = '';
+let currentDomain = 'any';
+let stepList = [];
+let stepIdx = 0;
+const history = [];
+let historyOpen = false;
+
+const SUPPLY_PRESETS = {
+  kitchen:     'baking soda, vinegar, food coloring, salt, sugar, dish soap, cooking oil, lemon juice, cornstarch, water, ice, plastic bags, paper towels, measuring cups',
+  art:         'watercolor paint, colored pencils, construction paper, scissors, glue, tape, rubber bands, clay, markers, tissue paper, cardboard, aluminum foil',
+  outdoor:     'dirt/soil, rocks, leaves, grass, twigs, magnifying glass, plastic cups, string, measuring tape, water, sunlight, seeds',
+  electronics: 'AA batteries, LED bulbs, copper wire, small motor, cardboard, aluminum foil, paper clips, tape, flashlight',
+};
+
+const DOMAIN_LABELS = {
+  any: 'General Science', chemistry: '⚗️ Chemistry', physics: '⚡ Physics',
+  biology: '🌿 Biology', earth: '🌍 Earth Science', engineering: '🔧 Engineering',
+};
+
+const DOMAIN_COLORS = {
+  chemistry: '#00e5ff', physics: '#ffe156', biology: '#00f59b',
+  earth: '#ff7a00', engineering: '#b44cff', any: '#e8eaf8',
+};
+
+const DIFFICULTY = {
+  'Kindergarten': { label: '⭐ Beginner', time: '~15 min' },
+  '1st Grade':    { label: '⭐ Beginner', time: '~15 min' },
+  '2nd Grade':    { label: '⭐ Beginner', time: '~20 min' },
+  '3rd Grade':    { label: '⭐⭐ Elementary', time: '~20 min' },
+  '4th Grade':    { label: '⭐⭐ Elementary', time: '~25 min' },
+  '5th Grade':    { label: '⭐⭐ Elementary', time: '~25 min' },
+  '6th Grade':    { label: '⭐⭐⭐ Intermediate', time: '~30 min' },
+  '7th Grade':    { label: '⭐⭐⭐ Intermediate', time: '~35 min' },
+  '8th Grade':    { label: '⭐⭐⭐ Intermediate', time: '~35 min' },
+  '9th Grade':    { label: '⭐⭐⭐⭐ Advanced', time: '~45 min' },
+  '10th Grade':   { label: '⭐⭐⭐⭐ Advanced', time: '~45 min' },
+  '11th Grade':   { label: '⭐⭐⭐⭐⭐ Expert', time: '~60 min' },
+  '12th Grade':   { label: '⭐⭐⭐⭐⭐ Expert', time: '~60 min' },
+};
+
+const LOADING_MSGS = [
+  'Consulting the periodic table...',
+  'Mixing virtual reagents...',
+  'Calibrating the bunsen burner...',
+  'Sourcing household materials...',
+  'Running safety checks...',
+  'Optimizing for grade level...',
+  'Checking for cool reactions...',
+  'Reviewing lab protocol...',
+  'Adding a pinch of curiosity...',
+  'Testing hypothesis...',
+];
+let loadingMsgInterval = null;
+
+const SURPRISE_GRADES  = ['Kindergarten','2nd Grade','4th Grade','6th Grade','8th Grade','10th Grade'];
+const SURPRISE_DOMAINS = ['chemistry','physics','biology','earth','engineering'];
+const SURPRISE_PRESETS = ['kitchen','art','outdoor','electronics'];
+
+// ══════════════════════════════════════════
+// API KEY
+// ══════════════════════════════════════════
+function setKey() {
+  const input = document.getElementById('key-input');
+  const val = input.value.trim();
+  if (!val) return;
+  apiKey = val;
+  input.value = '••••••••' + val.slice(-4);
+  updateKeyStatus();
+}
+function clearKey() {
+  apiKey = null;
+  document.getElementById('key-input').value = '';
+  updateKeyStatus();
+}
+function updateKeyStatus() {
+  const el = document.getElementById('key-status');
+  el.textContent = apiKey ? '✓ SET' : 'NOT SET';
+  el.className = 'key-status ' + (apiKey ? 'set' : 'unset');
+}
+function loadEnvFile(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const match = ev.target.result.match(/OPENAI_API_KEY\s*=\s*(.+)/);
+    if (match) {
+      apiKey = match[1].trim().replace(/['"]/g, '');
+      document.getElementById('key-input').value = '••••••••' + apiKey.slice(-4);
+      updateKeyStatus();
+    }
+  };
+  reader.readAsText(file);
+}
+window.addEventListener('beforeunload', () => { apiKey = null; });
+
+// ══════════════════════════════════════════
+// DOMAIN
+// ══════════════════════════════════════════
+function setDomain(btn) {
+  document.querySelectorAll('.domain-pill').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  currentDomain = btn.dataset.domain;
+}
+
+// ══════════════════════════════════════════
+// SUPPLY PRESETS
+// ══════════════════════════════════════════
+function loadSupplies(preset) {
+  const el = document.getElementById('supplies-input');
+  el.value = SUPPLY_PRESETS[preset]; el.focus();
+}
+
+// ══════════════════════════════════════════
+// SURPRISE ME
+// ══════════════════════════════════════════
+function surpriseMe() {
+  const grade   = SURPRISE_GRADES[Math.floor(Math.random() * SURPRISE_GRADES.length)];
+  const domain  = SURPRISE_DOMAINS[Math.floor(Math.random() * SURPRISE_DOMAINS.length)];
+  const preset  = SURPRISE_PRESETS[Math.floor(Math.random() * SURPRISE_PRESETS.length)];
+
+  document.getElementById('grade-select').value = grade;
+  loadSupplies(preset);
+
+  const domainBtn = document.querySelector(`.domain-pill[data-domain="${domain}"]`);
+  if (domainBtn) setDomain(domainBtn);
+
+  generate();
+}
+
+// ══════════════════════════════════════════
+// LOADING MESSAGE CYCLE
+// ══════════════════════════════════════════
+function startLoadingMsg() {
+  const el = document.getElementById('loading-msg');
+  el.style.display = 'block';
+  let i = 0;
+  el.textContent = LOADING_MSGS[0];
+  loadingMsgInterval = setInterval(() => {
+    i = (i + 1) % LOADING_MSGS.length;
+    el.textContent = LOADING_MSGS[i];
+  }, 2200);
+}
+function stopLoadingMsg() {
+  clearInterval(loadingMsgInterval);
+  document.getElementById('loading-msg').style.display = 'none';
+}
+
+// ══════════════════════════════════════════
+// MARKDOWN → HTML
+// ══════════════════════════════════════════
+function renderMarkdown(text) {
+  const lines = text.split('\n');
+  let html = '', inUl = false, inOl = false;
+
+  function closeList() {
+    if (inUl) { html += '</ul>'; inUl = false; }
+    if (inOl) { html += '</ol>'; inOl = false; }
+  }
+
+  function inline(s) {
+    return s
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g,     '<em>$1</em>')
+      .replace(/`(.+?)`/g,       '<code>$1</code>');
+  }
+
+  for (const line of lines) {
+    if      (/^### (.+)/.test(line)) { closeList(); html += `<h3>${inline(line.slice(4))}</h3>`; }
+    else if (/^## (.+)/.test(line))  { closeList(); html += `<h2>${inline(line.slice(3))}</h2>`; }
+    else if (/^# (.+)/.test(line))   { closeList(); html += `<h1>${inline(line.slice(2))}</h1>`; }
+    else if (/^---+$/.test(line.trim())) { closeList(); html += '<hr>'; }
+    else if (/^\d+\. (.+)/.test(line)) {
+      if (!inOl) { closeList(); html += '<ol>'; inOl = true; }
+      html += `<li>${inline(line.replace(/^\d+\. /, ''))}</li>`;
+    }
+    else if (/^[-*] (.+)/.test(line)) {
+      if (!inUl) { closeList(); html += '<ul>'; inUl = true; }
+      html += `<li>${inline(line.replace(/^[-*] /, ''))}</li>`;
+    }
+    else if (line.trim() === '') { closeList(); }
+    else { closeList(); html += `<p>${inline(line)}</p>`; }
+  }
+  closeList();
+  return html;
+}
+
+// ══════════════════════════════════════════
+// STEP EXTRACTOR
+// ══════════════════════════════════════════
+function extractSteps(text) {
+  // Find numbered list items anywhere in the step section
+  const sectionMatch = text.match(/(?:step-by-step instructions?|instructions?)[^\n]*\n([\s\S]*?)(?:\n##|\n#|$)/i);
+  const section = sectionMatch ? sectionMatch[1] : text;
+  const steps = [];
+  const re = /^\d+\.\s+(.+)/gm;
+  let m;
+  while ((m = re.exec(section)) !== null) steps.push(m[1].trim());
+  return steps;
+}
+
+// ══════════════════════════════════════════
+// STEP MODE
+// ══════════════════════════════════════════
+function openStepMode() {
+  stepList = extractSteps(lastRawText);
+  if (!stepList.length) { alert('No numbered steps found in this experiment.'); return; }
+  stepIdx = 0;
+  renderStep();
+  document.getElementById('step-overlay').classList.add('active');
+  document.addEventListener('keydown', stepKeyHandler);
+}
+
+function closeStepMode() {
+  document.getElementById('step-overlay').classList.remove('active');
+  document.removeEventListener('keydown', stepKeyHandler);
+}
+
+function stepKeyHandler(e) {
+  if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); stepNav(1); }
+  if (e.key === 'ArrowLeft')                   { e.preventDefault(); stepNav(-1); }
+  if (e.key === 'Escape')                      closeStepMode();
+}
+
+function stepNav(dir) {
+  const next = stepIdx + dir;
+  if (next < 0 || next >= stepList.length) return;
+  stepIdx = next;
+  renderStep();
+}
+
+function renderStep() {
+  const total = stepList.length;
+  document.getElementById('step-counter').textContent = `Step ${stepIdx + 1} of ${total}`;
+  document.getElementById('step-number').textContent  = stepIdx + 1;
+  document.getElementById('step-text').textContent    = stepList[stepIdx];
+  document.getElementById('step-progress').style.width = `${((stepIdx + 1) / total) * 100}%`;
+  document.getElementById('step-prev').disabled = stepIdx === 0;
+  document.getElementById('step-next').disabled = stepIdx === total - 1;
+
+  // Swap Done / Next
+  const done = document.getElementById('step-done');
+  const next = document.getElementById('step-next');
+  if (stepIdx === total - 1) {
+    done.style.display = 'block';
+    next.style.display = 'none';
+  } else {
+    done.style.display = 'none';
+    next.style.display = 'flex';
+  }
+
+  // Re-trigger animation
+  const numEl = document.getElementById('step-number');
+  numEl.style.animation = 'none';
+  void numEl.offsetWidth;
+  numEl.style.animation = '';
+
+  const txtEl = document.getElementById('step-text');
+  txtEl.style.animation = 'none';
+  void txtEl.offsetWidth;
+  txtEl.style.animation = '';
+}
+
+// ══════════════════════════════════════════
+// SHARE VIA URL HASH
+// ══════════════════════════════════════════
+function shareExperiment() {
+  if (!lastRawText) return;
+  try {
+    const encoded = btoa(unescape(encodeURIComponent(lastRawText)));
+    const url = location.origin + location.pathname + '#exp=' + encoded;
+    navigator.clipboard.writeText(url).then(() => {
+      const btn = event.target;
+      const orig = btn.textContent;
+      btn.textContent = '✓ Copied!';
+      btn.style.color = 'var(--green)';
+      setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 2000);
+    });
+  } catch(e) { showError('Share failed: experiment text too large to encode.'); }
+}
+
+function loadFromHash() {
+  const hash = location.hash;
+  const match = hash.match(/[#&]exp=([^&]+)/);
+  if (!match) return;
+  try {
+    const text = decodeURIComponent(escape(atob(match[1])));
+    lastRawText = text;
+    document.getElementById('output-body').innerHTML = renderMarkdown(text);
+    document.getElementById('output-wrap').classList.add('visible');
+    document.getElementById('output-label').textContent = 'Shared Experiment';
+    document.getElementById('remix-bar').classList.add('visible');
+    showStepButton();
+  } catch(e) {}
+}
+
+// ══════════════════════════════════════════
+// META BADGES
+// ══════════════════════════════════════════
+function showMeta(grade, domain) {
+  const diff = DIFFICULTY[grade] || { label: '⭐⭐ Intermediate', time: '~30 min' };
+  document.getElementById('meta-domain').textContent = DOMAIN_LABELS[domain] || 'General Science';
+  document.getElementById('meta-diff').textContent   = diff.label;
+  document.getElementById('meta-time').textContent   = '⏱ ' + diff.time;
+  document.getElementById('meta-row').style.display  = 'flex';
+}
+
+function showStepButton() {
+  const steps = extractSteps(lastRawText);
+  document.getElementById('step-mode-btn').style.display = steps.length > 1 ? 'block' : 'none';
+}
+
+// ══════════════════════════════════════════
+// CORE API CALL
+// ══════════════════════════════════════════
+async function callOpenAI({ messages, onChunk }) {
+  const model = document.getElementById('model-select').value;
+  const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+    body: JSON.stringify({ model, messages, stream: true }),
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err?.error?.message ?? `OpenAI error ${resp.status}`);
+  }
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let full = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    for (const line of decoder.decode(value).split('\n')) {
+      if (!line.startsWith('data: ') || line === 'data: [DONE]') continue;
+      try {
+        const delta = JSON.parse(line.slice(6)).choices?.[0]?.delta?.content ?? '';
+        full += delta;
+        if (onChunk) onChunk(delta, full);
+      } catch {}
+    }
+  }
+  return full;
+}
+
+// ══════════════════════════════════════════
+// GENERATE
+// ══════════════════════════════════════════
+async function generate() {
+  const grade    = document.getElementById('grade-select').value;
+  const supplies = document.getElementById('supplies-input').value.trim();
+  const errEl    = document.getElementById('error-msg');
+  errEl.classList.remove('show');
+
+  if (!apiKey)   { showError('OpenAI API key not set. Enter your key above.'); return; }
+  if (!supplies) { showError('Please list some available materials first.'); return; }
+
+  setBusy(true);
+
+  const domainClause = currentDomain === 'any' ? '' : ` The experiment must be in the domain of ${DOMAIN_LABELS[currentDomain].replace(/[⚗️⚡🌿🌍🔧]/g,'').trim()}.`;
+
+  const system = `You are an expert science educator. You generate safe, engaging, hands-on science experiments perfectly tailored to a student's grade level. Your experiments use only household materials and follow real scientific concepts. Always include: a clear title, learning objective, materials list, step-by-step instructions, what to observe, and a brief explanation of the science involved. Match vocabulary and complexity exactly to the grade level.`;
+
+  const prompt = `Generate one science experiment for a ${grade} student using some or all of these available household materials: ${supplies}.${domainClause}
+
+The experiment should be safe for ${grade}, genuinely hands-on, and clearly explain the science involved.
+
+Format in clean markdown with exactly these section headers: Title (as # heading), Learning Objective, Materials Needed, Step-by-Step Instructions, What to Observe, The Science Behind It.`;
+
+  const outWrap  = document.getElementById('output-wrap');
+  const outBody  = document.getElementById('output-body');
+  outWrap.classList.add('visible');
+  outBody.innerHTML = '<span class="cursor-blink" style="color:var(--dim)"></span>';
+  document.getElementById('output-label').textContent = grade;
+  document.getElementById('meta-row').style.display = 'none';
+  document.getElementById('remix-bar').classList.remove('visible');
+  document.getElementById('step-mode-btn').style.display = 'none';
+
+  try {
+    const full = await callOpenAI({
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user',   content: prompt },
+      ],
+      onChunk: (_, full) => {
+        outBody.innerHTML = renderMarkdown(full) + '<span class="cursor-blink"></span>';
+      },
+    });
+
+    lastRawText = full;
+    outBody.innerHTML = renderMarkdown(full);
+    showMeta(grade, currentDomain);
+    document.getElementById('remix-bar').classList.add('visible');
+    showStepButton();
+    addToHistory(grade, currentDomain, full);
+
+  } catch (err) {
+    outWrap.classList.remove('visible');
+    showError(err.message);
+  } finally {
+    setBusy(false);
+  }
+}
+
+// ══════════════════════════════════════════
+// REMIX
+// ══════════════════════════════════════════
+async function remix(type) {
+  if (!lastRawText) return;
+  const errEl = document.getElementById('error-msg');
+  errEl.classList.remove('show');
+
+  const instructions = {
+    harder:    'Rewrite this experiment to be significantly more challenging and complex, adding more precise measurements, hypothesis formation, and deeper scientific analysis. Keep the same materials but raise the cognitive level considerably.',
+    easier:    'Simplify this experiment to be much easier and more accessible, with simpler steps and kid-friendly language. Reduce precision requirements and focus on clear, dramatic, observable results.',
+    different: 'Create a completely different experiment using the same materials that demonstrates a different scientific concept or phenomenon. Keep the same format and grade level.',
+    extension: 'Keep the original experiment and add an "Extension Activity" section at the end with 2-3 ways to make the experiment more complex, test further variables, or connect to real-world applications.',
+  };
+
+  setBusy(true);
+
+  const outBody  = document.getElementById('output-body');
+  const outWrap  = document.getElementById('output-wrap');
+  outWrap.classList.add('visible');
+  outBody.innerHTML = '<span class="cursor-blink" style="color:var(--dim)"></span>';
+  document.getElementById('remix-bar').classList.remove('visible');
+  document.getElementById('step-mode-btn').style.display = 'none';
+
+  try {
+    const full = await callOpenAI({
+      messages: [
+        { role: 'user',      content: `Here is a science experiment:\n\n${lastRawText}` },
+        { role: 'assistant', content: 'I understand this experiment. What would you like me to do with it?' },
+        { role: 'user',      content: instructions[type] + '\n\nUse the same markdown format: Title (# heading), Learning Objective, Materials Needed, Step-by-Step Instructions, What to Observe, The Science Behind It.' },
+      ],
+      onChunk: (_, full) => {
+        outBody.innerHTML = renderMarkdown(full) + '<span class="cursor-blink"></span>';
+      },
+    });
+
+    lastRawText = full;
+    outBody.innerHTML = renderMarkdown(full);
+    document.getElementById('remix-bar').classList.add('visible');
+    showStepButton();
+    const grade = document.getElementById('grade-select').value;
+    addToHistory(grade, currentDomain, full);
+
+  } catch (err) {
+    showError(err.message);
+  } finally {
+    setBusy(false);
+  }
+}
+
+// ══════════════════════════════════════════
+// BUSY STATE
+// ══════════════════════════════════════════
+function setBusy(on) {
+  const gen = document.getElementById('gen-btn');
+  const sur = document.getElementById('surprise-btn');
+  gen.disabled = sur.disabled = on;
+  document.querySelectorAll('.remix-btn').forEach(b => b.disabled = on);
+  if (on) {
+    gen.innerHTML = '<span class="loading-dots"><span></span><span></span><span></span></span>';
+    startLoadingMsg();
+  } else {
+    gen.textContent = 'Generate Experiment';
+    stopLoadingMsg();
+  }
+}
+
+// ══════════════════════════════════════════
+// HISTORY
+// ══════════════════════════════════════════
+function addToHistory(grade, domain, text) {
+  const titleMatch = text.match(/^#+ (.+)/m);
+  const title = titleMatch ? titleMatch[1] : 'Experiment';
+  history.unshift({ title, grade, domain, text, time: new Date().toLocaleTimeString() });
+  renderHistory();
+}
+
+function renderHistory() {
+  const section = document.getElementById('history-section');
+  const list    = document.getElementById('history-list');
+  document.getElementById('history-count').textContent = history.length;
+  if (!history.length) { section.classList.remove('visible'); return; }
+  section.classList.add('visible');
+
+  list.innerHTML = history.map((h, i) => {
+    const color = DOMAIN_COLORS[h.domain] || '#e8eaf8';
+    return `
+    <div class="history-card">
+      <div class="history-meta">
+        <span class="history-domain-dot" style="background:${color}"></span>
+        <strong>${escHtml(h.title)}</strong>
+        <span style="margin:0 7px;opacity:.35">|</span>${escHtml(h.grade)}
+        <span style="margin:0 7px;opacity:.35">|</span>${escHtml(h.time)}
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button class="btn-sm" onclick="loadHistory(${i})">Load</button>
+        <button class="del-btn" onclick="deleteHistory(${i})">×</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function loadHistory(i) {
+  const h = history[i];
+  lastRawText = h.text;
+  document.getElementById('output-body').innerHTML = renderMarkdown(h.text);
+  document.getElementById('output-wrap').classList.add('visible');
+  document.getElementById('output-label').textContent = h.grade;
+  document.getElementById('remix-bar').classList.add('visible');
+  showMeta(h.grade, h.domain);
+  showStepButton();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function deleteHistory(i) { history.splice(i, 1); renderHistory(); }
+
+function toggleHistory() {
+  historyOpen = !historyOpen;
+  document.getElementById('history-list').style.display = historyOpen ? 'flex' : 'none';
+  document.getElementById('history-toggle').textContent = historyOpen ? '▲ Hide' : '▼ Show';
+}
+
+// ══════════════════════════════════════════
+// SAVE / COPY / CLEAR / SHARE
+// ══════════════════════════════════════════
+function saveExperiment() {
+  if (!lastRawText) return;
+  const grade = document.getElementById('grade-select').value;
+  const titleMatch = lastRawText.match(/^#+ (.+)/m);
+  const title = titleMatch ? titleMatch[1] : 'Experiment';
+  const blob = new Blob([lastRawText], { type: 'text/markdown' });
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(blob),
+    download: `${title.replace(/[^a-z0-9]/gi,'_').toLowerCase()}.md`,
+  });
+  a.click(); URL.revokeObjectURL(a.href);
+
+  const btn = document.getElementById('save-btn');
+  btn.textContent = '✓ Saved!';
+  btn.style.color = 'var(--green)';
+  setTimeout(() => { btn.textContent = 'Save'; btn.style.color = ''; }, 1800);
+}
+
+function copyOutput() {
+  if (!lastRawText) return;
+  navigator.clipboard.writeText(lastRawText).then(() => {
+    const btn = event.target;
+    const orig = btn.textContent;
+    btn.textContent = '✓ Copied!';
+    setTimeout(() => { btn.textContent = orig; }, 1500);
+  });
+}
+
+function clearAll() {
+  document.getElementById('supplies-input').value = '';
+  document.getElementById('output-wrap').classList.remove('visible');
+  document.getElementById('error-msg').classList.remove('show');
+  lastRawText = '';
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-msg');
+  el.textContent = '⚠ ' + msg;
+  el.classList.add('show');
+}
+
+function escHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ══════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════
+loadFromHash();
+</script>
+</body>
+</html>
